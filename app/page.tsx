@@ -8,7 +8,7 @@ export default function Home() {
 
         <div className="buttons">
           <a href="https://github.com/nerv-bit/nerv/blob/main/NERV_Whitepaper_v1.01.pdf" className="btn primary">Read Whitepaper v1.01</a>
-          <a href="https://github.com/nerv-bit" target="_blank" className="btn secondary">GitHub →</a>
+          <a href="https://github.com/nerv-bit/nerv" target="_blank" className="btn secondary">GitHub →</a>
         </div>
         {/* ←←← THIS IS THE ONLY NEW PARAGRAPH ADDED ←←← */}
         <p className="launch" style={{ marginTop: '2.5rem', maxWidth: '860px', lineHeight: '1.7' }}>
