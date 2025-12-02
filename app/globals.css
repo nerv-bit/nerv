@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Inter', sans-serif; background:#0d1117; color:#c9d1d9; line-height:1.6; }
+a { color:#58a6ff; text-decoration:none; }
+a:hover { text-decoration:underline; }
+
+.hero {
+  min-height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center;
+  text-align:center; padding:2rem; background:radial-gradient(circle at center, #1a1f2e 0%, #0d1117 80%);
+}
+h1 { font-size:7rem; font-weight:800; background:linear-gradient(90deg,#58a6ff,#f97583); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.tagline { font-size:1.8rem; margin:1.5rem 0; color:#8b949e; }
+.launch { font-size:1.2rem; color:#58a6ff; margin-bottom:3rem; }
+
+.buttons { display:flex; gap:1.5rem; flex-wrap:wrap; justify-content:center; }
+.btn { padding:1rem 2rem; border-radius:0.6rem; font-weight:600; font-size:1.1rem; }
+.primary { background:#238636; color:white; }
+.primary:hover { background:#2ea043; }
+.secondary { border:1px solid #30363d; color:#c9d1d9; }
+.secondary:hover { background:#21262d; }
+
+.promise {
+  padding:6rem 2rem; background:#161b22;
+  text-align:center;
+}
+.grid {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:2rem; max-width:1000px; margin:3rem auto;
+  font-size:1.3rem; font-weight:600;
+}
+
+.timeline {
+  padding:6rem 2rem; text-align:center;
+}
+.timeline h2 { font-size:2.2rem; margin-bottom:3rem; }
+.timeline-items {
+  max-width:700px; margin:0 auto; text-align:left; font-size:1.2rem;
+}
+.timeline-items div {
+  padding:1rem 0; border-left:3px solid #30363d; padding-left:1.5rem; margin:1.5rem 0;
+}
+.timeline-items span {
+  background:#238636; color:white; padding:0.2rem 0.6rem; border-radius:0.4rem; font-size:0.9rem; font-weight:600;
+}
+
+.links {
+  padding:6rem 2rem; background:#0d1117; text-align:center;
+}
+.links h2 { font-size:2rem; margin-bottom:3rem; }
+.link-grid {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:1.5rem; max-width:1000px; margin:0 auto;
+}
+.link-grid a {
+  padding:1.5rem; border:1px solid #30363d; border-radius:0.8rem; display:block; background:#161b22;
+}
+.link-grid a:hover { background:#21262d; border-color:#58a6ff; }
+
+footer {
+  padding:4rem 2rem; text-align:center; color:#8b949e; font-size:0.9rem; background:#010409;
+}
+footer p { margin:0.5rem 0; }
