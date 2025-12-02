@@ -10,6 +10,11 @@ export default function Home() {
           <a href="https://github.com/nerv-bit/nerv/blob/main/NERV_Whitepaper_v1.01.pdf" className="btn primary">Read Whitepaper v1.01</a>
           <a href="https://github.com/nerv-bit" target="_blank" className="btn secondary">GitHub →</a>
         </div>
+        {/* ←←← THIS IS THE ONLY NEW PARAGRAPH ADDED ←←← */}
+        <p className="launch" style={{ marginTop: '2.5rem', maxWidth: '860px', lineHeight: '1.7' }}>
+          NERV is the first blockchain that replaces Merkle trees with 512-byte AI embeddings to deliver full privacy, infinite scalability, post-quantum security, and a useful-work economy that pays nodes to make the network itself smarter — 100 % open-source, zero pre-mine, fair launch June 2028
+        </p>
+        {/* ←←← END OF ADDITION ←←← */}
       </div>
 
       <section className="promise">
