@@ -7,7 +7,7 @@ export default function Home() {
         <p className="launch">Fair launch June 2028 • No pre-mine • All code public today</p>
 
         <div className="buttons">
-          <a href="/NERV_Whitepaper_v1.01.pdf" className="btn primary">Read Whitepaper v1.01</a>
+          <a href="https://github.com/nerv-bit/nerv/blob/main/NERV_Whitepaper_v1.01.pdf" className="btn primary">Read Whitepaper v1.01</a>
           <a href="https://github.com/nerv-bit" target="_blank" className="btn secondary">GitHub →</a>
         </div>
       </div>
