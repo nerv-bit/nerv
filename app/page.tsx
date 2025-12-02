@@ -38,7 +38,7 @@ export default function Home() {
           <a href="https://github.com/nerv-bit/formal" target="_blank">Lean 4 Formal Proofs (live)</a>
           <a href="https://github.com/nerv-bit/circuits" target="_blank">Halo2 Circuits</a>
           <a href="https://github.com/nerv-bit/simulations" target="_blank">10 000-node Simulator</a>
-          <a href="mailto:hello@nerv.network">Contact → hello@nerv.network</a>
+          <a href="mailto:NERV.Warriors@gmail.com">Contact → NERV.Warriors@gmail.com</a>
         </div>
       </section>
 
