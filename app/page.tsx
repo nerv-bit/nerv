@@ -4,7 +4,7 @@ export default function Home() {
       <div className="hero">
         <h1>NERV</h1>
         <p className="tagline">The private, post-quantum, infinitely scalable blockchain</p>
-        <p className="launch">Fair launch June 2028 • No pre-mine • All code public today</p>
+        <p className="launch">Fair launch June 2028 • No pre-mine • Epics, user-stories, tasks public today</p>
 
         <div className="buttons">
           <a href="https://github.com/nerv-bit/nerv/blob/main/NERV_Whitepaper_v1.01.pdf" className="btn primary">Read Whitepaper v1.01</a>
@@ -12,7 +12,7 @@ export default function Home() {
         </div>
         {/* ←←← THIS IS THE ONLY NEW PARAGRAPH ADDED ←←← */}
         <p className="launch" style={{ marginTop: '2.5rem', maxWidth: '860px', lineHeight: '1.7' }}>
-          NERV is the first blockchain that replaces Merkle trees with 512-byte AI embeddings to deliver full privacy, infinite scalability, post-quantum security, and a useful-work economy that pays nodes to make the network itself smarter — 100 % open-source, zero pre-mine, fair launch June 2028
+          NERV is the first blockchain that replaces Merkle trees with 512-byte AI embeddings within enclave-bound private nodes to deliver full privacy, infinite scalability, post-quantum security and a useful-work economy that pays nodes to make the network itself smarter — 100 % open-source, zero pre-mine, fair launch June 2028
         </p>
         {/* ←←← END OF ADDITION ←←← */}
       </div>
