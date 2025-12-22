@@ -12,7 +12,7 @@ export default function Home() {
         </div>
         {/* ←←← THIS IS THE ONLY NEW PARAGRAPH ADDED ←←← */}
         <p className="launch" style={{ marginTop: '2.5rem', maxWidth: '860px', lineHeight: '1.7' }}>
-          NERV is the first blockchain that replaces Merkle trees with 512-byte AI embeddings within enclave-bound private nodes to deliver full privacy, infinite scalability, post-quantum security and a useful-work economy that pays nodes to make the network itself smarter — 100 % open-source, zero pre-mine, fair launch June 2028
+          NERV is the first truly private, post-quantum, infinitely scalable L1 blockchain—replacing Merkle trees with verifiable neural state embeddings (Halo2 + Nova), achieving &gt;1M TPS with dynamic sharding, full privacy by default via TEE-bound 5-hop mixing, and a self-improving useful-work economy through federated learning. Fair launch June 2028: zero pre-mine, open-source from day one, community-governed. If you're building/reviewing ZK circuits, TEE privacy, PQ crypto, or the next privacy layer, we'd love your eyes on the whitepaper. Let's build the nervous system of the private internet together!
         </p>
         {/* ←←← END OF ADDITION ←←← */}
       </div>
@@ -43,7 +43,7 @@ export default function Home() {
           <a href="https://github.com/nerv-bit/formal" target="_blank">Lean 4 Formal Proofs (live)</a>
           <a href="https://github.com/nerv-bit/circuits" target="_blank">Halo2 Circuits</a>
           <a href="https://github.com/nerv-bit/simulations" target="_blank">10 000-node Simulator</a>
-          <a href="mailto:NERV.Warriors@gmail.com">Contact → NERV.Warriors@gmail.com</a>
+          <a href="mailto:namsjeev@gmail.com">Contact → namsjeev@gmail.com</a>
         </div>
       </section>
 
