@@ -5,16 +5,33 @@ export default function Home() {
         <h1>NERV</h1>
         <p className="tagline">The private, post-quantum, infinitely scalable blockchain</p>
         <p className="launch">Fair launch June 2028 • No pre-mine • Epics, user-stories, tasks public today</p>
-
         <div className="buttons">
           <a href="https://github.com/nerv-bit/nerv/blob/main/NERV_Whitepaper_v1.01.pdf" className="btn primary">Read Whitepaper v1.01</a>
           <a href="https://github.com/nerv-bit/nerv" target="_blank" className="btn secondary">GitHub →</a>
         </div>
-        {/* ←←← THIS IS THE ONLY NEW PARAGRAPH ADDED ←←← */}
+        {/* Trimmed for scannability */}
         <p className="launch" style={{ marginTop: '2.5rem', maxWidth: '860px', lineHeight: '1.7' }}>
-          NERV is the first truly private, post-quantum, infinitely scalable L1 blockchain—replacing Merkle trees with verifiable neural state embeddings (Halo2 + Nova), achieving &gt;1M TPS with dynamic sharding, full privacy by default via TEE-bound 5-hop mixing, and a self-improving useful-work economy through federated learning. Fair launch June 2028: zero pre-mine, open-source from day one, community-governed. If you're building/reviewing ZK circuits, TEE privacy, PQ crypto, or the next privacy layer, we'd love your eyes on the whitepaper. Let's build the nervous system of the private internet together!
+          NERV delivers full privacy by default (&gt;1M TPS via dynamic neural sharding and verifiable embeddings in Halo2/Nova), post-quantum security from genesis, and a self-improving useful-work economy. Fair launch June 2028: zero pre-mine, fully open-source, community-governed. Join us in building the nervous system of the private internet!
         </p>
-        {/* ←←← END OF ADDITION ←←← */}
+
+        {/* New: Architecture Diagram Section */}
+        <section className="architecture" style={{ margin: '4rem auto', maxWidth: '900px', textAlign: 'center' }}>
+          <h2 style={{ marginBottom: '1.5rem', fontSize: '1.8rem' }}>High-Level Architecture</h2>
+          <img 
+            src="https://cdn.prod.website-files.com/64c231f464b91d6bd0303294/6711029566dc1475c0a37d98_66f258e47f53e2e2341aaae0_66d16bf1edcb81f15215c5b6_66d16b305dedb7e05c1b0920_diagram-export-8-30-2024-12_18_02-PM.png" 
+            alt="NERV Blockchain Architecture: Flow from user wallet through 5-hop TEE mixer, neural state embeddings, dynamic shards, AI-native consensus, to embedding root and VDW receipts"
+            style={{
+              width: '100%',
+              height: 'auto',
+              borderRadius: '12px',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+              border: '1px solid #333'
+            }}
+          />
+          <p style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#aaa' }}>
+            User → 5-hop TEE Mixer → Dynamic Neural Shards → AI-Native Consensus → 512-byte Embedding Root
+          </p>
+        </section>
       </div>
 
       <section className="promise">
