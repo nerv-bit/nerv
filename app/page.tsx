@@ -9,7 +9,7 @@ const Particles = dynamic(
   () => import('@tsparticles/react').then((mod) => mod.Particles),
   {
     ssr: false,
-    loading: () => null, // No fallback needed since we'll handle mounting
+    loading: () => null,
   }
 );
 
@@ -62,10 +62,10 @@ export default function Home() {
         move: {
           enable: true,
           speed: 0.8,
-          direction: 'none' as const,
+          direction: 'none',
           random: false,
           straight: false,
-          outModes: 'bounce' as const,
+          outModes: 'bounce',
         },
         number: {
           density: {
@@ -125,7 +125,7 @@ export default function Home() {
   return (
     <>
       <div className="relative min-h-screen bg-black text-white overflow-hidden">
-        {/* Only render Particles after mount (100% client-side guarantee) */}
+        {/* Neural particle background - only renders on client */}
         {mounted && (
           <Particles
             id="tsparticles"
