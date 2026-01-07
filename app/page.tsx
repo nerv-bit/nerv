@@ -4,7 +4,6 @@ import React, { useCallback, useMemo, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 
-// Dynamic import for Particles (SSR-safe)
 const Particles = dynamic(
   () => import('@tsparticles/react').then((mod) => mod.Particles),
   {
@@ -65,7 +64,9 @@ export default function Home() {
           direction: 'none',
           random: false,
           straight: false,
-          outModes: 'bounce',
+          outModes: {
+            default: 'bounce',
+          },
         },
         number: {
           density: {
