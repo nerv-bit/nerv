@@ -15,9 +15,10 @@ const Particles = dynamic(
 );
 
 export default function Home() {
-  const particlesInit = useCallback(async (engine: any) => {
-    await loadSlim(engine);
-  }, []);
+ const particlesInit = useCallback(async (engine: any) => {
+  const { loadSlim } = await import("@tsparticles/slim");
+  await loadSlim(engine);
+}, []);
 
   const particlesOptions = useMemo(
     () => ({
