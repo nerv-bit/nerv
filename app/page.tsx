@@ -1,24 +1,29 @@
 'use client';
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
-import { loadSlim } from '@tsparticles/slim';
 
-// Dynamic import for tsParticles (prevents SSR issues)
+// Dynamic import for Particles (SSR-safe)
 const Particles = dynamic(
   () => import('@tsparticles/react').then((mod) => mod.Particles),
   {
     ssr: false,
-    loading: () => <div className="absolute inset-0 bg-black" />,
+    loading: () => null, // No fallback needed since we'll handle mounting
   }
 );
 
 export default function Home() {
- const particlesInit = useCallback(async (engine: any) => {
-  const { loadSlim } = await import("@tsparticles/slim");
-  await loadSlim(engine);
-}, []);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const particlesInit = useCallback(async (engine: any) => {
+    const { loadSlim } = await import("@tsparticles/slim");
+    await loadSlim(engine);
+  }, []);
 
   const particlesOptions = useMemo(
     () => ({
@@ -92,7 +97,6 @@ export default function Home() {
     []
   );
 
-  // Framer Motion variants (unchanged)
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -121,13 +125,15 @@ export default function Home() {
   return (
     <>
       <div className="relative min-h-screen bg-black text-white overflow-hidden">
-        {/* Neural background particles */}
-        <Particles
-          id="tsparticles"
-          init={particlesInit}
-          options={particlesOptions}
-          className="absolute inset-0 -z-10"
-        />
+        {/* Only render Particles after mount (100% client-side guarantee) */}
+        {mounted && (
+          <Particles
+            id="tsparticles"
+            init={particlesInit}
+            options={particlesOptions}
+            className="absolute inset-0 -z-10"
+          />
+        )}
 
         <div className="hero relative z-10 py-20 px-8 text-center">
           <motion.div
@@ -178,7 +184,6 @@ export default function Home() {
             </motion.p>
           </motion.div>
 
-          {/* Architecture Section */}
           <motion.section
             variants={sectionVariants}
             initial="offscreen"
@@ -199,7 +204,6 @@ export default function Home() {
           </motion.section>
         </div>
 
-        {/* Rest of sections unchanged except adding glow-pulse classes */}
         <motion.section variants={sectionVariants} initial="offscreen" whileInView="onscreen" viewport={{ once: true }} className="promise py-20 text-center">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto text-xl font-medium">
             <motion.div variants={childVariants}>Privacy by default</motion.div>
