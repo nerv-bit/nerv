@@ -1,102 +1,11 @@
-'use client';
-
-import React, { useCallback, useMemo, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 
-// Dynamic import for Particles (SSR-safe)
-const Particles = dynamic(
-  () => import('@tsparticles/react').then((mod) => mod.Particles),
-  {
-    ssr: false,
-    loading: () => null,
-  }
-);
+const ParticlesComponent = dynamic(() => import('./ParticlesComponent'), {
+  ssr: false,
+});
 
 export default function Home() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const particlesInit = useCallback(async (engine: any) => {
-    const { loadSlim } = await import("@tsparticles/slim");
-    await loadSlim(engine);
-  }, []);
-
-  const particlesOptions = useMemo(
-    () => ({
-      background: {
-        color: {
-          value: '#000000',
-        },
-      },
-      fpsLimit: 120,
-      interactivity: {
-        events: {
-          onHover: {
-            enable: true,
-            mode: 'repulse',
-          },
-          resize: { enable: true },
-        },
-        modes: {
-          repulse: {
-            distance: 150,
-            duration: 0.4,
-          },
-        },
-      },
-      particles: {
-        color: {
-          value: ['#00ffff', '#8a2be2', '#ffffff'],
-        },
-        links: {
-          color: '#00ffff',
-          distance: 180,
-          enable: true,
-          opacity: 0.4,
-          width: 1,
-        },
-        move: {
-          enable: true,
-          speed: 0.8,
-          direction: 'none',
-          random: false,
-          straight: false,
-          outModes: 'bounce',
-        },
-        number: {
-          density: {
-            enable: true,
-            area: 1000,
-          },
-          value: 100,
-        },
-        opacity: {
-          value: { min: 0.1, max: 0.6 },
-          random: true,
-          animation: {
-            enable: true,
-            speed: 1,
-            minimumValue: 0.1,
-            sync: false,
-          },
-        },
-        shape: {
-          type: 'circle',
-        },
-        size: {
-          value: { min: 1, max: 4 },
-          random: true,
-        },
-      },
-      detectRetina: true,
-    }),
-    []
-  );
-
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -125,15 +34,7 @@ export default function Home() {
   return (
     <>
       <div className="relative min-h-screen bg-black text-white overflow-hidden">
-        {/* Neural particle background - only renders on client */}
-        {mounted && (
-          <Particles
-            id="tsparticles"
-            init={particlesInit}
-            options={particlesOptions}
-            className="absolute inset-0 -z-10"
-          />
-        )}
+        <ParticlesComponent />
 
         <div className="hero relative z-10 py-20 px-8 text-center">
           <motion.div
