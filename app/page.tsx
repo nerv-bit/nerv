@@ -1,9 +1,18 @@
 'use client';
 
 import React, { useCallback, useMemo } from 'react';
-import Particles from '@tsparticles/react';
-import { loadSlim } from '@tsparticles/slim';
+import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
+import { loadSlim } from '@tsparticles/slim';
+
+// Dynamic import for tsParticles (prevents SSR issues)
+const Particles = dynamic(
+  () => import('@tsparticles/react').then((mod) => mod.Particles),
+  {
+    ssr: false,
+    loading: () => <div className="absolute inset-0 bg-black" />,
+  }
+);
 
 export default function Home() {
   const particlesInit = useCallback(async (engine: any) => {
@@ -35,7 +44,7 @@ export default function Home() {
       },
       particles: {
         color: {
-          value: ['#00ffff', '#8a2be2', '#ffffff'], // Cyan, purple (crypto lattice vibe), white
+          value: ['#00ffff', '#8a2be2', '#ffffff'],
         },
         links: {
           color: '#00ffff',
@@ -82,6 +91,7 @@ export default function Home() {
     []
   );
 
+  // Framer Motion variants (unchanged)
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -110,44 +120,13 @@ export default function Home() {
   return (
     <>
       <div className="relative min-h-screen bg-black text-white overflow-hidden">
-        {/* Neural/breathing background – pulsing opacity + connections evoke living nervous system + latent embeddings */}
+        {/* Neural background particles */}
         <Particles
           id="tsparticles"
           init={particlesInit}
           options={particlesOptions}
           className="absolute inset-0 -z-10"
         />
-
-        {/* Subtle global glow keyframes for crypto/neural feel */}
-        <style jsx global>{`
-          @keyframes glowPulse {
-            0%, 100% {
-              text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
-            }
-            50% {
-              text-shadow: 0 0 30px rgba(0, 255, 255, 0.8), 0 0 40px rgba(138, 43, 226, 0.5);
-            }
-          }
-          @keyframes shadowPulse {
-            0%, 100% {
-              box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
-            }
-            50% {
-              box-shadow: 0 0 40px rgba(0, 255, 255, 0.6);
-            }
-          }
-          .glow-pulse {
-            animation: glowPulse 6s infinite;
-          }
-          .btn-primary:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 10px 30px rgba(0, 255, 255, 0.4);
-          }
-          .btn-secondary:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 10px 30px rgba(138, 43, 226, 0.4);
-          }
-        `}</style>
 
         <div className="hero relative z-10 py-20 px-8 text-center">
           <motion.div
@@ -172,7 +151,7 @@ export default function Home() {
             <motion.div variants={childVariants} className="buttons flex flex-col sm:flex-row gap-6 justify-center mb-16">
               <motion.a
                 href="https://github.com/nerv-bit/nerv/blob/main/NERV_Whitepaper_v1.01.pdf"
-                className="btn primary bg-cyan-500 hover:bg-cyan-400 text-black font-semibold py-4 px-8 rounded-lg transition"
+                className="btn primary bg-cyan-500 hover:bg-cyan-400 text-black font-semibold py-4 px-8 rounded-lg transition btn-primary"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -198,7 +177,7 @@ export default function Home() {
             </motion.p>
           </motion.div>
 
-          {/* Architecture Diagram Section */}
+          {/* Architecture Section */}
           <motion.section
             variants={sectionVariants}
             initial="offscreen"
@@ -209,9 +188,8 @@ export default function Home() {
             <h2 className="text-4xl font-bold mb-8 glow-pulse">High-Level Architecture</h2>
             <motion.img
               src="https://cdn.prod.website-files.com/64c231f464b91d6bd0303294/6711029566dc1475c0a37d98_66f258e47f53e2e2341aaae0_66d16bf1edcb81f15215c5b6_66d16b305dedb7e05c1b0920_diagram-export-8-30-2024-12_18_02-PM.png"
-              alt="NERV Blockchain Architecture: Flow from user wallet through 5-hop TEE mixer, neural state embeddings, dynamic shards, AI-native consensus, to embedding root and VDW receipts"
-              className="w-full rounded-xl"
-              style={{ boxShadow: '0 10px 30px rgba(0,0,0,0.5)', animation: 'shadowPulse 8s infinite' }}
+              alt="NERV Blockchain Architecture"
+              className="w-full rounded-xl shadow-pulse"
               whileHover={{ scale: 1.02 }}
             />
             <p className="mt-4 text-sm opacity-70">
@@ -220,13 +198,8 @@ export default function Home() {
           </motion.section>
         </div>
 
-        <motion.section
-          variants={sectionVariants}
-          initial="offscreen"
-          whileInView="onscreen"
-          viewport={{ once: true }}
-          className="promise py-20 text-center"
-        >
+        {/* Rest of sections unchanged except adding glow-pulse classes */}
+        <motion.section variants={sectionVariants} initial="offscreen" whileInView="onscreen" viewport={{ once: true }} className="promise py-20 text-center">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto text-xl font-medium">
             <motion.div variants={childVariants}>Privacy by default</motion.div>
             <motion.div variants={childVariants}>1 M+ TPS target</motion.div>
@@ -235,13 +208,7 @@ export default function Home() {
           </div>
         </motion.section>
 
-        <motion.section
-          variants={sectionVariants}
-          initial="offscreen"
-          whileInView="onscreen"
-          viewport={{ once: true }}
-          className="timeline py-20 text-center"
-        >
+        <motion.section variants={sectionVariants} initial="offscreen" whileInView="onscreen" viewport={{ once: true }} className="timeline py-20 text-center">
           <h2 className="text-4xl font-bold mb-12 glow-pulse">Road to Mainnet (100% transparent)</h2>
           <div className="timeline-items max-w-2xl mx-auto text-lg space-y-6">
             <motion.div variants={childVariants}><span className="font-bold">Dec 2025</span> Whitepaper + all code & proofs public</motion.div>
@@ -251,13 +218,7 @@ export default function Home() {
           </div>
         </motion.section>
 
-        <motion.section
-          variants={sectionVariants}
-          initial="offscreen"
-          whileInView="onscreen"
-          viewport={{ once: true }}
-          className="links py-20 text-center"
-        >
+        <motion.section variants={sectionVariants} initial="offscreen" whileInView="onscreen" viewport={{ once: true }} className="links py-20 text-center">
           <h2 className="text-4xl font-bold mb-12 glow-pulse">Join the nervous system</h2>
           <div className="link-grid max-w-4xl mx-auto grid md:grid-cols-2 gap-6 text-lg">
             <motion.a href="https://github.com/nerv-bit" target="_blank" className="hover:text-cyan-400 transition" variants={childVariants}>GitHub Organization (10+ repos)</motion.a>
