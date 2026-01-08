@@ -11,15 +11,16 @@ const NeuralBackground = ({ isActive }) => {
     let animationId;
     let particles = [];
 
+    // Initialize canvas size
     const resize = () => {
-      canvas.width = canvas.clientWidth;
-      canvas.height = canvas.clientHeight;
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
       initParticles();
     };
 
     const initParticles = () => {
       particles = [];
-      const count = Math.min(40, (canvas.width * canvas.height) / 15000);
+      const count = Math.min(40, (window.innerWidth * window.innerHeight) / 15000);
       for (let i = 0; i < count; i++) {
         particles.push({
           x: Math.random() * canvas.width,
@@ -35,7 +36,7 @@ const NeuralBackground = ({ isActive }) => {
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (isActive) {
-        // Draw connections (neural network effect)
+        // Draw connections
         for (let i = 0; i < particles.length; i++) {
           for (let j = i + 1; j < particles.length; j++) {
             const dx = particles[i].x - particles[j].x;
@@ -52,6 +53,7 @@ const NeuralBackground = ({ isActive }) => {
           }
         }
       }
+      
       // Update & draw particles
       particles.forEach(p => {
         p.x += p.speedX;
@@ -79,8 +81,16 @@ const NeuralBackground = ({ isActive }) => {
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 z-0 w-full h-full pointer-events-none"
-      style={{ opacity: isActive ? 0.8 : 0.2, transition: 'opacity 1.2s ease' }}
+      className="fixed inset-0 w-screen h-screen z-0 pointer-events-none"
+      style={{ 
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        opacity: isActive ? 0.8 : 0.2,
+        transition: 'opacity 1.2s ease'
+      }}
     />
   );
 };
