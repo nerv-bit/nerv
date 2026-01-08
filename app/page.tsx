@@ -12,12 +12,12 @@ export default function Home() {
       {/* Interactive Neural Background */}
       <NeuralBackground isActive={heroHovered} />
 
-      {/* Main Content Container - Adjusted for higher hero placement */}
-      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8">
+      {/* Main Content Container - SIGNIFICANTLY LESS TOP PADDING */}
+      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-8">
         
-        {/* HERO SECTION - Positioned higher with less top spacing */}
+        {/* HERO SECTION - POSITIONED MUCH HIGHER */}
         <section 
-          className="min-h-[70vh] flex flex-col justify-start items-center text-center mt-8 md:mt-12"
+          className="min-h-[50vh] flex flex-col justify-start items-center text-center"
           onMouseEnter={() => setHeroHovered(true)}
           onMouseLeave={() => setHeroHovered(false)}
         >
@@ -27,8 +27,8 @@ export default function Home() {
           <div className="crypto-icon absolute left-[15%] bottom-1/3 text-xl opacity-0">{`{ }`}</div>
           <div className="crypto-icon absolute right-[15%] bottom-1/4 text-3xl opacity-0">🛡️</div>
 
-          {/* Glass Hero Block - Higher on page */}
-          <div className="glass-hero mt-8 md:mt-12">
+          {/* Glass Hero Block - MINIMAL TOP MARGIN */}
+          <div className="glass-hero mt-2 md:mt-4">
             <h1 className="text-7xl md:text-9xl font-bold mb-2 tracking-tighter">
               NERV
             </h1>
@@ -65,8 +65,8 @@ export default function Home() {
           </div>
         </section>
 
-        {/* HIGH-LEVEL ARCHITECTURE SECTION */}
-        <section className="architecture mt-16 max-w-6xl mx-auto text-center">
+        {/* HIGH-LEVEL ARCHITECTURE SECTION - Adjusted spacing */}
+        <section className="architecture mt-8 max-w-6xl mx-auto text-center">
           <h2 className="text-4xl font-bold mb-8">High-Level Architecture</h2>
           <div className="w-full rounded-xl overflow-hidden shadow-lg">
             <Image 
@@ -84,9 +84,9 @@ export default function Home() {
         </section>
 
         {/* CORE INNOVATIONS SECTION */}
-        <section className="promise py-16 text-center max-w-5xl mx-auto">
-          <h2 className="text-4xl font-bold mb-12">Core Pillars of NERV</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <section className="promise py-12 text-center max-w-5xl mx-auto">
+          <h2 className="text-4xl font-bold mb-8">Core Pillars of NERV</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="neural-card p-6">
               <div className="text-4xl mb-4">🧠</div>
               <h3 className="text-xl font-bold mb-3 gradient-text">Live, Breathing System</h3>
@@ -105,10 +105,10 @@ export default function Home() {
           </div>
         </section>
 
-        {/* TIMELINE SECTION - From Original */}
-        <section className="timeline py-16 text-center max-w-4xl mx-auto">
-          <h2 className="text-4xl font-bold mb-12">Road to Mainnet (100% transparent)</h2>
-          <div className="timeline-items max-w-2xl mx-auto text-lg space-y-6">
+        {/* TIMELINE SECTION */}
+        <section className="timeline py-12 text-center max-w-4xl mx-auto">
+          <h2 className="text-4xl font-bold mb-8">Road to Mainnet (100% transparent)</h2>
+          <div className="timeline-items max-w-2xl mx-auto text-lg space-y-4">
             <div><span className="font-bold">Dec 2025</span> Whitepaper + all code & proofs public</div>
             <div><span className="font-bold">Q1 2026</span> First multi-vendor TEE mixer testnet</div>
             <div><span className="font-bold">Q2 2026</span> Aurora public testnet (real metrics published)</div>
@@ -116,20 +116,20 @@ export default function Home() {
           </div>
         </section>
 
-        {/* LINKS SECTION - From Original */}
-        <section className="links py-16 text-center max-w-4xl mx-auto">
-          <h2 className="text-4xl font-bold mb-12">Join the nervous system</h2>
-          <div className="link-grid max-w-4xl mx-auto grid md:grid-cols-2 gap-6 text-lg">
-            <a href="https://github.com/nerv-bit" target="_blank" className="hover:text-cyan-400 transition">GitHub Organization (10+ repos)</a>
-            <a href="https://github.com/nerv-bit/formal" target="_blank" className="hover:text-cyan-400 transition">Lean 4 Formal Proofs (live)</a>
-            <a href="https://github.com/nerv-bit/circuits" target="_blank" className="hover:text-cyan-400 transition">Halo2 Circuits</a>
-            <a href="https://github.com/nerv-bit/simulations" target="_blank" className="hover:text-cyan-400 transition">10 000-node Simulator</a>
-            <a href="mailto:namsjeev@gmail.com" className="hover:text-cyan-400 transition">Contact → namsjeev@gmail.com</a>
+        {/* LINKS SECTION */}
+        <section className="links py-12 text-center max-w-4xl mx-auto">
+          <h2 className="text-4xl font-bold mb-8">Join the nervous system</h2>
+          <div className="link-grid max-w-4xl mx-auto grid md:grid-cols-2 gap-4 text-lg">
+            <a href="https://github.com/nerv-bit" target="_blank" className="hover:text-cyan-400 transition p-3">GitHub Organization (10+ repos)</a>
+            <a href="https://github.com/nerv-bit/formal" target="_blank" className="hover:text-cyan-400 transition p-3">Lean 4 Formal Proofs (live)</a>
+            <a href="https://github.com/nerv-bit/circuits" target="_blank" className="hover:text-cyan-400 transition p-3">Halo2 Circuits</a>
+            <a href="https://github.com/nerv-bit/simulations" target="_blank" className="hover:text-cyan-400 transition p-3">10 000-node Simulator</a>
+            <a href="mailto:namsjeev@gmail.com" className="hover:text-cyan-400 transition p-3">Contact → namsjeev@gmail.com</a>
           </div>
         </section>
 
-        {/* FOOTER - From Original */}
-        <footer className="py-12 text-center text-sm opacity-70 border-t border-gray-800 mt-8">
+        {/* FOOTER */}
+        <footer className="py-8 text-center text-sm opacity-70 border-t border-gray-800 mt-8">
           <p>© 2025–2028 NERV • All specifications, code, and proofs are MIT/Apache 2.0 or public domain</p>
           <p>No tokens exist yet • No private sales • No foundation treasury</p>
         </footer>
