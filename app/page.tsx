@@ -19,7 +19,7 @@ export default function Home() {
         
         {/* HERO SECTION - ABSOLUTELY POSITIONED AT THE TOP */}
         <section 
-          className="absolute top-4 left-1/2 transform -translate-x-1/2 w-full max-w-5xl px-4 text-center"
+          className="absolute top-[10vh] left-1/2 transform -translate-x-1/2 w-full max-w-5xl px-4 text-center"
           onMouseEnter={() => setHeroHovered(true)}
           onMouseLeave={() => setHeroHovered(false)}
         >
