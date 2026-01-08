@@ -58,8 +58,8 @@ export default function Home() {
             </a>
           </div>
 
-          <p className="mt-8 text-lg leading-relaxed opacity-90 max-w-3xl mx-auto">
-            <span className="gradient-text font-semibold">NERV</span> delivers full privacy by default (&gt;1M TPS via dynamic neural sharding and verifiable embeddings in Halo2/Nova), post-quantum security from genesis, and a self-improving useful-work economy. Fair launch June 2028: zero pre-mine, fully open-source, community-governed. Join us in building the <span className="gradient-text font-semibold">nervous system of the private internet</span>!
+          <p className="mt-10 text-lg leading-relaxed opacity-90 max-w-3xl mx-auto">
+            <span className="gradient-text font-semibold">NERV</span> delivers full privacy by default  via TEE-bound 5-hop mixing (&gt;1M TPS via dynamic neural sharding and verifiable embeddings in Halo2/Nova), post-quantum security from genesis, and a self-improving useful-work economy. Fair launch June 2028: zero pre-mine, fully open-source, community-governed. Join us in building the <span className="gradient-text font-semibold">nervous system of the private internet</span>!
           </p>
         </div>
       </section>
