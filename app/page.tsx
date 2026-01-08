@@ -67,23 +67,31 @@ export default function Home() {
       {/* MAIN CONTENT - Pushed down to avoid hero overlap */}
       <div className="relative z-10 pt-[480px] md:pt-[520px]">
         
-        {/* HIGH-LEVEL ARCHITECTURE SECTION */}
-        <section className="architecture max-w-6xl mx-auto text-center px-4">
-          <h2 className="text-4xl font-bold mb-8">High-Level Architecture</h2>
-          <div className="w-full rounded-xl overflow-hidden shadow-lg">
-            <Image 
-              src="https://cdn.prod.website-files.com/64c231f464b91d6bd0303294/6711029566dc1475c0a37d98_66f258e47f53e2e2341aaae0_66d16bf1edcb81f15215c5b6_66d16b305dedb7e05c1b0920_diagram-export-8-30-2024-12_18_02-PM.png"
-              alt="NERV Blockchain Architecture"
-              width={1200}
-              height={600}
-              className="w-full h-auto"
-              unoptimized
-            />
-          </div>
-          <p className="mt-4 text-sm opacity-70">
-            User → 5-hop TEE Mixer → Dynamic Neural Shards → AI-Native Consensus → 512-byte Embedding Root
-          </p>
-        </section>
+    {/* HIGH-LEVEL ARCHITECTURE SECTION - Fixed for mobile */}
+<section className="architecture max-w-6xl mx-auto text-center px-4">
+  <h2 className="text-3xl md:text-4xl font-bold mb-6 md:mb-8">High-Level Architecture</h2>
+  
+  <div className="w-full rounded-xl overflow-hidden shadow-lg bg-black bg-opacity-30">
+    {/* Responsive container with proper aspect ratio */}
+    <div className="relative w-full aspect-[16/9] md:aspect-[2/1]">
+      <Image 
+        src="https://cdn.prod.website-files.com/64c231f464b91d6bd0303294/6711029566dc1475c0a37d98_66f258e47f53e2e2341aaae0_66d16bf1edcb81f15215c5b6_66d16b305dedb7e05c1b0920_diagram-export-8-30-2024-12_18_02-PM.png"
+        alt="NERV Blockchain Architecture Diagram showing: User → 5-hop TEE Mixer → Dynamic Neural Shards → AI-Native Consensus → 512-byte Embedding Root"
+        fill
+        style={{ 
+          objectFit: 'contain',
+          objectPosition: 'center',
+        }}
+        sizes="(max-width: 768px) 100vw, 1200px"
+        className="rounded-lg p-2 md:p-4"
+        unoptimized
+      />
+    </div>
+    <p className="mt-3 md:mt-4 text-xs md:text-sm opacity-70 px-2">
+      User → 5-hop TEE Mixer → Dynamic Neural Shards → AI-Native Consensus → 512-byte Embedding Root
+    </p>
+  </div>
+</section>
 
         {/* CORE INNOVATIONS SECTION */}
         <section className="promise py-12 text-center max-w-5xl mx-auto px-4">
