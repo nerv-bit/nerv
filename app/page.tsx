@@ -12,12 +12,12 @@ export default function Home() {
       {/* Interactive Neural Background */}
       <NeuralBackground isActive={heroHovered} />
 
-      {/* Main Content Container - SIGNIFICANTLY LESS TOP PADDING */}
-      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-8">
+      {/* Main Content Container - NO TOP PADDING */}
+      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 pt-0 pb-8">
         
-        {/* HERO SECTION - POSITIONED MUCH HIGHER */}
+        {/* HERO SECTION - MUCH HIGHER POSITION */}
         <section 
-          className="min-h-[50vh] flex flex-col justify-start items-center text-center"
+          className="min-h-[30vh] flex flex-col justify-start items-center text-center -mt-8"
           onMouseEnter={() => setHeroHovered(true)}
           onMouseLeave={() => setHeroHovered(false)}
         >
@@ -27,8 +27,8 @@ export default function Home() {
           <div className="crypto-icon absolute left-[15%] bottom-1/3 text-xl opacity-0">{`{ }`}</div>
           <div className="crypto-icon absolute right-[15%] bottom-1/4 text-3xl opacity-0">🛡️</div>
 
-          {/* Glass Hero Block - MINIMAL TOP MARGIN */}
-          <div className="glass-hero mt-2 md:mt-4">
+          {/* Glass Hero Block - NO TOP MARGIN */}
+          <div className="glass-hero mt-0">
             <h1 className="text-7xl md:text-9xl font-bold mb-2 tracking-tighter">
               NERV
             </h1>
@@ -65,8 +65,8 @@ export default function Home() {
           </div>
         </section>
 
-        {/* HIGH-LEVEL ARCHITECTURE SECTION - Adjusted spacing */}
-        <section className="architecture mt-8 max-w-6xl mx-auto text-center">
+        {/* HIGH-LEVEL ARCHITECTURE SECTION - Adjusted for higher hero */}
+        <section className="architecture mt-2 max-w-6xl mx-auto text-center">
           <h2 className="text-4xl font-bold mb-8">High-Level Architecture</h2>
           <div className="w-full rounded-xl overflow-hidden shadow-lg">
             <Image 
