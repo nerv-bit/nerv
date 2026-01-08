@@ -1,5 +1,5 @@
 import dynamic from 'next/dynamic';
-import { motion } from 'framer-motion';
+import { animated, useSpring, config } from '@react-spring/web';
 import Image from 'next/image';
 
 const ParticlesComponent = dynamic(() => import('./ParticlesComponent'), {
