@@ -86,7 +86,8 @@ export default function Home() {
           ))}
         </div>
 
-        <div className="hero relative z-10 py-20 px-8 text-center">
+        {/* HERO SECTION - FIXED PADDING (less top padding) */}
+        <div className="hero relative z-10 pt-12 pb-20 px-8 text-center">
           <motion.div
             variants={containerVariants}
             initial="hidden"
@@ -201,12 +202,13 @@ export default function Home() {
             </motion.p>
           </motion.div>
 
+          {/* ARCHITECTURE SECTION - FIXED LARGER CONTAINER */}
           <motion.section
             variants={sectionVariants}
             initial="offscreen"
             whileInView="onscreen"
             viewport={{ once: true, amount: 0.3 }}
-            className="architecture mt-32 max-w-5xl mx-auto text-center"
+            className="architecture mt-24 max-w-6xl mx-auto text-center"
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -220,29 +222,46 @@ export default function Home() {
                 </span>
               </h2>
               
-              {/* Fixed Architecture Diagram */}
               <motion.div 
-                className="w-full relative rounded-xl overflow-hidden border border-cyan-500 border-opacity-30 bg-gradient-to-br from-black to-cyan-900 bg-opacity-20 p-4"
+                className="w-full relative rounded-xl overflow-hidden border border-cyan-500 border-opacity-30 bg-gradient-to-br from-black to-cyan-900 bg-opacity-20 p-6"
                 whileHover={{ scale: 1.01 }}
               >
-                <div className="relative h-[500px] w-full">
+                <div className="relative h-[600px] md:h-[700px] w-full bg-black bg-opacity-50 rounded-lg">
                   <Image 
                     src="https://cdn.prod.website-files.com/64c231f464b91d6bd0303294/6711029566dc1475c0a37d98_66f258e47f53e2e2341aaae0_66d16bf1edcb81f15215c5b6_66d16b305dedb7e05c1b0920_diagram-export-8-30-2024-12_18_02-PM.png"
                     alt="NERV Blockchain Architecture Diagram showing: User → 5-hop TEE Mixer → Dynamic Neural Shards → AI-Native Consensus → 512-byte Embedding Root"
                     fill
-                    style={{ objectFit: 'contain' }}
-                    sizes="(max-width: 768px) 100vw, 800px"
+                    style={{ objectFit: 'contain', padding: '20px' }}
+                    sizes="(max-width: 768px) 100vw, 1200px"
                     priority
                     className="rounded-lg"
+                    unoptimized={true}
                   />
                 </div>
+                
                 <motion.div 
-                  className="mt-4 text-sm opacity-70 border-t border-cyan-500 border-opacity-20 pt-4"
+                  className="mt-6 text-base opacity-90 border-t border-cyan-500 border-opacity-20 pt-6"
                   initial={{ opacity: 0 }}
                   whileInView={{ opacity: 1 }}
                   transition={{ delay: 0.3 }}
                 >
-                  <span className="text-cyan-400">User</span> → <span className="text-purple-400">5-hop TEE Mixer</span> → <span className="text-green-400">Dynamic Neural Shards</span> → <span className="text-yellow-400">AI-Native Consensus</span> → <span className="text-cyan-400">512-byte Embedding Root</span>
+                  <div className="flex flex-wrap justify-center items-center gap-2 md:gap-4">
+                    {[
+                      { label: "User", color: "text-cyan-400" },
+                      { label: "→", color: "text-gray-400" },
+                      { label: "5-hop TEE Mixer", color: "text-purple-400" },
+                      { label: "→", color: "text-gray-400" },
+                      { label: "Dynamic Neural Shards", color: "text-green-400" },
+                      { label: "→", color: "text-gray-400" },
+                      { label: "AI-Native Consensus", color: "text-yellow-400" },
+                      { label: "→", color: "text-gray-400" },
+                      { label: "512-byte Embedding Root", color: "text-cyan-400" }
+                    ].map((item, index) => (
+                      <span key={index} className={`font-medium ${item.color}`}>
+                        {item.label}
+                      </span>
+                    ))}
+                  </div>
                 </motion.div>
               </motion.div>
             </motion.div>
@@ -304,7 +323,6 @@ export default function Home() {
           </div>
         </motion.section>
 
-        {/* Rest of your sections remain the same */}
         <motion.section 
           variants={sectionVariants} 
           initial="offscreen" 
@@ -337,7 +355,6 @@ export default function Home() {
           </div>
         </motion.section>
 
-        {/* Links and Footer sections remain similar to before */}
         <motion.section 
           variants={sectionVariants} 
           initial="offscreen" 
