@@ -1,5 +1,6 @@
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 
 const ParticlesComponent = dynamic(() => import('./ParticlesComponent'), {
   ssr: false,
@@ -76,10 +77,38 @@ export default function Home() {
               </motion.a>
             </motion.div>
 
+            <div className="image-section flex flex-col md:flex-row gap-8 justify-center items-center mt-12">
+              <motion.div 
+                variants={childVariants}
+                className="w-full md:w-1/2 h-64 md:h-80 relative"
+              >
+                <Image 
+                  src="/hero.svg" 
+                  alt="Hero" 
+                  fill
+                  style={{ objectFit: 'contain' }}
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  priority
+                />
+              </motion.div>
+              <motion.div 
+                variants={childVariants}
+                className="w-full md:w-1/2 h-64 md:h-80 relative"
+              >
+                <Image 
+                  src="/hero2.svg" 
+                  alt="Hero 2" 
+                  fill
+                  style={{ objectFit: 'contain' }}
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  priority
+                />
+              </motion.div>
+            </div>
+
             <motion.p
               variants={childVariants}
-              className="launch max-w-3xl mx-auto text-lg leading-relaxed opacity-90"
-              style={{ marginTop: '2.5rem' }}
+              className="launch max-w-3xl mx-auto text-lg leading-relaxed opacity-90 mt-12"
             >
               NERV delivers full privacy by default (&gt;1M TPS via dynamic neural sharding and verifiable embeddings in Halo2/Nova), post-quantum security from genesis, and a self-improving useful-work economy. Fair launch June 2028: zero pre-mine, fully open-source, community-governed. Join us in building the nervous system of the private internet!
             </motion.p>
@@ -93,19 +122,31 @@ export default function Home() {
             className="architecture mt-32 max-w-5xl mx-auto text-center"
           >
             <h2 className="text-4xl font-bold mb-8 glow-pulse">High-Level Architecture</h2>
-            <motion.img
-              src="https://cdn.prod.website-files.com/64c231f464b91d6bd0303294/6711029566dc1475c0a37d98_66f258e47f53e2e2341aaae0_66d16bf1edcb81f15215c5b6_66d16b305dedb7e05c1b0920_diagram-export-8-30-2024-12_18_02-PM.png"
-              alt="NERV Blockchain Architecture"
-              className="w-full rounded-xl shadow-pulse"
+            <motion.div 
+              className="w-full relative h-96 rounded-xl overflow-hidden shadow-pulse"
               whileHover={{ scale: 1.02 }}
-            />
+            >
+              <Image 
+                src="https://cdn.prod.website-files.com/64c231f464b91d6bd0303294/6711029566dc1475c0a37d98_66f258e47f53e2e2341aaae0_66d16bf1edcb81f15215c5b6_66d16b305dedb7e05c1b0920_diagram-export-8-30-2024-12_18_02-PM.png"
+                alt="NERV Blockchain Architecture"
+                fill
+                style={{ objectFit: 'cover' }}
+                sizes="100vw"
+              />
+            </motion.div>
             <p className="mt-4 text-sm opacity-70">
               User → 5-hop TEE Mixer → Dynamic Neural Shards → AI-Native Consensus → 512-byte Embedding Root
             </p>
           </motion.section>
         </div>
 
-        <motion.section variants={sectionVariants} initial="offscreen" whileInView="onscreen" viewport={{ once: true }} className="promise py-20 text-center">
+        <motion.section 
+          variants={sectionVariants} 
+          initial="offscreen" 
+          whileInView="onscreen" 
+          viewport={{ once: true }} 
+          className="promise py-20 text-center"
+        >
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto text-xl font-medium">
             <motion.div variants={childVariants}>Privacy by default</motion.div>
             <motion.div variants={childVariants}>1 M+ TPS target</motion.div>
@@ -114,7 +155,13 @@ export default function Home() {
           </div>
         </motion.section>
 
-        <motion.section variants={sectionVariants} initial="offscreen" whileInView="onscreen" viewport={{ once: true }} className="timeline py-20 text-center">
+        <motion.section 
+          variants={sectionVariants} 
+          initial="offscreen" 
+          whileInView="onscreen" 
+          viewport={{ once: true }} 
+          className="timeline py-20 text-center"
+        >
           <h2 className="text-4xl font-bold mb-12 glow-pulse">Road to Mainnet (100% transparent)</h2>
           <div className="timeline-items max-w-2xl mx-auto text-lg space-y-6">
             <motion.div variants={childVariants}><span className="font-bold">Dec 2025</span> Whitepaper + all code & proofs public</motion.div>
@@ -124,7 +171,13 @@ export default function Home() {
           </div>
         </motion.section>
 
-        <motion.section variants={sectionVariants} initial="offscreen" whileInView="onscreen" viewport={{ once: true }} className="links py-20 text-center">
+        <motion.section 
+          variants={sectionVariants} 
+          initial="offscreen" 
+          whileInView="onscreen" 
+          viewport={{ once: true }} 
+          className="links py-20 text-center"
+        >
           <h2 className="text-4xl font-bold mb-12 glow-pulse">Join the nervous system</h2>
           <div className="link-grid max-w-4xl mx-auto grid md:grid-cols-2 gap-6 text-lg">
             <motion.a href="https://github.com/nerv-bit" target="_blank" className="hover:text-cyan-400 transition" variants={childVariants}>GitHub Organization (10+ repos)</motion.a>
