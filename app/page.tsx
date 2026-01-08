@@ -1,5 +1,7 @@
+"use client";
 import dynamic from 'next/dynamic';
 import { animated, useSpring, config } from '@react-spring/web';
+import { motion } from 'framer-motion';  // This will now work correctly
 import Image from 'next/image';
 
 const ParticlesComponent = dynamic(() => import('./ParticlesComponent'), {
