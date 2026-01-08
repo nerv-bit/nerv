@@ -9,32 +9,32 @@ export default function Home() {
 
   return (
     <div className="relative min-h-screen bg-black text-white overflow-x-hidden">
-      {/* 1. Interactive Neural Background */}
+      {/* Interactive Neural Background */}
       <NeuralBackground isActive={heroHovered} />
 
-      {/* 2. Main Content Container */}
-      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Main Content Container - Adjusted for higher hero placement */}
+      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8">
         
-        {/* HERO SECTION - With hover-triggered animation */}
+        {/* HERO SECTION - Positioned higher with less top spacing */}
         <section 
-          className="min-h-[80vh] flex flex-col justify-center items-center text-center"
+          className="min-h-[70vh] flex flex-col justify-start items-center text-center mt-8 md:mt-12"
           onMouseEnter={() => setHeroHovered(true)}
           onMouseLeave={() => setHeroHovered(false)}
         >
-          {/* Cryptographic Icons (appear on hover) */}
+          {/* Cryptographic Icons */}
           <div className="crypto-icon absolute left-[10%] top-1/4 text-3xl opacity-0">🔐</div>
           <div className="crypto-icon absolute right-[12%] top-1/3 text-2xl opacity-0">{`</>`}</div>
           <div className="crypto-icon absolute left-[15%] bottom-1/3 text-xl opacity-0">{`{ }`}</div>
           <div className="crypto-icon absolute right-[15%] bottom-1/4 text-3xl opacity-0">🛡️</div>
 
-          {/* Glass Hero Block */}
-          <div className="glass-hero">
+          {/* Glass Hero Block - Higher on page */}
+          <div className="glass-hero mt-8 md:mt-12">
             <h1 className="text-7xl md:text-9xl font-bold mb-2 tracking-tighter">
               NERV
             </h1>
             <div className="h-1 w-24 bg-gradient-to-r from-cyan-500 to-purple-500 mx-auto my-6 rounded-full"></div>
             
-            {/* YOUR ORIGINAL HERO TEXT - UNCHANGED */}
+            {/* Original Hero Text */}
             <p className="tagline text-2xl md:text-3xl mb-4 opacity-90">
               The private, post-quantum, infinitely scalable blockchain
             </p>
@@ -42,7 +42,7 @@ export default function Home() {
               Fair launch June 2028 • No pre-mine • Epics, user-stories, tasks public today
             </p>
 
-            {/* YOUR ORIGINAL BUTTONS - UNCHANGED */}
+            {/* Original Buttons */}
             <div className="buttons flex flex-col sm:flex-row gap-6 justify-center mb-8">
               <a
                 href="https://github.com/nerv-bit/nerv/blob/main/NERV_Whitepaper_v1.01.pdf"
@@ -65,10 +65,9 @@ export default function Home() {
           </div>
         </section>
 
-        {/* HIGH-LEVEL ARCHITECTURE SECTION - YOUR ORIGINAL, UNCHANGED */}
-        <section className="architecture mt-20 max-w-6xl mx-auto text-center">
+        {/* HIGH-LEVEL ARCHITECTURE SECTION */}
+        <section className="architecture mt-16 max-w-6xl mx-auto text-center">
           <h2 className="text-4xl font-bold mb-8">High-Level Architecture</h2>
-          {/* Your original diagram container and image tag remain exactly as they were */}
           <div className="w-full rounded-xl overflow-hidden shadow-lg">
             <Image 
               src="https://cdn.prod.website-files.com/64c231f464b91d6bd0303294/6711029566dc1475c0a37d98_66f258e47f53e2e2341aaae0_66d16bf1edcb81f15215c5b6_66d16b305dedb7e05c1b0920_diagram-export-8-30-2024-12_18_02-PM.png"
@@ -84,23 +83,20 @@ export default function Home() {
           </p>
         </section>
 
-        {/* CORE INNOVATIONS SECTION - Restyled Cards */}
-        <section className="promise py-20 text-center max-w-5xl mx-auto">
+        {/* CORE INNOVATIONS SECTION */}
+        <section className="promise py-16 text-center max-w-5xl mx-auto">
           <h2 className="text-4xl font-bold mb-12">Core Pillars of NERV</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Card 1: Living System */}
             <div className="neural-card p-6">
               <div className="text-4xl mb-4">🧠</div>
               <h3 className="text-xl font-bold mb-3 gradient-text">Live, Breathing System</h3>
               <p className="opacity-80">A self-adapting, economic nervous system that evolves organically.</p>
             </div>
-            {/* Card 2: Neural Embeddings */}
             <div className="neural-card p-6">
               <div className="text-4xl mb-4">⚡</div>
               <h3 className="text-xl font-bold mb-3 gradient-text">Neural Embeddings</h3>
               <p className="opacity-80">State compression and verification through AI-native transformer models.</p>
             </div>
-            {/* Card 3: Cryptography */}
             <div className="neural-card p-6">
               <div className="text-4xl mb-4">🔐</div>
               <h3 className="text-xl font-bold mb-3 gradient-text">Cryptography</h3>
@@ -109,10 +105,34 @@ export default function Home() {
           </div>
         </section>
 
-        {/* YOUR ORIGINAL TIMELINE, LINKS, AND FOOTER SECTIONS */}
-        {/* ... Paste the rest of your original page.tsx sections here exactly as they were ... */}
-        {/* They will automatically inherit the improved spacing and container styles */}
+        {/* TIMELINE SECTION - From Original */}
+        <section className="timeline py-16 text-center max-w-4xl mx-auto">
+          <h2 className="text-4xl font-bold mb-12">Road to Mainnet (100% transparent)</h2>
+          <div className="timeline-items max-w-2xl mx-auto text-lg space-y-6">
+            <div><span className="font-bold">Dec 2025</span> Whitepaper + all code & proofs public</div>
+            <div><span className="font-bold">Q1 2026</span> First multi-vendor TEE mixer testnet</div>
+            <div><span className="font-bold">Q2 2026</span> Aurora public testnet (real metrics published)</div>
+            <div><span className="font-bold">June 2028</span> Fair mainnet launch – zero pre-mine</div>
+          </div>
+        </section>
 
+        {/* LINKS SECTION - From Original */}
+        <section className="links py-16 text-center max-w-4xl mx-auto">
+          <h2 className="text-4xl font-bold mb-12">Join the nervous system</h2>
+          <div className="link-grid max-w-4xl mx-auto grid md:grid-cols-2 gap-6 text-lg">
+            <a href="https://github.com/nerv-bit" target="_blank" className="hover:text-cyan-400 transition">GitHub Organization (10+ repos)</a>
+            <a href="https://github.com/nerv-bit/formal" target="_blank" className="hover:text-cyan-400 transition">Lean 4 Formal Proofs (live)</a>
+            <a href="https://github.com/nerv-bit/circuits" target="_blank" className="hover:text-cyan-400 transition">Halo2 Circuits</a>
+            <a href="https://github.com/nerv-bit/simulations" target="_blank" className="hover:text-cyan-400 transition">10 000-node Simulator</a>
+            <a href="mailto:namsjeev@gmail.com" className="hover:text-cyan-400 transition">Contact → namsjeev@gmail.com</a>
+          </div>
+        </section>
+
+        {/* FOOTER - From Original */}
+        <footer className="py-12 text-center text-sm opacity-70 border-t border-gray-800 mt-8">
+          <p>© 2025–2028 NERV • All specifications, code, and proofs are MIT/Apache 2.0 or public domain</p>
+          <p>No tokens exist yet • No private sales • No foundation treasury</p>
+        </footer>
       </div>
     </div>
   );
