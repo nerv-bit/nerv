@@ -38,7 +38,7 @@ export default function Home() {
             The private, post-quantum, infinitely scalable blockchain
           </p>
           <p className="launch text-lg md:text-xl mb-12 opacity-80">
-            Fair launch June 2028 • No pre-mine • Epics, user-stories, tasks public today
+            Fair launch June 2028 • No pre-mine • Foundational codebase public today
           </p>
 
           {/* Original Buttons */}
