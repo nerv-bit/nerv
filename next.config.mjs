@@ -4,7 +4,6 @@ const nextConfig = {
     domains: ['cdn.prod.website-files.com'],
     unoptimized: true,
   },
-  // Disable type checking during build to ensure deployment works
   typescript: {
     ignoreBuildErrors: true,
   },
