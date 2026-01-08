@@ -58,7 +58,7 @@ export default function Home() {
             </a>
           </div>
 
-          <p className="mt-10 text-4g leading-relaxed opacity-90 max-w-3xl mx-auto">
+          <p className="launch text-lg md:text-xl mb-12 opacity-80">
             <span className="gradient-text font-semibold">NERV</span> delivers full privacy by default  via TEE-bound 5-hop mixing (&gt;1M TPS via dynamic neural sharding and verifiable embeddings in Halo2/Nova), post-quantum security from genesis, and a self-improving useful-work economy. Fully open-source, community-governed. Join us in building the <span className="gradient-text font-semibold">nervous system of the private internet</span>!
           </p>
         </div>
