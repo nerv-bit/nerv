@@ -99,6 +99,65 @@ footer p { margin:0.5rem 0; }
   transform: translateY(-4px);
   box-shadow: 0 10px 30px rgba(0, 255, 255, 0.4);
 }
+/* === New Neural & Cryptographic Visual Styles === */
+/* Hero container with glass effect */
+.glass-hero {
+  background: rgba(10, 15, 30, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(100, 200, 255, 0.2);
+  border-radius: 24px;
+  padding: 3rem 2.5rem;
+  position: relative;
+  z-index: 20;
+  transition: all 0.5s ease;
+  max-width: 900px;
+  margin: 2rem auto;
+}
+
+/* Hover-triggered "breathing" glow for the hero */
+.glass-hero:hover {
+  border-color: rgba(100, 200, 255, 0.4);
+  box-shadow:
+    0 0 40px rgba(0, 200, 255, 0.15),
+    inset 0 0 20px rgba(100, 220, 255, 0.05);
+}
+
+/* Cryptography theme: Animated gradient text for key terms */
+.gradient-text {
+  background: linear-gradient(90deg, #00ffff, #9070ff, #00ffaa);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-shift 3s ease infinite;
+}
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+}
+
+/* Neural theme: Card styling for innovations */
+.neural-card {
+  background: linear-gradient(145deg, rgba(15, 25, 50, 0.7), rgba(5, 10, 25, 0.9));
+  border: 1px solid rgba(100, 200, 255, 0.15);
+  border-radius: 16px;
+  transition: all 0.4s ease;
+}
+.neural-card:hover {
+  border-color: rgba(100, 220, 255, 0.4);
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0, 100, 255, 0.2);
+}
+
+/* Cryptographic icon fade-in (for hover state) */
+.crypto-icon {
+  opacity: 0;
+  transition: opacity 0.8s ease;
+  filter: drop-shadow(0 0 6px rgba(0, 255, 255, 0.5));
+}
+.glass-hero:hover .crypto-icon {
+  opacity: 0.7;
+}
 
 .btn-secondary:hover {
   transform: translateY(-4px);
