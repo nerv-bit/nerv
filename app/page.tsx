@@ -16,10 +16,9 @@ export default function Home() {
 
       {/* HERO SECTION - FORCED TO ABSOLUTE TOP */}
       <section 
-        className="absolute top-0 left-1/2 transform -translate-x-1/2 w-full max-w-5xl px-4 text-center"
+        className="absolute -top-8 left-1/2 transform -translate-x-1/2 w-full max-w-5xl px-4 text-center"
         onMouseEnter={() => setHeroHovered(true)}
         onMouseLeave={() => setHeroHovered(false)}
-        style={{ top: '10px' }} {/* Direct CSS for precise control */}
       >
         {/* Cryptographic Icons */}
         <div className="crypto-icon absolute left-[5%] top-1/4 text-3xl opacity-0">🔐</div>
@@ -28,7 +27,7 @@ export default function Home() {
         <div className="crypto-icon absolute right-[10%] bottom-1/4 text-3xl opacity-0">🛡️</div>
 
         {/* Glass Hero Block - Minimal padding */}
-        <div className="glass-hero mt-0 pt-6 pb-8">
+        <div className="glass-hero mt-0 pt-4 pb-8">
           <h1 className="text-7xl md:text-9xl font-bold mb-2 tracking-tighter">
             NERV
           </h1>
@@ -66,7 +65,7 @@ export default function Home() {
       </section>
 
       {/* MAIN CONTENT - Pushed down to avoid hero overlap */}
-      <div className="relative z-10 pt-[500px] md:pt-[550px]">
+      <div className="relative z-10 pt-[480px] md:pt-[520px]">
         
         {/* HIGH-LEVEL ARCHITECTURE SECTION */}
         <section className="architecture max-w-6xl mx-auto text-center px-4">
