@@ -7,7 +7,9 @@ Feature	Description	Status
 Privacy by default	No addresses, balances, amounts, or metadata ever exposed on-chain	✅ Core design
 Infinite horizontal scalability	>1 million sustained TPS with no theoretical upper bound via dynamic neural sharding	🔄 In development
 Post-quantum security from genesis	Full NIST-standard lattice-based cryptography (Dilithium-3, ML-KEM-768)	✅ Spec complete
-Endogenous intelligence	Nodes rewarded for useful-work federated learning that perpetually improves network encoders and predictors	🔄 Research phase
+Endogenous intelligence	Nodes rewarded for useful-work federated learning that perpetually improves network encoders and predictors	🔄 
+
+Research phase
 We replace traditional Merkle trees with compact, homomorphic neural state embeddings (512-byte latent vectors from a transformer attested in hardware enclaves). Combined with 5-hop TEE-bound anonymous routing, AI-native optimistic consensus, and a pure useful-work economy, NERV becomes a self-improving, quantum-immune nervous system for private money and computation.
 
 There is no foundation, no pre-mine, no VC allocation, no hidden treasuries. The launch is provably fair, and the protocol is fully open from day one.
@@ -17,7 +19,7 @@ Resource	Description	Link
 Whitepaper (v1.01)	Complete technical specification (30 November 2025)	NERV_Whitepaper_v1.01.pdf
 FAQ Document	Addendum to the whitepaper	NERV_FAQ_Addendum.pdf
 Project Landing Page	Live project website	https://nerv-3w4y.vercel.app
-Proof-of-Concept Tasks	Epic breakdown for skeptics	POC_Epics_User_Stories_Tasks.md
+
 License: Dual MIT / Apache 2.0 – see LICENSE-MIT.txt and LICENSE-APACHE.txt
 
 📊 Current Repository Status
