@@ -44,7 +44,7 @@ Principle	Commitment
 📖 Radical Openness	Everything auditable, no hidden logic or allocations
 ⚖️ Provable Fairness	Zero pre-mine, transparent emissions, community governance from genesis
 🛡️ Post-Quantum Readiness	No legacy curves in critical paths
-💡 Useful Work Over Waste	Nodes earn by making the network smarter, not by burning energy
+💡 Useful Work. Nodes earn by making the network smartery
 </div>
 NERV belongs to the global privacy and open-source community. We invite cryptographers, systems engineers, privacy advocates, and builders to review, critique, audit, and contribute.
 
