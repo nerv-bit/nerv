@@ -126,7 +126,7 @@ export default function Home() {
             <a href="https://github.com/nerv-bit/formal" target="_blank" className="hover:text-cyan-400 transition p-3">Lean 4 Formal Proofs (live)</a>
             <a href="https://github.com/nerv-bit/circuits" target="_blank" className="hover:text-cyan-400 transition p-3">Halo2 Circuits</a>
             <a href="https://github.com/nerv-bit/simulations" target="_blank" className="hover:text-cyan-400 transition p-3">10 000-node Simulator</a>
-            <a href="mailto:namsjeev@gmail.com" className="hover:text-cyan-400 transition p-3">Contact → namsjeev@gmail.com</a>
+            <a href="mailto:namsjeev@gmail.com" className="hover:text-cyan-400 transition p-3">Contact → nerv.raj@gmail.com</a>
           </div>
         </section>
 
