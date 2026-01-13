@@ -1,0 +1,200 @@
+# Cargo.toml
+# ============================================================================
+# NERV BLOCKCHAIN - THE PRIVATE, POST-QUANTUM, INFINITELY SCALABLE BLOCKCHAIN
+# ============================================================================
+# This file defines the project dependencies, features, and workspace structure.
+# All code is MIT/Apache 2.0 licensed - Fair Launch June 2028
+# ============================================================================
+[package]
+name = "nerv"
+version = "0.1.0"
+edition = "2021"
+authors = ["NERV Community "]
+description = "A private, post-quantum, infinitely scalable blockchain via neural state embeddings and useful-work"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/nerv-bit/nerv"
+readme = "README.md"
+keywords = ["blockchain", "privacy", "post-quantum", "zero-knowledge", "neural-networks", "federated-learning"]
+categories = ["cryptography", "distributed-systems", "network-programming"]
+# ============================================================================
+# CRITICAL DEPENDENCIES - Core cryptographic and ZK libraries
+# ============================================================================
+[dependencies]
+# ---------- ZERO-KNOWLEDGE PROOF SYSTEMS ----------
+halo2-prover = { version = "0.4", package = "halo2_prover", features = ["circuit-params", "dev-graph"] }
+halo2-gates = { version = "0.4", package = "halo2_gates" }
+nova-scotia = { version = "0.9", features = ["ark"] }
+ark-std = { version = "0.4", features = ["parallel"] }
+ark-ff = "0.4"
+ark-ec = "0.4"
+ark-poly = "0.4"
+ark-bls12-381 = "0.4"
+ark-ed-on-bls12-381 = "0.4"
+hex = "0.4"
+# ---------- POST-QUANTUM CRYPTOGRAPHY ----------
+pqcrypto-dilithium = { version = "0.5", features = ["level3"] }      # ML-DSA/Dilithium-3
+pqcrypto-kyber = { version = "0.7", features = ["kyber768"] }       # ML-KEM-768
+pqcrypto-sphincsplus = { version = "0.5", features = ["sha256-192s-robust"] }  # SLH-DSA/SPHINCS+
+bls12_381 = "0.8"
+pairing = "0.23"
+# ---------- NEURAL NETWORK & MACHINE LEARNING ----------
+tch = { version = "0.15", features = ["torch-sys"] }                 # LibTorch bindings (updated to latest stable)
+candle-core = { version = "0.4", features = ["cuda"] }              # Lightweight tensor ops (optional CUDA)
+candle-transformers = "0.4"                                         # For transformer encoder loading/inference
+ndarray = { version = "0.15", features = ["blas", "rayon"] }
+opacus = { git = "https://github.com/pytorch/opacus", rev = "v1.4" } # Differential privacy for FL
+# ---------- HARDWARE ENCLAVE SUPPORT ----------
+sgx-isa = { version = "0.10", optional = true }
+sev = { version = "0.3", optional = true }
+psa-crypto = { version = "0.4", optional = true }                    # ARM PSA (updated crate name)
+fortanix-sgx-abi = { version = "0.5", optional = true }
+teepot = { version = "0.4", optional = true }
+# ---------- NETWORKING & DISTRIBUTED SYSTEMS ----------
+libp2p = { version = "0.53", features = ["tcp", "websocket", "noise", "yamux", "mplex", "quic"] }
+kad = { version = "0.4", features = ["async-std"] }                 # Kademlia DHT
+quinn = "0.11"                                                      # QUIC implementation
+h3 = "0.0.5"                                                        # HTTP/3 for VDW serving
+prost = "0.12"
+prost-types = "0.12"
+blake3 = "1.5"
+# ============================================================================
+# CORE RUNTIME DEPENDENCIES
+# ============================================================================
+[dependencies]
+tokio = { version = "1.38", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bincode = "2.0"
+blake3 = "1.5"
+rand = "0.8"
+rand_core = "0.6"
+chrono = { version = "0.4", features = ["serde"] }
+async-trait = "0.1"
+futures = "0.3"
+# ============================================================================
+# CRYPTOGRAPHY - ZERO-KNOWLEDGE AND POST-QUANTUM
+# ============================================================================
+# Halo2 for ZK circuits (latent ledger and delta circuits)
+halo2 = { version = "0.4", features = ["circuit-params", "dev-graph"] }
+# Nova for recursive proof folding and infinite scalability
+nova-scotia = { version = "0.37", features = ["ark", "parallel"] }
+# Arkworks ecosystem for finite fields and curves
+ark-std = { version = "0.4", features = ["parallel"] }
+ark-ff = "0.4"
+ark-ec = "0.4"
+ark-bls12-381 = "0.4"
+ark-ed-on-bls12-381 = "0.4"
+ark-serialize = "0.4"
+ark-groth16 = "0.4"
+# NIST-standardized post-quantum cryptography
+pqcrypto = "0.17"
+pqcrypto-traits = "0.3"
+pqcrypto-dilithium = "0.4"
+pqcrypto-kyber = "0.8"  # ML-KEM-768 equivalent
+pqcrypto-sphincsplus = "0.2"
+# ============================================================================
+# AI / NEURAL COMPONENTS (Candle for lightweight, no-GPU model loading)
+# ============================================================================
+# Candle framework for loading distilled transformer/LSTM models (.pt files)
+candle-core = { version = "0.6", features = ["serde"] }
+candle-nn = "0.6"
+candle-transformers = "0.6"
+# ============================================================================
+# PRIVACY AND TEE
+# ============================================================================
+# Intel SGX (optional - enabled via feature)
+sgx = { version = "2.0", optional = true }
+# AMD SEV-SNP (optional - enabled via feature)
+sev = { version = "2.0", optional = true }
+# Verifiable Delay Witnesses - permanent storage backend
+arweave-rs = "0.1"
+# ============================================================================
+# SHARDING AND DATA AVAILABILITY
+# ============================================================================
+reed-solomon-erasure = { version = "7.0", features = ["simd-accel"] }
+
+# ---------- STORAGE & PERSISTENCE ----------
+rocksdb = { version = "0.22", features = ["lz4", "zstd"] }
+arweave-rs = { version = "0.4", optional = true }
+ipfs-api = { version = "0.14", optional = true }
+# ---------- UTILITIES ----------
+tokio = { version = "1.38", features = ["full"] }
+async-std = { version = "1.12", features = ["attributes"] }
+anyhow = "1.0"
+thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+hex = "0.4"
+lazy_static = "1.5"
+arc-swap = "1.7"
+rand = "0.8"
+rand_chacha = "0.3"
+rayon = "1.10"
+atomic-float = "0.1"
+# ============================================================================
+# FEATURE FLAGS - Modular compilation
+# ============================================================================
+[features]
+default = ["tee-sgx", "storage-arweave", "storage-ipfs"]
+# Node types
+full-node = ["tee-sgx", "tee-sev", "tee-arm", "storage-arweave", "storage-ipfs", "rocksdb"]
+light-client = []
+archive-node = ["storage-arweave", "storage-ipfs"]
+relay-node = []                                                     # Mixer-only nodes
+# TEE vendor support (at least one required for full nodes)
+tee-sgx = ["dep:sgx-isa", "dep:fortanix-sgx-abi"]
+tee-sev = ["dep:sev"]
+tee-arm = ["dep:psa-crypto"]
+tee-apple = []                                                      # Future support
+tee-nvidia = []                                                     # Future support
+# Storage backends
+storage-arweave = ["dep:arweave-rs"]
+storage-ipfs = ["dep:ipfs-api"]
+# Acceleration / optional performance
+cuda = ["candle-core/cuda"]
+metal = ["candle-core/metal"]                                        # Apple Silicon support
+# Development and testing
+dev = ["halo2-prover/dev-graph", "tracing/fmt"]
+test = []
+bench = ["dep:criterion"]
+# ============================================================================
+# DEVELOPMENT DEPENDENCIES
+# ============================================================================
+[dev-dependencies]
+criterion = "0.5"
+proptest = "1.4"
+tempfile = "3.10"
+assert_matches = "1.5"
+insta = "1.39"
+pretty_assertions = "1.4"
+# ============================================================================
+# BUILD CONFIGURATION
+# ============================================================================
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = 3
+strip = true
+panic = "abort"
+overflow-checks = false
+[profile.dev]
+opt-level = 0
+debug = true
+debug-assertions = true
+overflow-checks = true
+[profile.test]
+opt-level = 3
+debug = true
+# ============================================================================
+# WORKSPACE (for future multi-crate expansion)
+# ============================================================================
+[workspace]
+members = [
+    "crates/*",
+]
+resolver = "2"
