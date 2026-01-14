@@ -28,6 +28,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::sync::Arc;
 use reqwest::Client;
+use crate::embedding::circuit::Fp;  // pallas::Base
 
 /// Supported TEE types (merged - added None from old)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -98,6 +99,25 @@ pub trait TEERuntime: Send + Sync + Debug {
     
     /// Generate local attestation (from old trait)
     async fn local_attest(&self, data: &[u8]) -> Result<Vec<u8>, NervError>;
+
+    /// Prove a homomorphic embedding update inside the TEE
+    /// 
+    /// Inside the TEE:
+    /// - Unseal the previous private embedding (stored separately by the node)
+    /// - Compute new_embedding = prev_embedding + summed_delta + error (error optional/bounded)
+    /// - Synthesize the LatentLedgerCircuit witness
+    /// - Generate step proof (mock for now; real Halo2/Nova later)
+    /// - Compute new_embedding_hash
+    /// 
+    /// Returns: (proof_bytes, attestation_report)
+    /// The attestation covers the code measurement and optional report data (e.g., new_hash)
+    async fn prove_embedding_update(
+        &self,
+        sealed_prev_embedding: &[u8],     // Provided by host, unsealed inside TEE
+        summed_delta: Vec<Fp>,             // Public or from batch, passed in clear
+        expected_new_hash: [u8; 32],       // For verification (blake3 or poseidon)
+    ) -> Result<(Vec<u8>, Vec<u8>), NervError>;  // proof, attestation_report
+
 }
 
 /// Main TEE manager (from old, adapted to new trait)

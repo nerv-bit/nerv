@@ -712,6 +712,10 @@ impl MetricsCollector {
                 vec![0.05, 0.1, 0.2, 0.5, 1.0, 2.0],
                 None,
             ).await?;
+            // Privacy metrics
+self.anonymity_set_size = self.registry.register(
+    Gauge::new("nerv_anonymity_set_size", "Current estimated anonymity set size")?
+).unwrap();
         }
         
         // ========== ECONOMIC METRICS ==========
@@ -999,6 +1003,13 @@ impl MetricsCollector {
         
         Ok(())
     }
+    
+    /// Record anonymity set size
+    pub async fn record_anonymity_set(&self, size: f64) -> Result<(), MetricsError> {
+    self.anonymity_set_size.set(size);
+    Ok(())
+}
+
     
     /// Record economic metrics
     pub async fn record_economic_metrics(

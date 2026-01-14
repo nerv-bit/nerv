@@ -62,6 +62,18 @@ pub trait ProtobufEncoder: Message + Default {
         let bytes = self.to_protobuf()?;
         Ok(base64::encode(bytes))
     }
+    /// Encode with canonical (fully deterministic) options if needed
+pub fn encode_canonical<M: Message>(&self, msg: &M) -> Result<Vec<u8>, SerializeError> {
+    let mut buf = Vec::with_capacity(msg.encoded_len());
+    // prost does not have built-in canonical mode, but we can enforce map key sorting
+    // via custom encoding if maps are used in critical messages.
+    // For now, standard encode is sufficient as NERV messages avoid unordered maps.
+    msg.encode(&mut buf)
+        .map_err(|e| SerializeError::Encoding(e.to_string()))?;
+    Ok(buf)
+}
+
+
 }
 
 /// Trait for types that can be deserialized from Protobuf

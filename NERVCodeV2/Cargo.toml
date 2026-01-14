@@ -8,7 +8,7 @@
 [package]
 name = "nerv"
 version = "0.1.0"
-edition = "2021"
+edition = "2025"
 authors = ["NERV Community "]
 description = "A private, post-quantum, infinitely scalable blockchain via neural state embeddings and useful-work"
 license = "MIT OR Apache-2.0"
@@ -21,6 +21,81 @@ categories = ["cryptography", "distributed-systems", "network-programming"]
 # ============================================================================
 [dependencies]
 # ---------- ZERO-KNOWLEDGE PROOF SYSTEMS ----------
+
+# ============================================================================
+# OPTIMIZED DEPENDENCIES FOR NERV BLOCKCHAIN
+# ============================================================================
+
+[dependencies]
+# Core cryptographic libraries
+halo2_proofs = { version = "0.3.0", features = ["circuit-params", "dev-graph"] }
+halo2_gadgets = { version = "0.3.0", features = ["poseidon"] }
+pasta_curves = "0.5.0"
+ff = "0.13.0"
+group = "0.13.0"
+
+# Poseidon hash implementation
+poseidon-hash = { version = "0.4.0", features = ["pasta"] }
+poseidon-param = { version = "0.2.0" }
+
+# Nova for recursive proofs
+nova-scotia = { version = "0.9.0", features = ["ark", "parallel"] }
+nova-snark = { version = "0.20.0", features = ["parallel"] }
+
+# Fixed-point arithmetic
+fixed = { version = "1.20.0", features = ["serde"] }
+
+# Parallel processing
+rayon = { version = "1.7.0", features = ["threads"] }
+crossbeam = "0.8.2"
+
+# Performance optimization
+arrayvec = "0.7.4"
+smallvec = "1.11.1"
+hex = "0.4.3"
+blake3 = "1.5.0"
+
+# Hardware acceleration (optional)
+#[target.'cfg(target_arch = "x86_64")'.dependencies]
+#stdsimd = { version = "0.1.0", features = ["avx2"] }
+
+[features]
+default = ["parallel", "poseidon-optimized"]
+parallel = ["rayon", "crossbeam"]
+poseidon-optimized = ["poseidon-hash/optimized", "poseidon-param/tuned"]
+bench = ["criterion"]
+test = ["proptest"]
+
+[dev-dependencies]
+criterion = { version = "0.5.0", optional = true }
+proptest = { version = "1.4.0", optional = true }
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = 3
+strip = true
+panic = "abort"
+overflow-checks = false
+incremental = false
+
+[profile.dev]
+opt-level = 1
+debug = true
+incremental = true
+
+[profile.test]
+opt-level = 1
+debug = true
+pasta_curves = "0.5"
+ff = "0.13"
+group = "0.13"
+
+
+nova_scotia = { git = "https://github.com/nalinbhardwaj/Nova-Scotia.git" }  # If using the example crate; or use nova-snark directly
+
+rand = "0.8"
+
 halo2-prover = { version = "0.4", package = "halo2_prover", features = ["circuit-params", "dev-graph"] }
 halo2-gates = { version = "0.4", package = "halo2_gates" }
 nova-scotia = { version = "0.9", features = ["ark"] }
@@ -31,10 +106,34 @@ ark-poly = "0.4"
 ark-bls12-381 = "0.4"
 ark-ed-on-bls12-381 = "0.4"
 hex = "0.4"
+
+# Add to [dependencies] section
+nova-snark = { version = "0.20", features = ["parallel"] }
+halo2wrong = { version = "0.3", features = ["pasta"] }
+
+
+arrayref = "0.3"
+byteorder = "1.4"
+subtle = { version = "2.4", features = ["std"] }
+# For fixed-point arithmetic
+fixed = "1.20"
+# For parallel processing
+rayon = "1.7"
+crossbeam = "0.8"
+
+# Add to [features] section
+nova-folding = ["nova-snark", "halo2wrong/nova"]
+benchmarks = ["criterion", "iai"]
+
+
+
 # ---------- POST-QUANTUM CRYPTOGRAPHY ----------
-pqcrypto-dilithium = { version = "0.5", features = ["level3"] }      # ML-DSA/Dilithium-3
-pqcrypto-kyber = { version = "0.7", features = ["kyber768"] }       # ML-KEM-768
-pqcrypto-sphincsplus = { version = "0.5", features = ["sha256-192s-robust"] }  # SLH-DSA/SPHINCS+
+# Post-quantum cryptography (NIST standardized, audited)
+pqcrypto-dilithium = "0.4.5"      # Dilithium-3 (ML-DSA)
+pqcrypto-kyber = "0.7"         # ML-KEM-768 (Kyber)
+pqcrypto-sphincsplus = "0.7"   # SPHINCS+ backup (SHA256-192s-simple)
+pqcrypto-traits = "0.3"        # Common traits
+pqcrypto = "0.4.0"               # Core utilities
 bls12_381 = "0.8"
 pairing = "0.23"
 # ---------- NEURAL NETWORK & MACHINE LEARNING ----------
@@ -49,6 +148,12 @@ sev = { version = "0.3", optional = true }
 psa-crypto = { version = "0.4", optional = true }                    # ARM PSA (updated crate name)
 fortanix-sgx-abi = { version = "0.5", optional = true }
 teepot = { version = "0.4", optional = true }
+
+aes-gcm = "0.10"
+aead = { version = "0.5", features = ["std"] }
+zeroize = "1.7"  # For secure key wiping
+rand = { version = "0.8", features = ["std_rng"] }
+
 # ---------- NETWORKING & DISTRIBUTED SYSTEMS ----------
 libp2p = { version = "0.53", features = ["tcp", "websocket", "noise", "yamux", "mplex", "quic"] }
 kad = { version = "0.4", features = ["async-std"] }                 # Kademlia DHT

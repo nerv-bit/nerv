@@ -106,9 +106,10 @@ impl Default for EncoderConfig {
 
 
 /// Approximate GELU activation (Erf-based)
-fn gelu(x: f32) -> f32 {
-    0.5 * x * (1.0 + (x / (2.0f32.sqrt())).tanh())
+fn silu(x: f32) -> f32 {
+    x / (1.0 + (-x).exp())
 }
+
 
 
 /// Softmax over last dimension (in-place on row)
@@ -292,7 +293,7 @@ impl FeedForwardNetwork {
         let mut hidden = matmul(x, &int_w, self.dim, self.intermediate_dim);
         for i in 0..seq_len {
             for j in 0..self.intermediate_dim {
-                hidden[i][j] = gelu(hidden[i][j]);
+                 hidden[i][j] = silu(hidden[i][j]);
             }
         }
 
