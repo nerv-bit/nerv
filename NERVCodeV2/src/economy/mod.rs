@@ -16,7 +16,7 @@
 //! - Self-Improvement: Network intelligence improves over time through FL
 //! - Sybil Resistance: Shapley value discourages fake or low-quality contributions
 
-
+pub mod encoder_updater;
 mod shapley;
 mod fl_aggregation;
 mod rewards;
@@ -25,6 +25,7 @@ mod rewards;
 pub use shapley::{ShapleyComputer, ShapleyValue, ShapleyConfig, ShapleyError};
 pub use fl_aggregation::{FLAggregator, GradientUpdate, AggregationConfig, AggregationError};
 pub use rewards::{RewardDistributor, RewardConfig, RewardRecord, DistributionError};
+pub use encoder_updater::*;
 
 
 use crate::crypto::{CryptoProvider, ByteSerializable};

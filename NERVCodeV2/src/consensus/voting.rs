@@ -51,6 +51,7 @@ pub struct Validator {
     
     /// Network address
     pub network_address: String,
+
 }
 
 impl Validator {
@@ -260,6 +261,15 @@ pub struct WeightedQuorum {
     
     /// Minimum stake to become validator
     min_stake: u128,
+
+    /// Current encoder weight hash (consensus-critical)
+    current_encoder_hash: Arc<RwLock<[u8; 32]>>,
+    
+    /// Pending encoder update proposal (hash + supporting power)
+    pending_encoder_update: Arc<RwLock<Option<([u8; 32], u128)>>>,
+    
+    /// Encoder update quorum threshold (stricter than BFT - 80%)
+    const ENCODER_UPDATE_QUORUM: f64 = 0.8;  // 80% of total voting power
 }
 
 impl WeightedQuorum {
@@ -273,6 +283,8 @@ impl WeightedQuorum {
             my_address: None,
             epoch_length: 1000,
             min_stake: 1000 * 10u128.pow(18), // 1000 NERV
+            current_encoder_hash: Arc::new(RwLock::new([0u8; 32])),
+        pending_encoder_update: Arc::new(RwLock::new(None)),
         }
     }
     
@@ -600,6 +612,100 @@ impl WeightedQuorum {
         let proposer_index = (view as usize) % validators.len();
         Ok(validators.get(proposer_index).cloned())
     }
+
+    /// Propose an encoder update (called by EncoderUpdater when new gradients are applied)
+/// 
+/// This accumulates supporting voting power for a new encoder weight hash.
+/// When quorum (80% of total voting power) is reached, the update is queued for next epoch.
+pub async fn propose_encoder_update(
+    &mut self,
+    new_hash: [u8; 32],
+    proposer_power: u128,
+) -> Result<()> {
+    let total_power = self.total_voting_power().await?;
+    let mut pending = self.pending_encoder_update.write().await;
+    
+    match *pending {
+        Some((current_hash, current_support)) => {
+            if current_hash == new_hash {
+                // Same hash, add support
+                let new_support = current_support + proposer_power;
+                *pending = Some((new_hash, new_support));
+                
+                tracing::info!(
+                    "Encoder update support increased: {} / {} (need: {})",
+                    new_support,
+                    total_power,
+                    (total_power as f64 * Self::ENCODER_UPDATE_QUORUM) as u128
+                );
+                
+                // Check if we've reached quorum immediately
+                if new_support as f64 >= total_power as f64 * Self::ENCODER_UPDATE_QUORUM {
+                    tracing::info!("Encoder update reached quorum immediately!");
+                }
+            } else {
+                // Different hash - reset with new proposal (first-come-first-served per epoch)
+                tracing::warn!("Encoder update conflict: {:x?} vs {:x?}, resetting", 
+                    current_hash, new_hash);
+                *pending = Some((new_hash, proposer_power));
+            }
+        }
+        None => {
+            // First proposal for this epoch
+            *pending = Some((new_hash, proposer_power));
+            tracing::info!("New encoder update proposed: {:x?} with {} power", 
+                new_hash, proposer_power);
+        }
+    }
+    
+    Ok(())
+}
+
+/// Get current encoder hash (used by validators to verify predictions match current model)
+pub async fn get_current_encoder_hash(&self) -> Result<[u8; 32]> {
+    let hash = self.current_encoder_hash.read().await;
+    Ok(*hash)
+}
+
+/// Set current encoder hash (only called at epoch transition when quorum is reached)
+pub async fn set_current_encoder_hash(&mut self, new_hash: [u8; 32]) -> Result<()> {
+    let mut hash = self.current_encoder_hash.write().await;
+    *hash = new_hash;
+    tracing::info!("Encoder hash updated to: {:x?}", new_hash);
+    Ok(())
+}
+
+/// Check and apply pending encoder update at epoch transition
+/// Returns true if encoder was updated
+async fn check_encoder_update_at_epoch(&mut self, total_power: u128) -> Result<bool> {
+    let mut pending = self.pending_encoder_update.write().await;
+    
+    if let Some((new_hash, supporting_power)) = *pending {
+        let quorum_threshold = (total_power as f64 * Self::ENCODER_UPDATE_QUORUM) as u128;
+        
+        if supporting_power >= quorum_threshold {
+            // Apply update
+            self.set_current_encoder_hash(new_hash).await?;
+            tracing::info!(
+                "Encoder update applied at epoch transition: {:x?} with {}/{} support",
+                new_hash, supporting_power, total_power
+            );
+            
+            // Clear pending
+            *pending = None;
+            return Ok(true);
+        } else {
+            tracing::warn!(
+                "Encoder update proposal insufficient support: {}/{} (need {}) - discarding",
+                supporting_power, total_power, quorum_threshold
+            );
+            // Clear pending - didn't reach quorum
+            *pending = None;
+        }
+    }
+    
+    Ok(false)
+}
     
     /// Process epoch transition (update validator set based on performance)
     pub async fn process_epoch(&mut self, current_block: u64) -> Result<()> {
@@ -608,8 +714,16 @@ impl WeightedQuorum {
         }
         
         tracing::info!("Processing epoch transition at block {}", current_block);
+
+        // Check and apply any pending encoder updates first
+    let total_power = self.total_voting_power().await?;
+    if self.check_encoder_update_at_epoch(total_power).await? {
+        tracing::info!("Encoder was updated during epoch transition");
+    }
+    
+    let mut validators = self.validators.write().await;
         
-        let mut validators = self.validators.write().await;
+       
         
         // Update each validator based on epoch performance
         for validator in validators.iter_mut() {
@@ -674,4 +788,8 @@ pub enum ConsensusError {
     
     #[error("Invalid validator set")]
     InvalidValidatorSet,
+
+    #[error("Encoder update rejected: {0}")]
+    EncoderUpdateRejected(String),
+    
 }

@@ -25,6 +25,9 @@ pub const HOMO_ERROR_BOUND: f64 = 1e-9;
 /// Epoch length in days for encoder updates (30 days)
 pub const EPOCH_DAYS: u64 = 30;
 
+/// Learning rate for encoder
+ pub const ENCODER_LEARNING_RATE: f32 = 1e-4;
+
 /// Number of hops in the TEE mixer (5-hop anonymity)
 pub const MIXER_HOPS: usize = 5;
 

@@ -118,6 +118,13 @@ pub trait TEERuntime: Send + Sync + Debug {
         expected_new_hash: [u8; 32],       // For verification (blake3 or poseidon)
     ) -> Result<(Vec<u8>, Vec<u8>), NervError>;  // proof, attestation_report
 
+    /// NEW: Execute DP-SGD aggregation for federated learning
+    async fn execute_dp_sgd_aggregation(
+        &self,
+        gradients: Vec<GradientUpdate>,
+        dp_params: DpParams,
+    ) -> Result<(GradientUpdate, Vec<u8>), NervError>;
+
 }
 
 /// Main TEE manager (from old, adapted to new trait)

@@ -14,6 +14,7 @@
 
 use sev::firmware::guest::{Firmware, AttestationReport};
 use sev::certs::Chain;
+use crate::fl_aggregation::{GradientUpdate, DpParams};
 
 use halo2_proofs::{
     circuit::{floor_planner::V1, Layouter, Value},
@@ -196,6 +197,92 @@ impl TEERuntime for SEVRuntime {
         input.extend_from_slice(data);
        Ok(vec![0u8; 64]) // Placeholder result
     }
+
+     async fn execute_dp_sgd_aggregation(
+        &self,
+        gradients: Vec<GradientUpdate>,
+        dp_params: DpParams,
+    ) -> Result<(GradientUpdate, Vec<u8>), NervError> {
+        info!("Executing DP-SGD aggregation with σ={} in SEV-SNP guest", dp_params.sigma);
+        
+        if !self.initialized {
+            return Err(NervError::TEEAttestation("SEV not initialized".into()));
+        }
+        
+        if gradients.is_empty() {
+            return Err(NervError::TEEAttestation("No gradients to aggregate".into()));
+        }
+        
+        // Check all gradients have same dimension
+        let dim = gradients[0].data.len();
+        for grad in &gradients {
+            if grad.data.len() != dim {
+                return Err(NervError::TEEAttestation(
+                    format!("Gradient dimension mismatch: {} vs {}", dim, grad.data.len())
+                ));
+            }
+        }
+        
+        // Compute average gradient (inside SEV secure VM)
+        let mut aggregated = vec![0.0f32; dim];
+        
+        for grad in &gradients {
+            for (i, &value) in grad.data.iter().enumerate() {
+                aggregated[i] += value;
+            }
+        }
+        
+        let count = gradients.len() as f32;
+        for value in &mut aggregated {
+            *value /= count;
+        }
+        
+        // Apply DP-SGD with σ=0.5 (inside SEV)
+        // 1. Clip if needed
+        let norm = {
+            let sum_sq: f64 = aggregated.iter().map(|&x| (x as f64).powi(2)).sum();
+            sum_sq.sqrt()
+        };
+        
+        if norm > dp_params.clip_norm {
+            let scale = dp_params.clip_norm / norm;
+            for value in &mut aggregated {
+                *value *= scale as f32;
+            }
+        }
+        
+        // 2. Add Gaussian noise: N(0, σ² * clip_norm² * I)
+        use rand::{RngCore, SeedableRng};
+        use rand_chacha::ChaCha20Rng;
+        
+        let mut rng = ChaCha20Rng::from_entropy();
+        let noise_scale = dp_params.sigma * dp_params.clip_norm;
+        
+        for i in 0..aggregated.len() {
+            // Generate Gaussian noise using Box-Muller transform
+            let u1: f64 = (rng.next_u32() as f64) / (u32::MAX as f64);
+            let u2: f64 = (rng.next_u32() as f64) / (u32::MAX as f64);
+            let z = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos();
+            let noise = z * noise_scale;
+            
+            aggregated[i] = (aggregated[i] as f64 + noise) as f32;
+        }
+        
+        // Create DP gradient
+        let dp_gradient = GradientUpdate {
+            data: aggregated,
+            dp_applied: true,
+            dp_params: Some(dp_params.clone()),
+            attestation: vec![],
+            metadata: std::collections::HashMap::new(),
+        };
+        
+        // Get SEV attestation
+        let attestation = self.perform_attestation().await?;
+        
+        Ok((dp_gradient, attestation))
+    }
+
  async fn seal_state(&self, data: &[u8]) -> Result<Vec<u8>, NervError> {
     // Mock sealing key for AMD SEV-SNP (all-zero for dev/testing - in real SEV this would be firmware-derived)
     const MOCK_SEALING_KEY: [u8; 32] = [0xFFu8; 32]; // Distinct from SGX mock for debugging

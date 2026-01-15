@@ -11,6 +11,12 @@
 //! producing a global gradient update that improves the neural encoder ε_θ.
 
 
+use crate::embedding::encoder::NeuralEncoder;
+use crate::params::DP_SIGMA;  // Ensure fixed σ=0.5 is used
+use bincode;  // For serializing inputs/outputs to TEE
+use crate::privacy::tee::{TEERuntime, TEEType, TEEConfig};
+
+
 use crate::crypto::{CryptoProvider, MlKem768, ByteSerializable};
 use crate::params::{DP_SIGMA, RS_K, RS_M, TEE_CLUSTER_SIZE};
 use serde::{Deserialize, Serialize};
@@ -39,6 +45,8 @@ pub struct FLAggregator {
     
     /// TEE cluster manager
     tee_cluster: Option<TeeClusterManager>,
+
+    pub tee_manager: Option<Arc<PrivacyManager>>
     
     /// Aggregation semaphore for rate limiting
     aggregation_semaphore: Semaphore,
@@ -178,32 +186,71 @@ impl FLAggregator {
         let start_time = std::time::Instant::now();
         info!("Starting secure aggregation of {} gradients", gradients.len());
         
-        // Group gradients for parallel processing
-        let groups = self.group_gradients(gradients).await?;
-        
-        // Process in TEE cluster if available, otherwise locally
-        let aggregated = if let Some(tee_cluster) = &self.tee_cluster {
-            self.aggregate_in_tee_cluster(tee_cluster, groups).await?
-        } else {
-            self.aggregate_locally(groups).await?
-        };
-        
-        // Verify aggregation integrity
-        self.verify_aggregation(&aggregated).await?;
-        
-        // Clear processed submissions
-        self.clear_processed_submissions(&aggregated.processed_ids).await;
-        
-        // Update metrics
-        self.metrics.record_aggregation(start_time.elapsed(), aggregated.total_gradients);
-        
-        info!("Secure aggregation completed: {} gradients, {} nodes, loss improvement: {:.6}",
-              aggregated.total_gradients,
-              aggregated.contributions.len(),
-              aggregated.global_loss_improvement.unwrap_or(0.0));
-        
-        Ok(aggregated)
-    }
+        // FIRST: Try to use TEE runtime if available
+        if let Some(tee_runtime) = &self.tee_runtime {
+            // Decrypt gradients first
+            let mut decrypted_gradients = Vec::new();
+            let mut contributions = HashMap::new();
+            let mut processed_ids = HashSet::new();
+            
+            for encrypted in &gradients {
+                let decrypted = self.decrypt_gradient(encrypted).await?;
+                decrypted_gradients.push(decrypted.gradient.clone());
+                
+                // Record contribution
+                let contrib = GradientContribution {
+                    node_id: encrypted.node_id.clone(),
+                    submission_id: encrypted.id.clone(),
+                    quality_score: encrypted.quality_score,
+                    gradient_magnitude: decrypted.gradient.compute_norm(),
+                    timestamp: encrypted.timestamp,
+                };
+                
+                contributions.insert(encrypted.node_id.clone(), contrib);
+                processed_ids.insert(encrypted.id.clone());
+            }
+            
+            // Prepare DP parameters for TEE execution
+            let dp_params = DpParams {
+                epsilon: self.config.dp_epsilon,
+                delta: self.config.dp_delta,
+                sigma: DP_SIGMA,  // Fixed 0.5 as per whitepaper
+                clip_norm: self.config.clip_norm,
+                noise_scale: DP_SIGMA * self.config.clip_norm,
+            };
+            
+            // Execute in TEE with attestation
+            let (global_gradient, attestation) = self
+                .execute_dp_sgd_in_tee(tee_runtime, decrypted_gradients, dp_params)
+                .await?;
+            
+            // Calculate global loss improvement
+            let loss_improvement = self.calculate_loss_improvement(&global_gradient, &contributions).await?;
+            
+            let result = AggregationResult {
+                global_gradient,
+                contributions,
+                total_gradients: processed_ids.len(),
+                global_loss_improvement: Some(loss_improvement),
+                processed_ids,
+            };
+            
+            // Verify aggregation integrity
+            self.verify_aggregation(&result).await?;
+            
+            // Clear processed submissions
+            self.clear_processed_submissions(&result.processed_ids).await;
+            
+            // Update metrics
+            self.metrics.record_aggregation(start_time.elapsed(), result.total_gradients);
+            
+            info!("TEE-based DP-SGD aggregation completed: {} gradients, {} nodes, loss improvement: {:.6}",
+                  result.total_gradients,
+                  result.contributions.len(),
+                  result.global_loss_improvement.unwrap_or(0.0));
+            
+            return Ok(result);
+        }
     
     /// Get aggregation statistics
     pub async fn get_statistics(&self) -> AggregationStats {
@@ -714,6 +761,47 @@ impl FLAggregator {
         for id in processed_ids {
             submissions.remove(id);
         }
+    }
+
+    async fn execute_dp_sgd_in_tee(
+        &self,
+        tee_runtime: &Arc<dyn TEERuntime + Send + Sync>,
+        gradients: Vec<GradientUpdate>,
+        dp_params: DpParams,
+    ) -> Result<(GradientUpdate, Vec<u8>), AggregationError> {
+        info!("Executing DP-SGD aggregation in TEE with σ={}", dp_params.sigma);
+        
+        // Call the new method on TEE runtime
+        let (aggregated_gradient, attestation) = tee_runtime
+            .execute_dp_sgd_aggregation(gradients, dp_params.clone())
+            .await
+            .map_err(|e| AggregationError::TEEError(format!("TEE DP-SGD execution failed: {}", e)))?;
+        
+        // Verify DP was applied correctly
+        if !aggregated_gradient.dp_applied {
+            return Err(AggregationError::TEEError("DP not applied in TEE".to_string()));
+        }
+        
+        if let Some(params) = &aggregated_gradient.dp_params {
+            if (params.sigma - DP_SIGMA).abs() > 1e-10 {
+                return Err(AggregationError::TEEError(
+                    format!("DP sigma mismatch: TEE used {}, expected {}", params.sigma, DP_SIGMA)
+                ));
+            }
+        } else {
+            return Err(AggregationError::TEEError("Aggregated gradient missing DP parameters".to_string()));
+        }
+        
+        // Verify gradient matches encoder structure
+        let expected_params = NeuralEncoder::default_parameter_count();
+        if aggregated_gradient.data.len() != expected_params {
+            return Err(AggregationError::InvalidGradient(
+                format!("Gradient dimension mismatch — not for current encoder: expected {}, got {}", 
+                        expected_params, aggregated_gradient.data.len())
+            ));
+        }
+        
+        Ok((aggregated_gradient, attestation))
     }
     
     fn generate_submission_id(&self, node_id: &str, encrypted_data: &[u8]) -> String {

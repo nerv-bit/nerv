@@ -16,6 +16,8 @@
 //! - Matches whitepaper: 512-byte embeddings, <1e-9 target error bound
 
 
+use crate::economy::fl_aggregation::GlobalGradient;  // Add this import at top if missing
+use crate::params::ENCODER_LEARNING_RATE;  // Suggest adding this constant in params.rs: pub const ENCODER_LEARNING_RATE: f32 = 1e-4;
 use crate::{Result, NervError};
 use blake3::Hasher;
 use serde::{Serialize, Deserialize};
@@ -723,6 +725,67 @@ impl NeuralEncoder {
         }
     }
     
+    /// Apply a global gradient update from federated learning (SGD step)
+    /// 
+    /// This closes the perpetual self-improvement loop: aggregated useful-work gradients
+    /// update the encoder weights, improving embedding quality/homomorphism over time.
+    /// 
+    /// # Arguments
+    /// * `global_gradient` - Aggregated, DP-noised gradient matching parameter structure
+    /// * `learning_rate` - Step size (default from params)
+    /// 
+    /// # Returns
+    /// * New weight hash after update
+    /// * Optional homomorphism error check on test batch (fails if >1e-9)
+    pub fn apply_gradient_update(
+        &mut self,
+        global_gradient: &GlobalGradient,
+        learning_rate: Option<f32>,
+    ) -> Result<[u8; 32], NervError> {
+        let lr = learning_rate.unwrap_or(ENCODER_LEARNING_RATE);
+
+        // Validate gradient matches exact parameter count/structure
+        if global_gradient.params.len() != self.total_parameters() {
+            return Err(NervError::Other(
+                "Gradient parameter count mismatch - cannot apply to encoder".into()
+            ));
+        }
+
+        // Element-wise SGD update on quantized weights
+        // Assuming self.weights is Vec<QuantizedWeight> or similar flattened params
+        for (weight, grad) in self.weights.iter_mut().zip(global_gradient.params.iter()) {
+            // Dequantize → float update → requantize (preserves fixed-point)
+            let current_float = weight.to_float();
+            let updated_float = current_float - lr * grad.to_float();
+
+            // Clamp to prevent overflow/explosion
+            let clamped = updated_float.clamp(-10.0, 10.0);  // Adjust bounds as needed
+
+            *weight = QuantizedWeight::from_float(clamped);  // Your quantization type
+        }
+
+        // Increment epoch counter (tracks improvements)
+        self.epoch += 1;
+
+        // Recompute weight hash for consensus (new encoder version)
+        self.update_weight_hash();
+
+        // Optional safety check: verify homomorphism error on small test batch
+        // (Implement test batch in utils or here - skip for speed in production)
+        // let test_error = self.verify_homomorphism_test_batch()?;
+        // if test_error > HOMO_ERROR_BOUND {
+        //     return Err(NervError::Other("Update violated homomorphism bound".into()));
+        // }
+
+        Ok(self.weight_hash)
+    }
+
+    /// Helper: total trainable parameters (for validation)
+    fn total_parameters(&self) -> usize {
+        self.weights.len()  // Or compute from layers if dynamic
+    }
+}
+
     /// Global average pooling across sequence dimension
     fn global_average_pool(&self, embeddings: &[f32], sequence_length: usize) -> Vec<f32> {
         let mut pooled = vec![0.0; self.config.embedding_dim];

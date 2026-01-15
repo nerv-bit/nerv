@@ -169,6 +169,14 @@ async fn main() -> Result<()> {
 
     info!("NERV node fully operational - Privacy: {} hops, Role: {:?}", 
           config.privacy.mixer_hops, config.node_role);
+    
+          let updater = EncoderUpdater::new(
+    Arc::clone(&node.encoder),
+    Arc::clone(&node.fl_aggregator),
+    Arc::clone(&node.consensus),
+    10_000,  // Update every ~10k blocks
+);
+tokio::spawn(updater.run(current_height));
 
     // Wait for shutdown signal
     let shutdown = handle_signals().await;
