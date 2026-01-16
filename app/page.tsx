@@ -97,7 +97,7 @@ export default function Home() {
             <div className="neural-card p-6">
               <div className="text-4xl mb-4">⚡</div>
               <h3 className="text-xl font-bold mb-3 gradient-text">Neural Embeddings</h3>
-              <p className="opacity-80">Infinite scalability – >1 million sustained TPS with no theoretical upper bound via state compression and dynamic neural sharding. </p>
+              <p className="opacity-80">Infinite scalability – Over 1 million sustained TPS with no theoretical upper bound via state compression and dynamic neural sharding. </p>
             </div>
             <div className="neural-card p-6">
               <div className="text-4xl mb-4">🔐</div>
