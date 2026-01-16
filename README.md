@@ -2,7 +2,7 @@
 
 *A living, self-improving financial nervous system built on neural state embeddings and useful-work*
 
-**Open-source • No pre-mine • Community-governed • Fair launch June 2028**
+**Open-source • No pre-mine • Community-governed • Fair launch October 2027**
 
 ---
 
