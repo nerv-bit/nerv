@@ -28,17 +28,19 @@ We replace traditional Merkle trees with compact, homomorphic **neural state emb
 | **Whitepaper (v1.01)** | Complete technical specification (30 November 2025) | [NERV_Whitepaper_v1.01.pdf](NERV_Whitepaper_v1.01.pdf) |
 | **FAQ Document** | Addendum to the whitepaper | [NERV FAQ - Addendum to the Whitepaper.pdf](NERV%20FAQ%20-%20Addendum%20to%20the%20Whitepaper.pdf) |
 | **Project Landing Page** | Live project website | [https://nerv-3w4y.vercel.app](https://nerv-3w4y.vercel.app) |
+| **Project Codebase** | Complete Codebase  | (https://github.com/nerv-bit/nerv/tree/main/NERVCodeV2) |
 | **License** | Dual MIT / Apache 2.0 | See [LICENSE-MIT.txt](LICENSE-MIT.txt) and [LICENSE-APACHE.txt](LICENSE-APACHE.txt) |
 
 ---
 
 ## 📊 Current Repository Status
 
-**⚠️ Early-stage Development (December 2025)**
+**⚠️ Early-stage Development **
 
 This monorepo is in early-stage development:
 
 - ✅ Core documentation (whitepaper, planning, testing)
+- ✅ Complete codebase 
 - 🔄 No production node implementation yet – prototypes and circuits are under active development
 
 **All code, circuits, datasets, and specifications will be released under MIT/Apache 2.0 as they become available.**
@@ -67,13 +69,12 @@ NERV belongs to the global privacy and open-source community. We invite cryptogr
 1. **Read the whitepaper first** – it contains the complete technical specification
 2. **Review the FAQ document** for common questions and answers
 3. **Star/Watch this repo** for updates
+4. **Review the code** 
 
-### For Technical Experts:
-If you're skeptical of the whitepaper's claims (and you should be!), please review the **"NERV Proof-of-concept Epics-User stories-tasks"** document to help us find the answer to "Will this actually work?" in as little as 6 weeks!
 
 ### Ways to Contribute:
 - Open issues for questions, suggestions, or bug reports
-- Contribute code, reviews, audits, or documentation (PR guidelines coming soon)
+- Run encoder models, test homomorphism, simulate attacks, update code; perform reviews, audits, or provide documentation 
 - Follow progress on the project landing page and future community channels (to be announced)
 
 ---
@@ -82,15 +83,15 @@ If you're skeptical of the whitepaper's claims (and you should be!), please revi
 
 | Milestone | Target | Status |
 |-----------|--------|--------|
-| Public Testnet | Q2 2026 | Planned |
-| Mainnet Fair Launch | June 2028 | Scheduled |
+| Public Testnet | Q1 2027 | Planned |
+| Mainnet Fair Launch | October 2027 | Planned |
 
 **The nervous system of the private internet is being built in public. Join us!**
 
 ---
 
 **NERV Collective**  
-December 2025
+January 2026
 
 ---
 
