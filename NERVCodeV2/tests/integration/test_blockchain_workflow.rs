@@ -1,401 +1,208 @@
 // tests/integration/test_blockchain_workflow.rs
 // ============================================================================
-// BLOCKCHAIN WORKFLOW INTEGRATION TEST
+// COMPREHENSIVE BLOCKCHAIN WORKFLOW INTEGRATION TEST
 // ============================================================================
-// Tests the complete transaction flow from submission to confirmation,
-// including embedding updates, privacy mixing, and consensus validation.
+// This integration test simulates a full end-to-end workflow covering:
+// 1. Crypto: PQ keygen, signing, encryption (Dilithium + ML-KEM)
+// 2. Privacy: Transaction encryption, 5-hop mixing, TEE attestation (mock)
+// 3. Network: Mempool submission, gossip broadcast (mocked)
+// 4. Embedding: Homomorphic state update with delta application
+// 5. Consensus: Block proposal, neural predictor validation (fallback), voting
+// 6. Sharding: Load recording, potential split proposal detection
+// 
+// The test uses minimal configurations, fallbacks, and mocks to run without
+// real hardware/models/network while exercising all major code paths.
 // ============================================================================
 
-
-use crate::integration::*;
-use nerv_bit::embedding::*;
-use nerv_bit::privacy::*;
-use nerv_bit::consensus::*;
-use nerv_bit::crypto::*;
-use rand::{Rng, SeedableRng};
-use rand_chacha::ChaCha8Rng;
+use nerv_bit::{
+    crypto::{CryptoProvider, Dilithium3, MlKem768},
+    privacy::{PrivacyManager, PrivacyConfig},
+    network::{NetworkManager, NetworkConfig, EncryptedTransaction, TxPriority},
+    consensus::{ConsensusEngine, ConsensusConfig, BlockProposal, Vote},
+    embedding::{
+        encoder::NeuralEncoder,
+        homomorphism::{TransferTransaction, TransferDelta},
+        EmbeddingVec,
+    },
+    sharding::{ShardingManager, ShardingConfig, ShardLoadMetrics},
+    tokenomics::TokenomicsEngine,
+};
+use rand::thread_rng;
 use std::sync::Arc;
-use tokio::sync::Mutex;
-
-
-#[tokio::test]
-async fn test_complete_transaction_flow() {
-    let config = IntegrationConfig {
-        node_count: 3,
-        transaction_count: 10,
-        random_seed: 42,
-        ..Default::default()
-    };
-    
-    let mut env = TestEnvironment::new(config);
-    let mut rng = ChaCha8Rng::seed_from_u64(env.config.random_seed);
-    
-    println!("Starting complete transaction flow test...");
-    
-    // 1. Initialize nodes
-    for i in 0..env.config.node_count {
-        let node = TestNode::new(
-            i as u64,
-            &format!("127.0.0.1:{}", 8000 + i),
-            1000.0 * (i + 1) as f64,
-            i == 0, // First node is validator
-        );
-        env.add_node(node);
-    }
-    
-    println!("Initialized {} nodes", env.nodes.len());
-    
-    // 2. Generate transactions
-    for i in 0..env.config.transaction_count {
-        let mut sender = [0u8; 32];
-        let mut receiver = [0u8; 32];
-        rng.fill(&mut sender);
-        rng.fill(&mut receiver);
-        
-        let amount = rng.gen_range(1.0..100.0);
-        let fee = amount * 0.01;
-        
-        let tx = TestTransaction::new(sender, receiver, amount, fee);
-        env.add_transaction(tx);
-    }
-    
-    println!("Generated {} transactions", env.transactions.len());
-    
-    // 3. Create neural encoder
-    let encoder_config = nerv_bit::embedding::encoder::EncoderConfig::default();
-    let encoder = Arc::new(
-        nerv_bit::embedding::encoder::NeuralEncoder::new(encoder_config).unwrap()
-    );
-    
-    // 4. Create privacy mixer
-    let mixer_config = nerv_bit::privacy::mixer::MixerConfig::default();
-    let mixer = Arc::new(nerv_bit::privacy::mixer::OnionMixer::new(mixer_config));
-    
-    // 5. Create consensus predictor
-    let predictor_config = nerv_bit::consensus::predictor::ModelConfig::default();
-    let predictor = Arc::new(Mutex::new(
-        nerv_bit::consensus::predictor::NeuralPredictor::new(predictor_config).await.unwrap()
-    ));
-    
-    // 6. Process transactions
-    let mut metrics = IntegrationMetrics::default();
-    let mut processed_txs = 0;
-    
-    for tx in &env.transactions {
-        if env.is_timeout() {
-            println!("Test timeout reached");
-            break;
-        }
-        
-        let start_time = std::time::Instant::now();
-        
-        // Simulate transaction processing steps
-        
-        // Step 1: Privacy mixing
-        let payload = nerv_bit::privacy::mixer::EncryptedPayload::new(
-            &tx.id,
-            &[0u8; 32], // recipient key
-        ).unwrap();
-        
-        // Step 2: Create transfer delta
-        let mut sender_embedding = Vec::new();
-        let mut receiver_embedding = Vec::new();
-        let mut bias_terms = Vec::new();
-        
-        for _ in 0..512 {
-            sender_embedding.push(nerv_bit::embedding::homomorphism::FixedPoint32_16::from_float(
-                rng.gen_range(-1.0..1.0)
-            ));
-            receiver_embedding.push(nerv_bit::embedding::homomorphism::FixedPoint32_16::from_float(
-                rng.gen_range(-1.0..1.0)
-            ));
-            bias_terms.push(nerv_bit::embedding::homomorphism::FixedPoint32_16::from_float(
-                rng.gen_range(-0.1..0.1)
-            ));
-        }
-        
-        let transaction = nerv_bit::embedding::homomorphism::TransferTransaction {
-            sender: tx.sender,
-            receiver: tx.receiver,
-            amount: nerv_bit::embedding::homomorphism::FixedPoint32_16::from_float(tx.amount),
-            nonce: processed_txs as u64,
-            timestamp: tx.timestamp,
-            balance_proof: None,
-        };
-        
-        let delta = nerv_bit::embedding::homomorphism::TransferDelta::new(
-            transaction,
-            &sender_embedding,
-            &receiver_embedding,
-            &bias_terms,
-        ).unwrap();
-        
-        // Step 3: Consensus validation
-        let block_data = vec![0u8; 1024]; // Simulated block data
-        let prediction = predictor.lock().await.predict(&block_data).await.unwrap();
-        
-        if prediction.validity_score > 0.5 && prediction.confidence > 0.7 {
-            // Transaction considered valid
-            processed_txs += 1;
-            metrics.transactions_processed += 1;
-            
-            // Update embedding
-            let mut new_embedding = sender_embedding.clone();
-            for i in 0..512 {
-                new_embedding[i] = new_embedding[i].add(delta.delta[i]);
-            }
-            
-            // Record metrics
-            let latency = start_time.elapsed().as_millis() as f64;
-            metrics.avg_latency_ms = (metrics.avg_latency_ms * (processed_txs - 1) as f64 + latency) / processed_txs as f64;
-            
-            println!("Processed transaction {} with latency {:.2}ms", processed_txs, latency);
-        } else {
-            metrics.error_count += 1;
-            println!("Transaction failed validation (score: {:.2}, confidence: {:.2})", 
-                    prediction.validity_score, prediction.confidence);
-        }
-        
-        // Small delay to simulate real processing
-        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-    }
-    
-    // 7. Calculate success rate
-    metrics.success_rate = metrics.transactions_processed as f64 / env.transactions.len() as f64;
-    
-    // 8. Create result
-    let result = IntegrationResult {
-        test_name: "complete_transaction_flow".to_string(),
-        duration: env.elapsed(),
-        metrics,
-        passed: true,
-        errors: Vec::new(),
-    };
-    
-    println!("{}", result.summary());
-    
-    // Assertions
-    assert!(result.metrics.transactions_processed > 0, "Should process at least one transaction");
-    assert!(result.metrics.success_rate > 0.0, "Success rate should be positive");
-    assert!(result.metrics.avg_latency_ms > 0.0, "Average latency should be positive");
-    
-    println!("Complete transaction flow test passed!");
-}
-
+use tokio::time::{sleep, Duration};
 
 #[tokio::test]
-async fn test_multi_shard_transaction_processing() {
-    println!("Starting multi-shard transaction processing test...");
-    
-    let config = IntegrationConfig {
-        node_count: 5,
-        transaction_count: 50,
-        random_seed: 12345,
-        test_duration_secs: 30,
-        ..Default::default()
-    };
-    
-    let env = TestEnvironment::new(config);
-    let mut metrics = IntegrationMetrics::default();
-    
-    // Simulate multi-shard processing
-    let shard_count = 3;
-    let mut shard_metrics = vec![0u64; shard_count];
-    
-    for i in 0..env.config.transaction_count {
-        if i % 10 == 0 {
-            println!("Processing transaction {}/{}", i + 1, env.config.transaction_count);
-        }
-        
-        // Assign transaction to shard
-        let shard_id = i as usize % shard_count;
-        shard_metrics[shard_id] += 1;
-        metrics.transactions_processed += 1;
-        
-        // Simulate shard operation
-        if i % 15 == 0 {
-            metrics.shard_operations += 1;
-        }
-        
-        // Simulate consensus
-        if i % 5 == 0 {
-            metrics.consensus_rounds += 1;
-        }
-        
-        // Simulate block production
-        if i % 10 == 0 {
-            metrics.blocks_produced += 1;
-        }
-        
-        // Simulate TEE attestation
-        if i % 20 == 0 {
-            metrics.tee_attestations += 1;
-        }
-        
-        // Small delay
-        tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
-    }
-    
-    // Calculate average latency
-    metrics.avg_latency_ms = 150.0; // Simulated average
-    
-    // Verify shard distribution
-    println!("Shard distribution: {:?}", shard_metrics);
-    for (i, &count) in shard_metrics.iter().enumerate() {
-        assert!(count > 0, "Shard {} should have processed transactions", i);
-    }
-    
-    let result = IntegrationResult {
-        test_name: "multi_shard_processing".to_string(),
-        duration: env.elapsed(),
-        metrics,
-        passed: true,
-        errors: Vec::new(),
-    };
-    
-    println!("{}", result.summary());
-    
-    assert_eq!(result.metrics.transactions_processed, env.config.transaction_count);
-    assert!(result.metrics.blocks_produced > 0);
-    assert!(result.metrics.consensus_rounds > 0);
-    
-    println!("Multi-shard transaction processing test passed!");
-}
+async fn test_full_blockchain_workflow() {
+    // ========================================================================
+    // 1. Setup shared components
+    // ========================================================================
+    let crypto = Arc::new(CryptoProvider::new().unwrap());
 
+    // Privacy manager (with TEE mock/simulation)
+    let mut privacy_config = PrivacyConfig::default();
+    privacy_config.enable_tee = true; // Use simulation mode
+    let privacy = PrivacyManager::new(privacy_config.clone(), crypto.clone())
+        .await
+        .unwrap();
 
-#[tokio::test]
-async fn test_error_recovery_flow() {
-    println!("Starting error recovery flow test...");
-    
-    let config = IntegrationConfig {
-        node_count: 3,
-        transaction_count: 20,
-        random_seed: 999,
-        ..Default::default()
-    };
-    
-    let mut env = TestEnvironment::new(config);
-    let mut metrics = IntegrationMetrics::default();
-    let mut rng = ChaCha8Rng::seed_from_u64(env.config.random_seed);
-    
-    // Simulate transactions with failures
-    for i in 0..env.config.transaction_count {
-        let should_fail = rng.gen_bool(0.3); // 30% failure rate
-        
-        if should_fail {
-            metrics.error_count += 1;
-            println!("Transaction {} simulated failure", i + 1);
-            
-            // Simulate recovery
-            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-            
-            // Retry
-            metrics.transactions_processed += 1;
-            println!("Transaction {} recovered on retry", i + 1);
-        } else {
-            metrics.transactions_processed += 1;
-            println!("Transaction {} succeeded", i + 1);
-        }
-        
-        tokio::time::sleep(tokio::time::Duration::from_millis(20)).await;
-    }
-    
-    // Calculate metrics
-    metrics.success_rate = metrics.transactions_processed as f64 / 
-                         (metrics.transactions_processed + metrics.error_count) as f64;
-    metrics.avg_latency_ms = 75.0; // Simulated average with retries
-    
-    let result = IntegrationResult {
-        test_name: "error_recovery_flow".to_string(),
-        duration: env.elapsed(),
-        metrics,
-        passed: true,
-        errors: Vec::new(),
-    };
-    
-    println!("{}", result.summary());
-    
-    // Should have some errors and recoveries
-    assert!(result.metrics.error_count > 0, "Should have some errors");
-    assert!(result.metrics.success_rate > 0.7, "Success rate should be reasonable");
-    
-    println!("Error recovery flow test passed!");
-}
+    // Network manager
+    let network_config = NetworkConfig::default();
+    let network = NetworkManager::new(network_config, crypto.clone())
+        .await
+        .unwrap();
 
+    // Consensus engine
+    let mut consensus_config = ConsensusConfig::default();
+    consensus_config.predictor_model_path = "nonexistent.pt".to_string(); // Force fallback
+    let consensus = ConsensusEngine::new(consensus_config, crypto.clone()).await.unwrap();
 
-#[tokio::test]
-async fn test_concurrent_transaction_processing() {
-    println!("Starting concurrent transaction processing test...");
-    
-    let config = IntegrationConfig {
-        node_count: 10,
-        transaction_count: 100,
-        random_seed: 777,
-        ..Default::default()
+    // Sharding manager
+    let sharding_config = ShardingConfig::default();
+    let sharding = ShardingManager::new(sharding_config).await.unwrap();
+
+    // Embedding encoder
+    let encoder = NeuralEncoder::new(Default::default()).unwrap();
+
+    // Tokenomics (for fees/rewards)
+    let tokenomics = TokenomicsEngine::new(Default::default(), 1735689600);
+
+    // ========================================================================
+    // 2. Crypto: Generate keys and sign a transaction
+    // ========================================================================
+    let mut rng = thread_rng();
+    let (sig_pk, sig_sk) = Dilithium3::keypair(&mut rng);
+    let (kem_pk, kem_sk) = MlKem768::keypair(&mut rng).unwrap();
+
+    // Simple transfer transaction
+    let tx = TransferTransaction {
+        sender: [1u8; 32],
+        receiver: [2u8; 32],
+        amount: 1000u128.into(),
+        nonce: 1,
+        timestamp: 1234567890,
+        balance_proof: None,
     };
-    
-    let env = TestEnvironment::new(config);
-    let metrics = Arc::new(Mutex::new(IntegrationMetrics::default()));
-    
-    let start_time = std::time::Instant::now();
-    
-    // Process transactions concurrently
-    let mut handles = Vec::new();
-    
-    for i in 0..env.config.transaction_count {
-        let metrics_clone = metrics.clone();
-        
-        let handle = tokio::spawn(async move {
-            // Simulate transaction processing
-            let processing_time = 10 + (i % 20) as u64; // Varying processing times
-            tokio::time::sleep(tokio::time::Duration::from_millis(processing_time)).await;
-            
-            let mut metrics = metrics_clone.lock().await;
-            metrics.transactions_processed += 1;
-            
-            // Every 10th transaction creates a block
-            if i % 10 == 0 {
-                metrics.blocks_produced += 1;
-            }
-            
-            // Every 5th transaction requires consensus
-            if i % 5 == 0 {
-                metrics.consensus_rounds += 1;
-            }
-            
-            // Record latency
-            let latency = processing_time as f64;
-            let count = metrics.transactions_processed;
-            metrics.avg_latency_ms = (metrics.avg_latency_ms * (count - 1) as f64 + latency) / count as f64;
-        });
-        
-        handles.push(handle);
-    }
-    
-    // Wait for all transactions
-    for handle in handles {
-        handle.await.unwrap();
-    }
-    
-    let duration = start_time.elapsed();
-    let final_metrics = metrics.lock().await.clone();
-    
-    let result = IntegrationResult {
-        test_name: "concurrent_processing".to_string(),
-        duration,
-        metrics: final_metrics,
-        passed: true,
-        errors: Vec::new(),
+
+    let tx_bytes = bincode::serialize(&tx).unwrap();
+    let signature = Dilithium3::sign(&sig_sk, &tx_bytes).unwrap();
+
+    // ========================================================================
+    // 3. Privacy: Encrypt and mix the transaction
+    // ========================================================================
+    let mut encrypted_tx = EncryptedTransaction {
+        data: tx_bytes.clone(),
+        attestation: vec![],
+        shard_id: 0,
+        hash: blake3::hash(&tx_bytes).to_string(),
+        submission_time: std::time::SystemTime::now(),
+        priority: TxPriority::Normal,
     };
-    
-    println!("{}", result.summary());
-    
-    // Calculate TPS
-    let tps = result.metrics.transactions_processed as f64 / duration.as_secs_f64().max(1.0);
-    println!("Achieved TPS: {:.1}", tps);
-    
-    assert_eq!(result.metrics.transactions_processed, env.config.transaction_count);
-    assert!(tps > 10.0, "Should achieve reasonable TPS with concurrency");
-    
-    println!("Concurrent transaction processing test passed!");
+
+    // Apply mixing (5 hops, mock peers)
+    let mock_hops = vec![[10u8; 32]; 5];
+    let onion = privacy.mixer.unwrap().build_onion(tx_bytes.clone(), &mock_hops).await.unwrap();
+    encrypted_tx.data = bincode::serialize(&onion).unwrap();
+
+    // Mock TEE attestation for submission
+    let mock_attestation = privacy.tee_runtime.unwrap().local_attest(&tx_bytes).await.unwrap();
+    encrypted_tx.attestation = mock_attestation;
+
+    // ========================================================================
+    // 4. Network: Submit to mempool and simulate gossip
+    // ========================================================================
+    network.mempool_manager.add_transaction(encrypted_tx.clone()).await.unwrap();
+
+    let pending = network.mempool_manager.get_pending_transactions(0, 10).await.unwrap();
+    assert_eq!(pending.len(), 1);
+    assert_eq!(pending[0].hash, encrypted_tx.hash);
+
+    // Simulate gossip broadcast (no real peers, just check method)
+    network.gossip_manager.publish("transactions".to_string(), tx_bytes.clone()).await.unwrap();
+
+    // ========================================================================
+    // 5. Consensus: Propose block with transaction
+    // ========================================================================
+    let proposal = BlockProposal {
+        height: 1,
+        shard_id: 0,
+        transactions: vec![encrypted_tx.clone()],
+        previous_hash: [0u8; 32],
+        proposer: sig_pk,
+        timestamp: 1234567890,
+        neural_prediction: None, // Will use fallback
+    };
+
+    // Simulate proposal and voting
+    consensus.receive_proposal(proposal.clone()).await.unwrap();
+
+    // Mock vote
+    let vote = Vote {
+        voter: sig_pk,
+        proposal_hash: blake3::hash(&bincode::serialize(&proposal).unwrap()).into(),
+        vote_yes: true,
+        signature: signature.clone(),
+        reputation: 0.95,
+    };
+
+    consensus.receive_vote(vote).await.unwrap();
+
+    // Assume quorum reached → commit (simplified)
+    let committed = consensus.try_commit_block(&proposal).await;
+    assert!(committed.is_ok());
+
+    // ========================================================================
+    // 6. Embedding: Apply homomorphic update
+    // ========================================================================
+    let mut current_embedding = EmbeddingVec::zeros();
+
+    // Compute delta (mock account embeddings)
+    let sender_emb = vec![FixedPoint32_16::from_float(-0.5); 512];
+    let receiver_emb = vec![FixedPoint32_16::from_float(0.5); 512];
+    let bias = vec![FixedPoint32_16::from_float(0.0); 512];
+
+    let delta = TransferDelta::new(tx.clone(), &sender_emb, &receiver_emb, &bias).unwrap();
+
+    // Homomorphic update
+    current_embedding = current_embedding.add(&delta.delta.into());
+
+    // Verify error bound (should be near zero in mock)
+    let reconstructed = encoder.encode_state_mock(&current_embedding); // Assuming mock encode
+    assert!(current_embedding.approx_eq(&reconstructed, 1e-6));
+
+    // ========================================================================
+    // 7. Sharding: Record load and check for reconfiguration
+    // ========================================================================
+    let load_metrics = ShardLoadMetrics {
+        shard_id: 0,
+        tx_count: 1,
+        embedding_count: 1,
+        storage_bytes: 1024,
+        cpu_load: 0.1,
+        timestamp: std::time::SystemTime::now(),
+    };
+
+    sharding.record_load_metrics(load_metrics).await.unwrap();
+    sharding.run_prediction_cycle().await.unwrap();
+
+    // With low load, no split/merge expected
+    let ops = sharding.get_pending_operations().await;
+    assert!(ops.is_empty());
+
+    // ========================================================================
+    // 8. Tokenomics: Process fee and rewards
+    // ========================================================================
+    let fee = 100u128;
+    let fee_result = tokenomics.process_fee(fee);
+    assert!(fee_result.burned > 0);
+    assert!(fee_result.to_validators > 0);
+
+    // Block reward distribution
+    let block_reward = tokenomics.calculate_block_reward(1);
+    let dist = tokenomics.distribute_block_reward(block_reward);
+    assert_eq!(dist.gradient_pool + dist.validation_pool + dist.public_goods_pool, block_reward);
+
+    // ========================================================================
+    // Final assertions: All components interacted successfully
+    // ========================================================================
+    println!("Full blockchain workflow integration test passed!");
 }

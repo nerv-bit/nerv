@@ -1,405 +1,243 @@
-// tests/unit/test_sharding.rs
+Rust// tests/unit/test_sharding.rs
 // ============================================================================
 // SHARDING MODULE UNIT TESTS
 // ============================================================================
 
+use nerv_bit::sharding::{
+    ShardingManager, ShardingConfig, ShardState, ShardOperation,
+    lstm_predictor::{LstmLoadPredictor, LoadPrediction, ShardLoadMetrics, PredictionConfig},
+    bisection::{EmbeddingBisection, ShardBoundary, EmbeddingPartition},
+    erasure::{ReedSolomonEncoder, ReedSolomonDecoder, ErasureCodingConfig, EncoderStats},
+};
+use nerv_bit::embedding::{EmbeddingVec, EmbeddingHash};
+use rand::{thread_rng, Rng};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::time::{sleep, Duration};
 
-use nerv_bit::sharding::*;
-use rand::Rng;
+#[tokio::test]
+async fn test_sharding_manager_creation_and_basic_ops() {
+    let config = ShardingConfig::default();
+    let manager = ShardingManager::new(config).await.unwrap();
 
+    // Initial state
+    assert_eq!(manager.get_active_shards().await.len(), 1); // Genesis shard
+    assert_eq!(manager.current_shard_count().await, 1);
+
+    // Add mock load metrics
+    let metrics = ShardLoadMetrics {
+        shard_id: 0,
+        tx_count: 1000,
+        embedding_count: 500,
+        storage_bytes: 1_000_000,
+        cpu_load: 0.8,
+        timestamp: std::time::SystemTime::now(),
+    };
+    manager.record_load_metrics(metrics).await.unwrap();
+
+    let stats = manager.get_statistics().await;
+    assert_eq!(stats.total_transactions, 1000);
+    assert!(stats.avg_load_per_shard > 0.0);
+}
 
 #[test]
-fn test_lstm_predictor_creation() {
-    // This would test the LSTM load predictor
-    // Since we don't have the actual implementation, we'll create a placeholder
-    let predictor = LstmPredictor::new(1.1).unwrap(); // 1.1MB model
-    
-    assert!(predictor.model_size_mb > 0.0);
+fn test_sharding_config_defaults() {
+    let config = ShardingConfig::default();
+
+    assert_eq!(config.max_shards, 1024);
+    assert_eq!(config.min_shards, 1);
+    assert_eq!(config.target_load_per_shard, 10_000);
+    assert!(config.split_threshold > 1.0);
+    assert!(config.merge_threshold < 1.0);
+    assert!(config.erasure_coding.enabled);
+    assert_eq!(config.erasure_coding.data_shards, 5);
+    assert_eq!(config.erasure_coding.parity_shards, 2);
 }
 
+#[tokio::test]
+async fn test_shard_split_proposal() {
+    let mut config = ShardingConfig::default();
+    config.target_load_per_shard = 100; // Low threshold for test
+    config.split_threshold = 1.5;
 
-#[test]
-fn test_bisection_algorithm() {
-    // Test embedding bisection for shard splitting
-    let embeddings = vec![
-        vec![0.0, 1.0, 2.0],
-        vec![1.0, 2.0, 3.0],
-        vec![2.0, 3.0, 4.0],
-        vec![3.0, 4.0, 5.0],
-    ];
-    
-    // Test clustering
-    let (cluster1, cluster2) = bisection_algorithm(&embeddings).unwrap();
-    
-    assert!(!cluster1.is_empty());
-    assert!(!cluster2.is_empty());
-    assert_eq!(cluster1.len() + cluster2.len(), embeddings.len());
-}
+    let manager = ShardingManager::new(config).await.unwrap();
 
-
-#[test]
-fn test_erasure_coding() {
-    use nerv_bit::sharding::erasure::*;
-    
-    // Create test data
-    let data = b"test data for erasure coding";
-    
-    // Encode with Reed-Solomon (k=5, m=2)
-    let encoded = encode_erasure(data, 5, 2).unwrap();
-    
-    assert_eq!(encoded.len(), 7); // k + m = 5 + 2
-    
-    // Decode with all shards
-    let decoded = decode_erasure(&encoded, 5, 2).unwrap();
-    assert_eq!(decoded, data);
-    
-    // Decode with some missing shards (up to m=2 missing)
-    let mut partial = encoded.clone();
-    partial[0] = None; // Remove first shard
-    partial[3] = None; // Remove fourth shard
-    
-    let decoded_partial = decode_erasure(&partial, 5, 2).unwrap();
-    assert_eq!(decoded_partial, data);
-}
-
-
-#[test]
-fn test_shard_metrics() {
-    let mut metrics = ShardMetrics::new(1);
-    
-    // Update metrics
-    metrics.update_transaction_count(100);
-    metrics.update_processing_time(0.5);
-    metrics.update_validator_count(10);
-    
-    assert_eq!(metrics.transaction_count, 100);
-    assert_eq!(metrics.avg_processing_time, 0.5);
-    assert_eq!(metrics.validator_count, 10);
-    assert!(metrics.last_update > 0);
-    
-    // Test load calculation
-    let load = metrics.calculate_load();
-    assert!(load >= 0.0);
-}
-
-
-#[test]
-fn test_shard_state() {
-    let mut state = ShardState::new(1);
-    
-    // Add accounts
-    state.add_account([1u8; 32], 100.0);
-    state.add_account([2u8; 32], 200.0);
-    
-    assert_eq!(state.account_count(), 2);
-    
-    // Get balance
-    let balance = state.get_balance(&[1u8; 32]).unwrap();
-    assert_eq!(balance, 100.0);
-    
-    // Transfer
-    state.transfer(&[1u8; 32], &[2u8; 32], 50.0).unwrap();
-    
-    let new_balance1 = state.get_balance(&[1u8; 32]).unwrap();
-    let new_balance2 = state.get_balance(&[2u8; 32]).unwrap();
-    
-    assert_eq!(new_balance1, 50.0);
-    assert_eq!(new_balance2, 250.0);
-    
-    // Test insufficient balance
-    let result = state.transfer(&[1u8; 32], &[2u8; 32], 100.0);
-    assert!(result.is_err());
-}
-
-
-#[test]
-fn test_shard_manager() {
-    let manager = ShardManager::new();
-    
-    // Initially no shards
-    assert_eq!(manager.shard_count(), 0);
-    
-    // Create first shard
-    let shard_id = manager.create_shard().unwrap();
-    assert_eq!(shard_id, 0);
-    assert_eq!(manager.shard_count(), 1);
-    
-    // Create second shard
-    let shard_id2 = manager.create_shard().unwrap();
-    assert_eq!(shard_id2, 1);
-    assert_eq!(manager.shard_count(), 2);
-    
-    // Get shard
-    let shard = manager.get_shard(0).unwrap();
-    assert_eq!(shard.id, 0);
-    
-    // Remove shard
-    manager.remove_shard(1).unwrap();
-    assert_eq!(manager.shard_count(), 1);
-}
-
-
-#[test]
-fn test_shard_split_decision() {
-    let mut metrics = ShardMetrics::new(1);
-    
-    // Set high load
-    metrics.update_transaction_count(10000);
-    metrics.update_processing_time(2.0);
-    
-    let should_split = metrics.should_split();
-    assert!(should_split, "High load should trigger split");
-    
-    // Set low load
-    let mut low_metrics = ShardMetrics::new(2);
-    low_metrics.update_transaction_count(100);
-    low_metrics.update_processing_time(0.1);
-    
-    let should_split = low_metrics.should_split();
-    assert!(!should_split, "Low load should not trigger split");
-}
-
-
-#[test]
-fn test_shard_merge_decision() {
-    let mut metrics1 = ShardMetrics::new(1);
-    let mut metrics2 = ShardMetrics::new(2);
-    
-    // Both shards have low load
-    metrics1.update_transaction_count(50);
-    metrics2.update_transaction_count(60);
-    
-    let should_merge = ShardMetrics::should_merge(&metrics1, &metrics2);
-    assert!(should_merge, "Low load shards should merge");
-    
-    // One shard has high load
-    metrics1.update_transaction_count(5000);
-    let should_merge = ShardMetrics::should_merge(&metrics1, &metrics2);
-    assert!(!should_merge, "High load shard should not merge");
-}
-
-
-// Placeholder structs for tests
-struct LstmPredictor {
-    model_size_mb: f64,
-}
-
-
-impl LstmPredictor {
-    fn new(model_size_mb: f64) -> Result<Self, ShardingError> {
-        Ok(Self { model_size_mb })
+    // Overload genesis shard
+    for _ in 0..200 {
+        let metrics = ShardLoadMetrics {
+            shard_id: 0,
+            tx_count: 200,
+            embedding_count: 100,
+            storage_bytes: 500_000,
+            cpu_load: 0.9,
+            timestamp: std::time::SystemTime::now(),
+        };
+        manager.record_load_metrics(metrics).await.unwrap();
     }
+
+    // Trigger prediction and check for split proposal
+    manager.run_prediction_cycle().await.unwrap();
+
+    let operations = manager.get_pending_operations().await;
+    assert!(!operations.is_empty());
+    assert!(operations.iter().any(|op| matches!(op, ShardOperation::Split { .. })));
 }
 
+#[tokio::test]
+async fn test_shard_merge_proposal() {
+    let mut config = ShardingConfig::default();
+    config.target_load_per_shard = 1000;
+    config.merge_threshold = 0.3;
 
-#[derive(Debug)]
-pub enum ShardingError {
-    InvalidParameter(String),
-    ShardNotFound(u64),
-    InsufficientBalance,
-}
+    let manager = ShardingManager::new(config).await.unwrap();
 
+    // Manually create underloaded shards (simulate post-split)
+    manager.force_split(0).await.unwrap(); // Creates shard 1
 
-impl std::fmt::Display for ShardingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::InvalidParameter(msg) => write!(f, "Invalid parameter: {}", msg),
-            Self::ShardNotFound(id) => write!(f, "Shard not found: {}", id),
-            Self::InsufficientBalance => write!(f, "Insufficient balance"),
-        }
-    }
-}
-
-
-impl std::error::Error for ShardingError {}
-
-
-type Result<T> = std::result::Result<T, ShardingError>;
-
-
-fn bisection_algorithm(embeddings: &[Vec<f64>]) -> Result<(Vec<usize>, Vec<usize>)> {
-    // Simple implementation: split in the middle
-    let mid = embeddings.len() / 2;
-    let cluster1: Vec<usize> = (0..mid).collect();
-    let cluster2: Vec<usize> = (mid..embeddings.len()).collect();
-    Ok((cluster1, cluster2))
-}
-
-
-mod erasure {
-    use super::*;
-    
-    pub fn encode_erasure(data: &[u8], k: usize, m: usize) -> Result<Vec<Option<Vec<u8>>>> {
-        // Simplified implementation
-        let mut encoded = Vec::new();
-        for i in 0..(k + m) {
-            let mut shard = data.to_vec();
-            shard.push(i as u8); // Add index for differentiation
-            encoded.push(Some(shard));
-        }
-        Ok(encoded)
-    }
-    
-    pub fn decode_erasure(shards: &[Option<Vec<u8>>], k: usize, m: usize) -> Result<Vec<u8>> {
-        // Simplified implementation
-        let mut data = Vec::new();
-        for (i, shard) in shards.iter().enumerate() {
-            if let Some(shard_data) = shard {
-                if data.is_empty() {
-                    data = shard_data[..shard_data.len() - 1].to_vec(); // Remove index
-                }
-            }
-            if i >= k - 1 {
-                break;
-            }
-        }
-        Ok(data)
-    }
-}
-
-
-struct ShardMetrics {
-    shard_id: u64,
-    transaction_count: u64,
-    avg_processing_time: f64,
-    validator_count: u64,
-    last_update: u64,
-}
-
-
-impl ShardMetrics {
-    fn new(shard_id: u64) -> Self {
-        Self {
+    // Record very low load
+    for shard_id in 0..2 {
+        let metrics = ShardLoadMetrics {
             shard_id,
-            transaction_count: 0,
-            avg_processing_time: 0.0,
-            validator_count: 0,
-            last_update: 0,
+            tx_count: 10,
+            embedding_count: 5,
+            storage_bytes: 10_000,
+            cpu_load: 0.1,
+            timestamp: std::time::SystemTime::now(),
+        };
+        manager.record_load_metrics(metrics).await.unwrap();
+    }
+
+    manager.run_prediction_cycle().await.unwrap();
+
+    let operations = manager.get_pending_operations().await;
+    assert!(operations.iter().any(|op| matches!(op, ShardOperation::Merge { .. })));
+}
+
+#[test]
+fn test_embedding_bisection_simple_partition() {
+    let mut embeddings = vec![];
+    let mut rng = thread_rng();
+
+    // Cluster 1: around [0.0; 512]
+    for _ in 0..50 {
+        let mut vec = [0.0f64; 512];
+        for v in vec.iter_mut() {
+            *v = rng.gen_range(-0.1..0.1);
         }
+        embeddings.push(EmbeddingVec::new(vec));
     }
-    
-    fn update_transaction_count(&mut self, count: u64) {
-        self.transaction_count = count;
-        self.last_update = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+
+    // Cluster 2: around [1.0; 512]
+    for _ in 0..50 {
+        let mut vec = [1.0f64; 512];
+        for v in vec.iter_mut() {
+            *v += rng.gen_range(-0.1..0.1);
+        }
+        embeddings.push(EmbeddingVec::new(vec));
     }
-    
-    fn update_processing_time(&mut self, time: f64) {
-        self.avg_processing_time = time;
-    }
-    
-    fn update_validator_count(&mut self, count: u64) {
-        self.validator_count = count;
-    }
-    
-    fn calculate_load(&self) -> f64 {
-        // Simple load calculation
-        self.transaction_count as f64 * self.avg_processing_time
-    }
-    
-    fn should_split(&self) -> bool {
-        // Split if load is high
-        self.calculate_load() > 1000.0
-    }
-    
-    fn should_merge(metrics1: &Self, metrics2: &Self) -> bool {
-        // Merge if both shards have low load
-        metrics1.calculate_load() < 100.0 && metrics2.calculate_load() < 100.0
+
+    let bisection = EmbeddingBisection::new();
+    let partitions = bisection.partition_embeddings(&embeddings, 2).unwrap();
+
+    assert_eq!(partitions.len(), 2);
+    // Each partition should have roughly 50 embeddings
+    assert!(partitions[0].embeddings.len() >= 40 && partitions[0].embeddings.len() <= 60);
+    assert!(partitions[1].embeddings.len() >= 40 && partitions[1].embeddings.len() <= 60);
+
+    // Centroids should be far apart
+    let dist = partitions[0].boundary.centroid.distance(&partitions[1].boundary.centroid);
+    assert!(dist > 0.5);
+}
+
+#[test]
+fn test_reed_solomon_encoding_decoding() {
+    let config = ErasureCodingConfig::default();
+    let encoder = ReedSolomonEncoder::new(config.clone());
+
+    let data = vec![vec![42u8; 1024]; 5]; // 5 data shards
+
+    let shards = encoder.encode(&data).unwrap();
+    assert_eq!(shards.len(), 7); // 5 data + 2 parity
+
+    let stats = encoder.stats();
+    assert_eq!(stats.successful_encodes, 1);
+    assert!(stats.avg_encode_time_ms > 0.0);
+
+    // Test reconstruction with 2 missing shards
+    let mut incomplete = shards.clone();
+    incomplete[0] = vec![]; // Missing data shard
+    incomplete[5] = vec![]; // Missing parity shard
+
+    let decoder = ReedSolomonDecoder::new(config);
+    let reconstructed = decoder.reconstruct(&incomplete).unwrap();
+
+    assert_eq!(reconstructed.len(), 5);
+    for i in 0..5 {
+        assert_eq!(reconstructed[i], data[i]);
     }
 }
 
+#[test]
+fn test_reed_solomon_cache() {
+    let config = ErasureCodingConfig::default();
+    let mut encoder = ReedSolomonEncoder::new(config);
 
-struct AccountState {
-    balance: f64,
+    encoder.cache.max_size = 2;
+
+    let data1 = vec![vec![1u8; 512]; 5];
+    let hash1 = blake3::hash(&bincode::serialize(&data1).unwrap()).into();
+
+    let shards1 = encoder.encode(&data1).unwrap();
+    // Cache hit on second encode
+    let shards1_cached = encoder.encode(&data1).unwrap();
+    assert_eq!(shards1, shards1_cached);
+
+    let data2 = vec![vec![2u8; 512]; 5];
+    encoder.encode(&data2).unwrap();
+
+    // Cache should evict oldest (data1) when full
+    let data3 = vec![vec![3u8; 512]; 5];
+    encoder.encode(&data3).unwrap();
+
+    // data1 should be evicted
+    assert!(encoder.cache.get(&hash1).is_none());
 }
 
+#[tokio::test]
+async fn test_lstm_predictor_mock_fallback() {
+    // Use invalid model path to trigger fallback
+    let mut config = PredictionConfig::default();
+    config.model_path = "nonexistent.onnx".to_string();
 
-struct ShardState {
-    id: u64,
-    accounts: std::collections::HashMap<[u8; 32], AccountState>,
+    let predictor = LstmLoadPredictor::new(config).await.unwrap();
+    assert!(predictor.fallback_mode);
+
+    let history = vec![1000.0f32; 60]; // 1 hour of data
+
+    let prediction = predictor.predict_load(0, &history).unwrap();
+    assert!(prediction.predicted_load > 0.0);
+    assert!(prediction.confidence > 0.5); // Fallback heuristic
+
+    // Record feedback
+    predictor.record_feedback(0, prediction.predicted_load, 1100.0).await;
+    let accuracy = predictor.get_accuracy_metrics();
+    assert!(accuracy.accuracy_10_percent > 0.0);
 }
 
+#[tokio::test]
+async fn test_sharding_state_persistence() {
+    let config = ShardingConfig::default();
+    let manager = ShardingManager::new(config).await.unwrap();
 
-impl ShardState {
-    fn new(id: u64) -> Self {
-        Self {
-            id,
-            accounts: std::collections::HashMap::new(),
-        }
-    }
-    
-    fn add_account(&mut self, address: [u8; 32], balance: f64) {
-        self.accounts.insert(address, AccountState { balance });
-    }
-    
-    fn get_balance(&self, address: &[u8; 32]) -> Result<f64> {
-        self.accounts
-            .get(address)
-            .map(|acc| acc.balance)
-            .ok_or(ShardingError::InvalidParameter("Account not found".to_string()))
-    }
-    
-    fn account_count(&self) -> usize {
-        self.accounts.len()
-    }
-    
-    fn transfer(&mut self, from: &[u8; 32], to: &[u8; 32], amount: f64) -> Result<()> {
-        let from_balance = self.get_balance(from)?;
-        if from_balance < amount {
-            return Err(ShardingError::InsufficientBalance);
-        }
-        
-        let to_balance = self.get_balance(to).unwrap_or(0.0);
-        
-        if let Some(from_acc) = self.accounts.get_mut(from) {
-            from_acc.balance -= amount;
-        }
-        
-        let to_acc = self.accounts.entry(*to).or_insert(AccountState { balance: 0.0 });
-        to_acc.balance += amount;
-        
-        Ok(())
-    }
-}
+    // Modify state
+    manager.force_split(0).await.unwrap();
 
+    // Save
+    manager.save_state().await.unwrap();
 
-struct ShardManager {
-    shards: std::collections::HashMap<u64, ShardState>,
-    next_shard_id: u64,
-}
+    // Create new manager and load
+    let manager2 = ShardingManager::new(config).await.unwrap();
+    manager2.load_state().await.unwrap();
 
-
-impl ShardManager {
-    fn new() -> Self {
-        Self {
-            shards: std::collections::HashMap::new(),
-            next_shard_id: 0,
-        }
-    }
-    
-    fn shard_count(&self) -> usize {
-        self.shards.len()
-    }
-    
-    fn create_shard(&mut self) -> Result<u64> {
-        let id = self.next_shard_id;
-        self.shards.insert(id, ShardState::new(id));
-        self.next_shard_id += 1;
-        Ok(id)
-    }
-    
-    fn get_shard(&self, id: u64) -> Result<&ShardState> {
-        self.shards
-            .get(&id)
-            .ok_or(ShardingError::ShardNotFound(id))
-    }
-    
-    fn remove_shard(&mut self, id: u64) -> Result<()> {
-        self.shards
-            .remove(&id)
-            .ok_or(ShardingError::ShardNotFound(id))?;
-        Ok(())
-    }
+    assert_eq!(manager2.current_shard_count().await, 2);
 }

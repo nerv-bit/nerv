@@ -1,192 +1,337 @@
-// tests/unit/test_consensus.rs
+Rust// tests/unit/test_consensus.rs
 // ============================================================================
 // CONSENSUS MODULE UNIT TESTS
 // ============================================================================
 
+use nerv_bit::consensus::{
+    predictor::{Predictor, ConsensusConfig as PredictorConfigPart},
+    voting::{Validator, ValidatorSet, SlashingReason, EncoderUpdateVote},
+    dispute::{DisputeResolver, Dispute, DisputeType, DisputeEvidence, EvidenceType, DisputeStatus, ResolutionResult},
+    ConsensusConfig, ConsensusState,
+};
+use rand::{thread_rng, Rng};
+use std::collections::HashMap;
+use std::path::PathBuf;
+use tempfile::tempdir;
 
-use nerv_bit::consensus::predictor::*;
-use nerv_bit::Result;
-use rand::Rng;
+#[test]
+fn test_consensus_config_defaults() {
+    let config = ConsensusConfig::default();
 
+    assert_eq!(config.block_time_ms, 600);
+    assert_eq!(config.view_change_timeout_ms, 3000);
+    assert_eq!(config.max_validators, 1000);
+    assert_eq!(config.min_stake, 1000 * 10u128.pow(18));
+    assert!((config.reputation_decay - 0.95).abs() < 1e-9);
+    assert!((config.slashing_penalty - 0.1).abs() < 1e-9);
+    assert_eq!(config.dispute_timeout_sec, 30);
+    assert!(config.enable_predictor);
+}
+
+#[test]
+fn test_consensus_state_defaults() {
+    let state = ConsensusState::default();
+
+    assert_eq!(state.view_number, 0);
+    assert_eq!(state.block_height, 0);
+    assert_eq!(state.last_committed_hash, [0u8; 32]);
+    assert_eq!(state.proposer_index, 0);
+    assert!(state.locked_hash.is_none());
+    assert!(state.prepared_hash.is_none());
+}
+
+#[test]
+fn test_predictor_fallback_mode() {
+    // Use a non-existent model path to force fallback
+    let mut config = ConsensusConfig::default();
+    config.predictor_model_path = PathBuf::from("nonexistent_model.pt");
+
+    let predictor = Predictor::new(&config).unwrap();
+    assert!(predictor.fallback);
+
+    let tokens = vec![1u16, 2, 3, 4, 5];
+    let (embedding, score) = predictor.predict(&tokens).unwrap();
+
+    assert_eq!(embedding.0.len(), 512);
+    // In fallback: even length → 0.95, odd → 0.85
+    assert!((score - 0.85).abs() < 1e-6);
+
+    assert_eq!(predictor.parameter_count(), 0);
+    assert!((predictor.size_mb() - 0.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_predictor_input_validation() {
+    let mut config = ConsensusConfig::default();
+    config.predictor_model_path = PathBuf::from("nonexistent.pt");
+
+    let predictor = Predictor::new(&config).unwrap();
+
+    // Empty input
+    assert!(predictor.predict(&[]).is_err());
+
+    // Too long
+    let too_long = vec![0u16; 600];
+    assert!(predictor.predict(&too_long).is_err());
+
+    // Valid length
+    let valid = vec![0u16; 512];
+    assert!(predictor.predict(&valid).is_ok());
+}
+
+#[test]
+fn test_validator_creation_and_voting_power() {
+    let address = [1u8; 20];
+    let stake = 1_000_000_000_000_000_000u128; // 1e18
+    let pubkey = vec![0u8; 32];
+
+    let mut validator = Validator::new(address, stake, pubkey);
+
+    assert_eq!(validator.stake, stake);
+    assert!((validator.reputation - 0.5).abs() < 1e-9);
+    assert_eq!(validator.voting_power, (stake as f64 * 0.5) as u128);
+    assert!(validator.is_active(100));
+
+    // Update reputation
+    validator.reputation = 0.9;
+    validator.update_voting_power();
+    assert_eq!(validator.voting_power, (stake as f64 * 0.9) as u128);
+}
+
+#[test]
+fn test_validator_slashing_and_jailing() {
+    let address = [1u8; 20];
+    let stake = 1_000u128;
+    let mut validator = Validator::new(address, stake, vec![]);
+
+    // Slash 10%
+    validator.slash(0.1, SlashingReason::DoubleSign, 100);
+
+    assert_eq!(validator.stake, 900);
+    assert!((validator.reputation - 0.25).abs() < 1e-9); // 0.5 * 0.5
+    assert_eq!(validator.slashing_events.len(), 1);
+
+    // Jail for 1000 blocks
+    validator.jail(1000, 100);
+    assert!(validator.is_jailed(500));
+    assert!(!validator.is_jailed(1100));
+
+    validator.unjail();
+    assert!(!validator.is_jailed(500));
+}
 
 #[tokio::test]
-async fn test_neural_predictor_creation() {
-    let config = ModelConfig::default();
-    let predictor = NeuralPredictor::new(config).await.unwrap();
-    
-    // Test warmup
-    predictor.warmup().await.unwrap();
-    
-    // Test prediction with dummy data
-    let block_data = vec![0u8; 1024];
-    let result = predictor.predict(&block_data).await.unwrap();
-    
-    assert!(result.validity_score >= 0.0 && result.validity_score <= 1.0);
-    assert!(result.confidence >= 0.0 && result.confidence <= 1.0);
-    assert!(result.anomaly_score >= 0.0 && result.anomaly_score <= 1.0);
-    assert_eq!(result.model_version, 1);
-    assert_eq!(result.feature_vector.len(), 256);
+async fn test_validator_set_basic_operations() {
+    let mut set = ValidatorSet::new(1000 * 10u128.pow(18), 1000);
+
+    let val1 = Validator::new([1u8; 20], 2000 * 10u128.pow(18), vec![0u8; 32]);
+    let val2 = Validator::new([2u8; 20], 3000 * 10u128.pow(18), vec![0u8; 32]);
+
+    set.add_validator(val1.clone()).await.unwrap();
+    set.add_validator(val2.clone()).await.unwrap();
+
+    assert_eq!(set.len().await, 2);
+
+    let total_power = set.total_voting_power().await.unwrap();
+    assert_eq!(total_power, (2000 * 10u128.pow(18) as f64 * 0.5) as u128 + (3000 * 10u128.pow(18) as f64 * 0.5) as u128);
+
+    // Check quorum (2/3)
+    let quorum = set.has_quorum(total_power / 2).await;
+    assert!(!quorum); // half power
+    let quorum = set.has_quorum((total_power * 2 / 3) + 1).await;
+    assert!(quorum);
 }
 
+#[tokio::test]
+async fn test_validator_set_epoch_processing() {
+    let mut set = ValidatorSet::new(100 * 10u128.pow(18), 100);
 
-#[test]
-fn test_feature_extractor() {
-    let extractor = FeatureExtractor::new();
-    
-    // Test entropy calculation
-    let uniform_data = vec![0u8; 1000];
-    let high_entropy_data: Vec<u8> = (0..1000).map(|i| (i % 256) as u8).collect();
-    
-    let uniform_entropy = extractor.entropy(&uniform_data);
-    let high_entropy = extractor.entropy(&high_entropy_data);
-    
-    assert!(high_entropy > uniform_entropy, "High entropy data should have higher entropy");
-    assert!(uniform_entropy >= 0.0 && uniform_entropy <= 1.0);
-    
-    // Test byte distribution
-    let data = vec![0u8, 255u8, 128u8];
-    let distribution = extractor.byte_distribution(&data);
-    
-    assert_eq!(distribution.len(), 16);
-    let sum: f32 = distribution.iter().sum();
-    assert!((sum - 1.0).abs() < 0.0001, "Distribution should sum to 1");
+    let mut val1 = Validator::new([1u8; 20], 1000 * 10u128.pow(18), vec![]);
+    val1.reputation = 0.95;
+    set.add_validator(val1).await.unwrap();
+
+    let mut val2 = Validator::new([2u8; 20], 200 * 10u128.pow(18), vec![]);
+    val2.reputation = 0.05; // Low reputation
+    set.add_validator(val2).await.unwrap();
+
+    // Trigger epoch (block multiple of epoch_length, assume 100)
+    set.process_epoch(100).await.unwrap();
+
+    // val2 should be dropped due to reputation < 0.1
+    assert_eq!(set.len().await, 1);
+
+    let remaining = set.validators().await.unwrap();
+    assert_eq!(remaining[0].address, [1u8; 20]);
+    assert!(remaining[0].reputation < 0.95); // Decay applied
 }
 
+#[tokio::test]
+async fn test_validator_set_encoder_update_quorum() {
+    let mut set = ValidatorSet::new(100 * 10u128.pow(18), 100);
+
+    // 3 validators with equal stake → equal power
+    for i in 1..=3 {
+        let mut val = Validator::new([i; 20], 1000 * 10u128.pow(18), vec![]);
+        val.reputation = 1.0;
+        val.update_voting_power();
+        set.add_validator(val).await.unwrap();
+    }
+
+    let total_power = set.total_voting_power().await.unwrap();
+    let new_hash = [42u8; 32];
+
+    // 2 validators vote yes → 2/3 power
+    set.vote_encoder_update([1u8; 20], new_hash, true).await.unwrap();
+    set.vote_encoder_update([2u8; 20], new_hash, true).await.unwrap();
+
+    // Process epoch → should apply update
+    set.process_epoch(100).await.unwrap();
+    let current = set.current_encoder_hash().await.unwrap();
+    assert_eq!(current, new_hash);
+
+    // Insufficient (only 1 vote)
+    let mut set2 = set.clone();
+    set2.propose_encoder_update([99u8; 32]).await.unwrap();
+    set2.vote_encoder_update([1u8; 20], [99u8; 32], true).await.unwrap();
+    set2.process_epoch(200).await.unwrap();
+    let current2 = set2.current_encoder_hash().await.unwrap();
+    assert_ne!(current2, [99u8; 32]);
+}
 
 #[test]
-fn test_prediction_statistics() {
-    let mut stats = PredictionStatistics::new();
-    
-    // Add some results
+fn test_dispute_resolver_committee_selection() {
+    let mut rng = thread_rng();
+    let mut validators = HashSet::new();
     for i in 0..100 {
-        let result = PredictionResult {
-            validity_score: 0.8,
-            confidence: 0.9,
-            anomaly_score: 0.1,
-            inference_time_us: 1000,
-            model_version: 1,
-            feature_vector: vec![0.0; 256],
-            metadata: PredictionMetadata {
-                gas_price_prediction: 100,
-                gas_limit_prediction: 21000,
-                throughput_prediction: 1000.0,
-                latency_prediction: 100.0,
-                security_risk: 0.1,
-                energy_efficiency: 10.0,
-            },
-        };
-        
-        stats.update(&result);
-        stats.add_ground_truth(true);
+        validators.insert([i as u8; 20]);
     }
-    
-    assert_eq!(stats.total_predictions, 100);
-    assert_eq!(stats.correct_predictions, 100);
-    assert_eq!(stats.accuracy(), 1.0);
-    assert!(stats.recent_accuracy() > 0.0);
-}
 
+    let resolver = DisputeResolver::new(30, 0.1, 0.5); // committee size 30
+
+    let committee = resolver.select_committee(&validators, 12345, &mut rng);
+    assert_eq!(committee.len(), 30);
+    // Deterministic for same seed
+    let committee2 = resolver.select_committee(&validators, 12345, &mut rng);
+    assert_eq!(committee, committee2);
+}
 
 #[tokio::test]
-async fn test_prediction_cache() {
-    let cache = PredictionCache::new(10);
-    
-    let mut rng = rand::thread_rng();
-    
-    // Add entries
-    for i in 0..15 {
-        let mut key = [0u8; 32];
-        rng.fill(&mut key);
-        
-        let result = PredictionResult {
-            validity_score: 0.8,
-            confidence: 0.9,
-            anomaly_score: 0.1,
-            inference_time_us: 1000,
-            model_version: 1,
-            feature_vector: vec![0.0; 256],
-            metadata: PredictionMetadata::default(),
-        };
-        
-        cache.insert(key, result.clone());
-        
-        // Test retrieval
-        let cached = cache.get(&key);
-        if i >= 5 {
-            // First 5 should be evicted (LRU)
-            assert!(cached.is_some(), "Entry {} should be in cache", i);
-        }
-    }
-    
-    // Cache should have exactly 10 entries
-    // (Implementation detail: this depends on how your cache is implemented)
-}
+async fn test_dispute_resolution_guilty_case() {
+    let resolver = DisputeResolver::new(10, 0.2, 0.6); // small committee for test
 
+    let accused = [1u8; 20];
+    let accuser = [2u8; 20];
 
-#[test]
-fn test_model_config_serialization() {
-    let config = ModelConfig::default();
-    
-    // Test serialization
-    let json = serde_json::to_string(&config).unwrap();
-    let deserialized: ModelConfig = serde_json::from_str(&json).unwrap();
-    
-    assert_eq!(config.model_path, deserialized.model_path);
-    assert_eq!(config.input_shape, deserialized.input_shape);
-    assert_eq!(config.confidence_threshold, deserialized.confidence_threshold);
-}
-
-
-#[tokio::test]
-async fn test_predictor_state_persistence() {
-    let config = ModelConfig::default();
-    let mut predictor = NeuralPredictor::new(config).await.unwrap();
-    
-    // Add some test data
-    let block_data = vec![0u8; 1024];
-    let result = predictor.predict(&block_data).await.unwrap();
-    
-    // Update predictor with block
-    predictor.update_with_block(&block_data, true).await.unwrap();
-    
-    // Test state saving/loading (would need actual filesystem in production)
-    // For now, just test the functions don't panic
-    let save_result = predictor.save_state().await;
-    let load_result = predictor.load_state().await;
-    
-    // These might fail in test environment without proper files
-    // Just ensure they don't panic
-    println!("Save result: {:?}", save_result);
-    println!("Load result: {:?}", load_result);
-}
-
-
-#[test]
-fn test_prediction_metadata() {
-    let mut rng = rand::thread_rng();
-    let mut features = Vec::new();
-    
-    for _ in 0..256 {
-        features.push(rng.gen_range(0.0..1.0));
-    }
-    
-    // This would normally be done by the predictor
-    let feature_sum: f32 = features.iter().sum();
-    let feature_len = features.len() as f32;
-    
-    let metadata = PredictionMetadata {
-        gas_price_prediction: (feature_sum * 10.0).max(1.0) as u64,
-        gas_limit_prediction: (feature_sum * 1000.0).max(21000) as u64,
-        throughput_prediction: (feature_len * 100.0).min(10000.0),
-        latency_prediction: (feature_len * 0.1).max(1.0),
-        security_risk: (features.iter().map(|&x| x.abs()).sum::<f32>() / feature_len).min(1.0),
-        energy_efficiency: (feature_len / (feature_sum + 1.0)).max(0.1),
+    let evidence = DisputeEvidence {
+        evidence_type: EvidenceType::Signature,
+        data: vec![0u8; 64],
+        proof: vec![0u8; 96],
+        witness_signatures: vec![],
+        timestamp: 1234567890,
+        block_height: 100,
+        block_hash: [0u8; 32],
     };
-    
-    assert!(metadata.gas_price_prediction > 0);
-    assert!(metadata.gas_limit_prediction >= 21000);
-    assert!(metadata.throughput_prediction > 0.0);
-    assert!(metadata.latency_prediction >= 1.0);
-    assert!(metadata.security_risk >= 0.0 && metadata.security_risk <= 1.0);
-    assert!(metadata.energy_efficiency > 0.0);
+
+    let mut dispute = Dispute {
+        dispute_id: 1,
+        accused_validator: accused,
+        accuser,
+        dispute_type: DisputeType::DoubleSign,
+        evidence,
+        accuser_stake: 1000,
+        accused_stake: 10000,
+        status: DisputeStatus::Pending,
+        committee: None,
+        votes: None,
+        result: None,
+        created_at: 1234567890,
+        timeout_sec: 30,
+    };
+
+    // Select committee
+    let mut validators = HashSet::new();
+    for i in 0..20 {
+        validators.insert([i as u8; 20]);
+    }
+    let committee = resolver.select_committee(&validators, dispute.dispute_id, &mut thread_rng());
+    dispute.committee = Some(committee.clone());
+
+    // Simulate 8/10 guilty votes (80% > 66% threshold implied)
+    let mut votes = HashMap::new();
+    for (i, voter) in committee.iter().enumerate() {
+        let guilty = i < 8;
+        votes.insert(*voter, resolver::Vote {
+            voter: *voter,
+            vote: guilty,
+            confidence: if guilty { 0.95 } else { 0.9 },
+            justification: "test".into(),
+            signature: vec![], // skipped verification
+        });
+    }
+    dispute.votes = Some(votes);
+
+    let result = resolver.resolve_dispute(&dispute).await.unwrap();
+
+    assert!(result.guilty);
+    assert!((result.slashing_percentage - 0.2).abs() < 1e-9); // 20% slashing
+    assert!(result.accuser_reward > 0);
+    assert_eq!(result.accuser_penalty, 0);
+    assert!(!result.committee_rewards.is_empty());
+}
+
+#[tokio::test]
+async fn test_dispute_resolution_innocent_case() {
+    let resolver = DisputeResolver::new(10, 0.1, 0.5);
+
+    let accused = [1u8; 20];
+    let accuser = [2u8; 20];
+
+    let mut dispute = Dispute {
+        dispute_id: 2,
+        accused_validator: accused,
+        accuser,
+        dispute_type: DisputeType::InvalidBlock,
+        evidence: DisputeEvidence {
+            evidence_type: EvidenceType::Statistical,
+            data: vec![],
+            proof: vec![],
+            witness_signatures: vec![],
+            timestamp: 1234567890,
+            block_height: 200,
+            block_hash: [0u8; 32],
+        },
+        accuser_stake: 5000,
+        accused_stake: 10000,
+        status: DisputeStatus::Pending,
+        committee: None,
+        votes: None,
+        result: None,
+        created_at: 1234567890,
+        timeout_sec: 30,
+    };
+
+    // Small committee
+    let committee: Vec<[u8; 20]> = (0..10).map(|i| [i as u8; 20]).collect();
+    dispute.committee = Some(committee.clone());
+
+    // 7 innocent votes, 3 guilty → innocent majority
+    let mut votes = HashMap::new();
+    for (i, voter) in committee.iter().enumerate() {
+        let guilty = i >= 7; // only last 3 vote guilty
+        votes.insert(*voter, resolver::Vote {
+            voter: *voter,
+            vote: guilty,
+            confidence: 0.9,
+            justification: "test".into(),
+            signature: vec![],
+        });
+    }
+    dispute.votes = Some(votes);
+
+    let result = resolver.resolve_dispute(&dispute).await.unwrap();
+
+    assert!(!result.guilty);
+    assert_eq!(result.slashing_percentage, 0.0);
+    assert_eq!(result.accuser_reward, 0);
+    assert!(result.accuser_penalty > 0); // 10% penalty on false accusation
 }

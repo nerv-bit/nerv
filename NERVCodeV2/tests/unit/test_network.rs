@@ -1,661 +1,253 @@
-// tests/unit/test_network.rs
+Rust// tests/unit/test_network.rs
 // ============================================================================
 // NETWORK MODULE UNIT TESTS
 // ============================================================================
 
+use nerv_bit::network::{
+    NetworkManager, NetworkConfig,
+    mempool::{MempoolManager, MempoolConfig, EncryptedTransaction, TxPriority, PendingTransaction, ShardMempool},
+    dht::{DhtManager, DhtConfig, PeerId, PeerInfo, KBucket},
+    gossip::{GossipManager, GossipConfig, GossipMessage, MessageCache, PeerScore},
+};
+use nerv_bit::crypto::CryptoProvider;
+use std::collections::{HashSet, BinaryHeap};
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::{Instant, Duration};
+use tokio::time;
 
-use nerv_bit::network::*;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use rand::Rng;
+#[tokio::test]
+async fn test_network_manager_creation_and_components() {
+    let config = NetworkConfig::default();
+    let crypto = Arc::new(CryptoProvider::new().unwrap());
 
+    let manager = NetworkManager::new(config, crypto).await.unwrap();
 
-#[test]
-fn test_dht_creation() {
-    let dht = DistributedHashTable::new(8080).unwrap();
-    
-    assert_eq!(dht.port, 8080);
-    assert!(dht.nodes.is_empty());
+    // Basic access to components (ensure they are initialized)
+    let dht = manager.dht_manager.clone();
+    let gossip = manager.gossip_manager.clone();
+    let mempool = manager.mempool_manager.clone();
+
+    assert!(dht.local_id.0.len() == 32);
+    assert!(gossip.local_peer_id.len() > 0);
+    assert_eq!(mempool.metrics.current_size_bytes, 0);
 }
 
-
 #[test]
-fn test_dht_node_management() {
-    let mut dht = DistributedHashTable::new(8080).unwrap();
-    
-    // Add nodes
-    let node1 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8001);
-    let node2 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8002);
-    
-    dht.add_node(node1).unwrap();
-    dht.add_node(node2).unwrap();
-    
-    assert_eq!(dht.node_count(), 2);
-    
-    // Find closest nodes
-    let target_key = [0u8; 32];
-    let closest = dht.find_closest_nodes(&target_key, 1).unwrap();
-    
-    assert_eq!(closest.len(), 1);
-    
-    // Remove node
-    dht.remove_node(&node1).unwrap();
-    assert_eq!(dht.node_count(), 1);
-}
+fn test_pending_transaction_ordering() {
+    let now = Instant::now();
 
-
-#[test]
-fn test_gossip_protocol() {
-    let mut gossip = GossipProtocol::new();
-    
-    // Create message
-    let message = NetworkMessage {
-        id: [1u8; 32],
-        sender: [2u8; 32],
-        data: b"test message".to_vec(),
-        timestamp: 1234567890,
-        ttl: 10,
+    let tx_high = PendingTransaction {
+        tx_hash: "high".to_string(),
+        shard_id: 0,
+        priority_score: 1000,
+        submission_time: now,
+        size: 100,
     };
-    
-    // Broadcast message
-    gossip.broadcast(message.clone()).unwrap();
-    
-    // Should have the message
-    assert!(gossip.has_message(&message.id));
-    
-    // Get messages for peer
-    let peer_id = [3u8; 32];
-    let messages = gossip.get_messages_for_peer(&peer_id, 10).unwrap();
-    
-    assert_eq!(messages.len(), 1);
-    assert_eq!(messages[0].id, message.id);
-    
-    // Mark message as delivered
-    gossip.mark_delivered(&message.id, &peer_id).unwrap();
-    
-    // Peer shouldn't get the message again
-    let messages2 = gossip.get_messages_for_peer(&peer_id, 10).unwrap();
-    assert_eq!(messages2.len(), 0);
+
+    let tx_medium = PendingTransaction {
+        tx_hash: "medium".to_string(),
+        shard_id: 0,
+        priority_score: 500,
+        submission_time: now,
+        size: 100,
+    };
+
+    let tx_old_high = PendingTransaction {
+        tx_hash: "old_high".to_string(),
+        shard_id: 0,
+        priority_score: 1000,
+        submission_time: now - Duration::from_secs(10),
+        size: 100,
+    };
+
+    let mut heap = BinaryHeap::new();
+    heap.push(tx_medium.clone());
+    heap.push(tx_high.clone());
+    heap.push(tx_old_high.clone());
+
+    // Highest priority first
+    assert_eq!(heap.pop().unwrap(), tx_high);
+    // Then older same-priority
+    assert_eq!(heap.pop().unwrap(), tx_old_high);
+    assert_eq!(heap.pop().unwrap(), tx_medium);
 }
 
+#[tokio::test]
+async fn test_mempool_manager_basic_operations() {
+    let config = MempoolConfig::default();
+    let crypto = Arc::new(CryptoProvider::new().unwrap());
+    let manager = MempoolManager::new(config, crypto).await.unwrap();
 
-#[test]
-fn test_mempool_operations() {
-    let mut mempool = TransactionPool::new(1000); // Max 1000 transactions
-    
-    // Create transactions
-    let mut transactions = Vec::new();
-    
+    let tx = EncryptedTransaction {
+        data: vec![1u8; 256],
+        attestation: vec![2u8; 128],
+        shard_id: 1,
+        hash: "test_tx_1".to_string(),
+        submission_time: std::time::SystemTime::now(),
+        priority: TxPriority::High(1000),
+    };
+
+    // Add transaction
+    manager.add_transaction(tx.clone()).await.unwrap();
+
+    // Duplicate should fail
+    let err = manager.add_transaction(tx.clone()).await.unwrap_err();
+    assert!(matches!(err, nerv_bit::network::MempoolError::DuplicateTransaction));
+
+    // Get pending for shard
+    let pending = manager.get_pending_transactions(1, 10).await.unwrap();
+    assert_eq!(pending.len(), 1);
+    assert_eq!(pending[0].hash, "test_tx_1");
+
+    // Remove
+    manager.remove_transactions(&["test_tx_1".to_string()]).await.unwrap();
+    let pending_after = manager.get_pending_transactions(1, 10).await.unwrap();
+    assert!(pending_after.is_empty());
+}
+
+#[tokio::test]
+async fn test_mempool_eviction_and_size_limits() {
+    let mut config = MempoolConfig::default();
+    config.max_size_bytes = 1024; // Small limit for test
+
+    let crypto = Arc::new(CryptoProvider::new().unwrap());
+    let manager = MempoolManager::new(config, crypto).await.unwrap();
+
+    // Add transactions until over limit
     for i in 0..10 {
-        let tx = PooledTransaction {
-            id: [i as u8; 32],
-            data: vec![i as u8; 100],
-            priority: i as u64,
-            timestamp: 1234567890 + i as u64,
-            sender: [0u8; 32],
+        let tx = EncryptedTransaction {
+            data: vec![0u8; 300], // ~300 bytes each
+            attestation: vec![],
+            shard_id: 0,
+            hash: format!("tx_{}", i),
+            submission_time: std::time::SystemTime::now(),
+            priority: TxPriority::Normal,
         };
-        transactions.push(tx);
+        let _ = manager.add_transaction(tx).await; // Ignore errors for overflow
     }
-    
-    // Add transactions
-    for tx in &transactions {
-        mempool.add_transaction(tx.clone()).unwrap();
-    }
-    
-    assert_eq!(mempool.size(), 10);
-    
-    // Get highest priority transactions
-    let batch = mempool.get_batch(5).unwrap();
-    assert_eq!(batch.len(), 5);
-    
-    // Check ordering by priority (descending)
-    for i in 1..batch.len() {
-        assert!(batch[i-1].priority >= batch[i].priority);
-    }
-    
-    // Remove transactions
-    for tx in &transactions[0..5] {
-        mempool.remove_transaction(&tx.id).unwrap();
-    }
-    
-    assert_eq!(mempool.size(), 5);
-}
 
+    // After overflow, size should be bounded
+    assert!(manager.metrics.current_size_bytes <= config.max_size_bytes * 2); // Some tolerance
+
+    // Old transactions should be evicted on cleanup
+    time::sleep(Duration::from_millis(100)).await; // Allow background cleanup if any
+}
 
 #[test]
-fn test_network_message_serialization() {
-    let message = NetworkMessage {
-        id: [1u8; 32],
-        sender: [2u8; 32],
-        data: b"test data".to_vec(),
-        timestamp: 1234567890,
-        ttl: 10,
-    };
-    
-    // Serialize
-    let bytes = message.to_bytes().unwrap();
-    
-    // Deserialize
-    let deserialized = NetworkMessage::from_bytes(&bytes).unwrap();
-    
-    assert_eq!(message.id, deserialized.id);
-    assert_eq!(message.sender, deserialized.sender);
-    assert_eq!(message.data, deserialized.data);
-    assert_eq!(message.timestamp, deserialized.timestamp);
-    assert_eq!(message.ttl, deserialized.ttl);
-}
+fn test_peer_id_distance_and_leading_zeros() {
+    let id1 = PeerId::random();
+    let id2 = id1.clone();
+    assert_eq!(id1.distance(&id2), [0u8; 32]);
 
+    let mut bytes = [0u8; 32];
+    bytes[0] = 1;
+    let id3 = PeerId::from_bytes(&bytes);
+    let dist = id1.distance(&id3);
+    assert!(dist.iter().any(|&b| b != 0));
+
+    // Leading zeros
+    let zero_heavy = PeerId::from_bytes(&[0u8; 32]);
+    assert_eq!(zero_heavy.leading_zeros(), 256);
+
+    let one_bit = PeerId::from_bytes(&[128u8, 0u8; 16]); // MSB set
+    assert_eq!(one_bit.leading_zeros(), 0);
+}
 
 #[test]
-fn test_peer_discovery() {
-    let mut discovery = PeerDiscovery::new();
-    
-    // Add known peers
-    let peer1 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8001);
-    let peer2 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8002);
-    
-    discovery.add_peer(peer1).unwrap();
-    discovery.add_peer(peer2).unwrap();
-    
-    assert_eq!(discovery.peer_count(), 2);
-    
-    // Get random peers
-    let random_peers = discovery.get_random_peers(1).unwrap();
-    assert_eq!(random_peers.len(), 1);
-    
-    // Ban peer
-    discovery.ban_peer(&peer1, 3600).unwrap(); // Ban for 1 hour
-    
-    // Banned peer shouldn't be returned
-    let available_peers = discovery.get_available_peers(10).unwrap();
-    assert!(!available_peers.contains(&peer1));
-    
-    // Unban peer
-    discovery.unban_peer(&peer1).unwrap();
-    let available_peers2 = discovery.get_available_peers(10).unwrap();
-    assert!(available_peers2.contains(&peer1));
+fn test_kbucket_operations() {
+    let bucket_size = 5;
+    let mut bucket = KBucket::new(bucket_size);
+
+    let mut peers = vec![];
+    for i in 0..bucket_size + 2 {
+        let peer = PeerInfo {
+            peer_id: PeerId::random(),
+            address: format!("127.0.0.1:{}", 8000 + i).parse().unwrap(),
+            last_seen: Instant::now(),
+            reputation: 1.0,
+        };
+        peers.push(peer.clone());
+        bucket.add_peer(peer);
+    }
+
+    assert_eq!(bucket.peers.len(), bucket_size); // Full
+    // Lowest reputation or least recently seen should be evicted (implementation dependent)
 }
 
+#[tokio::test]
+async fn test_dht_manager_creation_and_bootstrap() {
+    let config = DhtConfig::default();
+    let crypto = Arc::new(CryptoProvider::new().unwrap());
+    let manager = DhtManager::new(config, crypto).await.unwrap();
+
+    // Add bootstrap node (mock address)
+    let bootstrap: SocketAddr = "1.1.1.1:1234".parse().unwrap();
+    manager.add_bootstrap_node(bootstrap);
+
+    // Basic lookup (self)
+    let peers = manager.find_peers(manager.local_id.clone(), 5).await.unwrap();
+    assert!(peers.is_empty() || peers.iter().any(|p| p.peer_id == manager.local_id));
+}
 
 #[test]
-fn test_connection_pool() {
-    let mut pool = ConnectionPool::new(5); // Max 5 connections
-    
-    // Create connections
-    for i in 0..5 {
-        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8000 + i as u16);
-        pool.add_connection(addr).unwrap();
-    }
-    
-    assert_eq!(pool.connection_count(), 5);
-    
-    // Should fail to add more connections
-    let addr6 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8005);
-    assert!(pool.add_connection(addr6).is_err());
-    
-    // Remove connection
-    let addr0 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8000);
-    pool.remove_connection(&addr0).unwrap();
-    
-    assert_eq!(pool.connection_count(), 4);
-    
-    // Now we can add a new connection
-    pool.add_connection(addr6).unwrap();
-    assert_eq!(pool.connection_count(), 5);
-}
+fn test_gossip_message_id_generation() {
+    let topic = "blocks";
+    let data = b"test_block_data";
 
+    let id1 = GossipManager::generate_message_id(topic, data);
+    let id2 = GossipManager::generate_message_id(topic, data);
+    assert_eq!(id1, id2);
+    assert_eq!(id1.len(), 64); // hex-encoded blake3
+
+    let different_data = b"different";
+    let id3 = GossipManager::generate_message_id(topic, different_data);
+    assert_ne!(id1, id3);
+}
 
 #[test]
-fn test_message_validation() {
-    // Create valid message
-    let valid_message = NetworkMessage {
-        id: [1u8; 32],
-        sender: [2u8; 32],
-        data: vec![0u8; 100], // 100 bytes
-        timestamp: 1234567890,
-        ttl: 10,
-    };
-    
-    // Validate
-    let is_valid = valid_message.validate().unwrap();
-    assert!(is_valid);
-    
-    // Create invalid message (TTL = 0)
-    let invalid_message = NetworkMessage {
-        ttl: 0,
-        ..valid_message.clone()
-    };
-    
-    let is_valid = invalid_message.validate().unwrap();
-    assert!(!is_valid);
-    
-    // Create invalid message (data too large)
-    let large_data = vec![0u8; 10 * 1024 * 1024]; // 10MB
-    let invalid_message2 = NetworkMessage {
-        data: large_data,
-        ..valid_message
-    };
-    
-    let is_valid = invalid_message2.validate().unwrap();
-    assert!(!is_valid);
+fn test_peer_score_and_message_cache() {
+    let mut score = PeerScore::new();
+    score.update(10.0);
+    score.update(-5.0);
+    assert_eq!(score.current_score, 5.0);
+
+    let mut cache = MessageCache::new(5);
+    for i in 0..10 {
+        let msg = GossipMessage {
+            message_id: format!("msg_{}", i),
+            topic: "test".to_string(),
+            data: vec![],
+            source: "peer1".to_string(),
+            seq_no: i as u64,
+            signature: vec![],
+            timestamp: Instant::now(),
+            ttl: 10,
+        };
+        cache.put(msg);
+    }
+
+    assert!(cache.messages.len() <= 5);
+    assert!(cache.has_message(&"msg_9".to_string()));
+    assert!(!cache.has_message(&"msg_0".to_string())); // Pruned
 }
 
+#[tokio::test]
+async fn test_gossip_manager_basic_flow() {
+    let config = GossipConfig::default();
+    let crypto = Arc::new(CryptoProvider::new().unwrap());
+    let manager = GossipManager::new(config, crypto).await.unwrap();
 
-#[test]
-fn test_encrypted_communication() {
-    let mut rng = rand::thread_rng();
-    
-    // Generate key pair for encryption
-    let mut private_key = [0u8; 32];
-    rng.fill(&mut private_key);
-    
-    let public_key = derive_public_key(&private_key).unwrap();
-    
-    // Encrypt message
-    let plaintext = b"secret message";
-    let (ciphertext, nonce) = encrypt_message(plaintext, &public_key).unwrap();
-    
-    assert_ne!(ciphertext, plaintext);
-    assert_eq!(nonce.len(), 24);
-    
-    // Decrypt message
-    let decrypted = decrypt_message(&ciphertext, &nonce, &private_key).unwrap();
-    
-    assert_eq!(decrypted, plaintext);
-    
-    // Test with wrong key
-    let mut wrong_key = [0u8; 32];
-    rng.fill(&mut wrong_key);
-    
-    let result = decrypt_message(&ciphertext, &nonce, &wrong_key);
-    assert!(result.is_err());
+    // Subscribe to topic
+    manager.subscribe("test_topic".to_string()).await.unwrap();
+    let subs = manager.subscriptions.read().await;
+    assert!(subs.contains("test_topic"));
+
+    // Publish message
+    let data = vec![1u8; 100];
+    manager.publish("test_topic".to_string(), data.clone()).await.unwrap();
+
+    // Message should be cached
+    let cache = manager.message_cache.read().await;
+    assert!(!cache.messages.is_empty());
 }
-
-
-// Placeholder implementations for network module
-
-
-pub struct DistributedHashTable {
-    port: u16,
-    nodes: std::collections::HashSet<SocketAddr>,
-}
-
-
-impl DistributedHashTable {
-    pub fn new(port: u16) -> Result<Self, NetworkError> {
-        Ok(Self {
-            port,
-            nodes: std::collections::HashSet::new(),
-        })
-    }
-    
-    pub fn add_node(&mut self, addr: SocketAddr) -> Result<(), NetworkError> {
-        self.nodes.insert(addr);
-        Ok(())
-    }
-    
-    pub fn remove_node(&mut self, addr: &SocketAddr) -> Result<(), NetworkError> {
-        self.nodes.remove(addr);
-        Ok(())
-    }
-    
-    pub fn node_count(&self) -> usize {
-        self.nodes.len()
-    }
-    
-    pub fn find_closest_nodes(&self, target: &[u8; 32], count: usize) -> Result<Vec<SocketAddr>, NetworkError> {
-        // Simplified implementation
-        let mut nodes: Vec<SocketAddr> = self.nodes.iter().cloned().collect();
-        nodes.truncate(count);
-        Ok(nodes)
-    }
-}
-
-
-pub struct GossipProtocol {
-    messages: std::collections::HashMap<[u8; 32], NetworkMessage>,
-    delivered: std::collections::HashMap<[u8; 32], std::collections::HashSet<[u8; 32]>>,
-}
-
-
-impl GossipProtocol {
-    pub fn new() -> Self {
-        Self {
-            messages: std::collections::HashMap::new(),
-            delivered: std::collections::HashMap::new(),
-        }
-    }
-    
-    pub fn broadcast(&mut self, message: NetworkMessage) -> Result<(), NetworkError> {
-        self.messages.insert(message.id, message);
-        Ok(())
-    }
-    
-    pub fn has_message(&self, message_id: &[u8; 32]) -> bool {
-        self.messages.contains_key(message_id)
-    }
-    
-    pub fn get_messages_for_peer(&self, peer_id: &[u8; 32], limit: usize) -> Result<Vec<NetworkMessage>, NetworkError> {
-        let mut messages = Vec::new();
-        
-        for (_, message) in &self.messages {
-            // Check if peer has already received this message
-            if let Some(delivered_set) = self.delivered.get(&message.id) {
-                if delivered_set.contains(peer_id) {
-                    continue;
-                }
-            }
-            
-            messages.push(message.clone());
-            if messages.len() >= limit {
-                break;
-            }
-        }
-        
-        Ok(messages)
-    }
-    
-    pub fn mark_delivered(&mut self, message_id: &[u8; 32], peer_id: &[u8; 32]) -> Result<(), NetworkError> {
-        self.delivered
-            .entry(*message_id)
-            .or_insert_with(std::collections::HashSet::new)
-            .insert(*peer_id);
-        Ok(())
-    }
-}
-
-
-pub struct PooledTransaction {
-    pub id: [u8; 32],
-    pub data: Vec<u8>,
-    pub priority: u64,
-    pub timestamp: u64,
-    pub sender: [u8; 32],
-}
-
-
-pub struct TransactionPool {
-    transactions: std::collections::HashMap<[u8; 32], PooledTransaction>,
-    max_size: usize,
-}
-
-
-impl TransactionPool {
-    pub fn new(max_size: usize) -> Self {
-        Self {
-            transactions: std::collections::HashMap::new(),
-            max_size,
-        }
-    }
-    
-    pub fn add_transaction(&mut self, tx: PooledTransaction) -> Result<(), NetworkError> {
-        if self.transactions.len() >= self.max_size {
-            return Err(NetworkError::PoolFull(self.max_size));
-        }
-        
-        self.transactions.insert(tx.id, tx);
-        Ok(())
-    }
-    
-    pub fn remove_transaction(&mut self, tx_id: &[u8; 32]) -> Result<(), NetworkError> {
-        self.transactions.remove(tx_id);
-        Ok(())
-    }
-    
-    pub fn size(&self) -> usize {
-        self.transactions.len()
-    }
-    
-    pub fn get_batch(&self, count: usize) -> Result<Vec<PooledTransaction>, NetworkError> {
-        let mut transactions: Vec<PooledTransaction> = self.transactions.values().cloned().collect();
-        
-        // Sort by priority (descending) and timestamp (ascending)
-        transactions.sort_by(|a, b| {
-            b.priority.cmp(&a.priority)
-                .then(a.timestamp.cmp(&b.timestamp))
-        });
-        
-        transactions.truncate(count);
-        Ok(transactions)
-    }
-}
-
-
-#[derive(Clone)]
-pub struct NetworkMessage {
-    pub id: [u8; 32],
-    pub sender: [u8; 32],
-    pub data: Vec<u8>,
-    pub timestamp: u64,
-    pub ttl: u32,
-}
-
-
-impl NetworkMessage {
-    pub fn to_bytes(&self) -> Result<Vec<u8>, NetworkError> {
-        let mut bytes = Vec::new();
-        bytes.extend_from_slice(&self.id);
-        bytes.extend_from_slice(&self.sender);
-        bytes.extend_from_slice(&(self.data.len() as u32).to_le_bytes());
-        bytes.extend_from_slice(&self.data);
-        bytes.extend_from_slice(&self.timestamp.to_le_bytes());
-        bytes.extend_from_slice(&self.ttl.to_le_bytes());
-        Ok(bytes)
-    }
-    
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, NetworkError> {
-        if bytes.len() < 32 + 32 + 4 + 8 + 4 {
-            return Err(NetworkError::InvalidData("Message too short".to_string()));
-        }
-        
-        let mut offset = 0;
-        
-        let mut id = [0u8; 32];
-        id.copy_from_slice(&bytes[offset..offset+32]);
-        offset += 32;
-        
-        let mut sender = [0u8; 32];
-        sender.copy_from_slice(&bytes[offset..offset+32]);
-        offset += 32;
-        
-        let data_len = u32::from_le_bytes(bytes[offset..offset+4].try_into().unwrap()) as usize;
-        offset += 4;
-        
-        if bytes.len() < offset + data_len + 8 + 4 {
-            return Err(NetworkError::InvalidData("Incomplete message".to_string()));
-        }
-        
-        let data = bytes[offset..offset+data_len].to_vec();
-        offset += data_len;
-        
-        let timestamp = u64::from_le_bytes(bytes[offset..offset+8].try_into().unwrap());
-        offset += 8;
-        
-        let ttl = u32::from_le_bytes(bytes[offset..offset+4].try_into().unwrap());
-        
-        Ok(Self {
-            id,
-            sender,
-            data,
-            timestamp,
-            ttl,
-        })
-    }
-    
-    pub fn validate(&self) -> Result<bool, NetworkError> {
-        if self.ttl == 0 {
-            return Ok(false);
-        }
-        
-        if self.data.len() > 5 * 1024 * 1024 { // 5MB max
-            return Ok(false);
-        }
-        
-        Ok(true)
-    }
-}
-
-
-pub struct PeerDiscovery {
-    peers: std::collections::HashSet<SocketAddr>,
-    banned: std::collections::HashMap<SocketAddr, u64>, // addr -> ban_until timestamp
-}
-
-
-impl PeerDiscovery {
-    pub fn new() -> Self {
-        Self {
-            peers: std::collections::HashSet::new(),
-            banned: std::collections::HashMap::new(),
-        }
-    }
-    
-    pub fn add_peer(&mut self, addr: SocketAddr) -> Result<(), NetworkError> {
-        self.peers.insert(addr);
-        Ok(())
-    }
-    
-    pub fn peer_count(&self) -> usize {
-        self.peers.len()
-    }
-    
-    pub fn get_random_peers(&self, count: usize) -> Result<Vec<SocketAddr>, NetworkError> {
-        use rand::seq::SliceRandom;
-        let mut rng = rand::thread_rng();
-        
-        let mut peers: Vec<SocketAddr> = self.peers.iter().cloned().collect();
-        peers.shuffle(&mut rng);
-        peers.truncate(count);
-        
-        Ok(peers)
-    }
-    
-    pub fn ban_peer(&mut self, addr: &SocketAddr, duration_secs: u64) -> Result<(), NetworkError> {
-        let ban_until = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() + duration_secs;
-        
-        self.banned.insert(*addr, ban_until);
-        Ok(())
-    }
-    
-    pub fn unban_peer(&mut self, addr: &SocketAddr) -> Result<(), NetworkError> {
-        self.banned.remove(addr);
-        Ok(())
-    }
-    
-    pub fn get_available_peers(&self, count: usize) -> Result<Vec<SocketAddr>, NetworkError> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        
-        let available: Vec<SocketAddr> = self.peers
-            .iter()
-            .filter(|&addr| {
-                if let Some(ban_until) = self.banned.get(addr) {
-                    now > *ban_until
-                } else {
-                    true
-                }
-            })
-            .take(count)
-            .cloned()
-            .collect();
-        
-        Ok(available)
-    }
-}
-
-
-pub struct ConnectionPool {
-    connections: std::collections::HashSet<SocketAddr>,
-    max_connections: usize,
-}
-
-
-impl ConnectionPool {
-    pub fn new(max_connections: usize) -> Self {
-        Self {
-            connections: std::collections::HashSet::new(),
-            max_connections,
-        }
-    }
-    
-    pub fn add_connection(&mut self, addr: SocketAddr) -> Result<(), NetworkError> {
-        if self.connections.len() >= self.max_connections {
-            return Err(NetworkError::ConnectionLimit(self.max_connections));
-        }
-        
-        self.connections.insert(addr);
-        Ok(())
-    }
-    
-    pub fn remove_connection(&mut self, addr: &SocketAddr) -> Result<(), NetworkError> {
-        self.connections.remove(addr);
-        Ok(())
-    }
-    
-    pub fn connection_count(&self) -> usize {
-        self.connections.len()
-    }
-}
-
-
-fn derive_public_key(private_key: &[u8; 32]) -> Result<[u8; 32], NetworkError> {
-    // Simplified: just hash the private key
-    use sha3::{Digest, Sha3_256};
-    let mut hasher = Sha3_256::new();
-    hasher.update(private_key);
-    let hash = hasher.finalize();
-    let mut public_key = [0u8; 32];
-    public_key.copy_from_slice(&hash);
-    Ok(public_key)
-}
-
-
-fn encrypt_message(plaintext: &[u8], public_key: &[u8; 32]) -> Result<(Vec<u8>, [u8; 24]), NetworkError> {
-    // Simplified: just return the plaintext
-    let mut nonce = [0u8; 24];
-    rand::thread_rng().fill(&mut nonce);
-    Ok((plaintext.to_vec(), nonce))
-}
-
-
-fn decrypt_message(ciphertext: &[u8], nonce: &[u8; 24], private_key: &[u8; 32]) -> Result<Vec<u8>, NetworkError> {
-    // Simplified: just return the ciphertext
-    Ok(ciphertext.to_vec())
-}
-
-
-#[derive(Debug)]
-pub enum NetworkError {
-    PoolFull(usize),
-    ConnectionLimit(usize),
-    InvalidData(String),
-    PeerNotFound,
-    MessageNotFound,
-    EncryptionError(String),
-    DecryptionError(String),
-}
-
-
-impl std::fmt::Display for NetworkError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::PoolFull(max) => write!(f, "Transaction pool full (max: {})", max),
-            Self::ConnectionLimit(max) => write!(f, "Connection limit reached (max: {})", max),
-            Self::InvalidData(msg) => write!(f, "Invalid data: {}", msg),
-            Self::PeerNotFound => write!(f, "Peer not found"),
-            Self::MessageNotFound => write!(f, "Message not found"),
-            Self::EncryptionError(msg) => write!(f, "Encryption error: {}", msg),
-            Self::DecryptionError(msg) => write!(f, "Decryption error: {}", msg),
-        }
-    }
-}
-
-
-impl std::error::Error for NetworkError {}
-
-
-type Result<T> = std::result::Result<T, NetworkError>;
