@@ -38,7 +38,7 @@ export default function Home() {
             The private, post-quantum, infinitely scalable blockchain
           </p>
           <p className="launch text-lg md:text-xl mb-12 opacity-80">
-            Fair launch June 2028 • No pre-mine • Foundational codebase public today
+            Fair launch October 2027 • No pre-mine • All code public today
           </p>
 
           {/* Original Buttons */}
@@ -111,10 +111,10 @@ export default function Home() {
         <section className="timeline py-12 text-center max-w-4xl mx-auto px-4">
           <h2 className="text-4xl font-bold mb-8">Road to Mainnet (100% transparent)</h2>
           <div className="timeline-items max-w-2xl mx-auto text-lg space-y-4">
-            <div><span className="font-bold">Dec 2025</span> Whitepaper + all code & proofs public</div>
-            <div><span className="font-bold">Q1 2026</span> First multi-vendor TEE mixer testnet</div>
-            <div><span className="font-bold">Q2 2026</span> Aurora public testnet (real metrics published)</div>
-            <div><span className="font-bold">June 2028</span> Fair mainnet launch – zero pre-mine</div>
+            <div><span className="font-bold">Dec 2025</span> Whitepaper + all code public</div>
+            <div><span className="font-bold">Q4 2026</span> First multi-vendor TEE mixer testnet</div>
+            <div><span className="font-bold">Q1 2027</span> Aurora public testnet (real metrics published)</div>
+            <div><span className="font-bold">October 2027</span> Fair mainnet launch – zero pre-mine</div>
           </div>
         </section>
 
@@ -124,8 +124,8 @@ export default function Home() {
           <div className="link-grid max-w-4xl mx-auto grid md:grid-cols-2 gap-4 text-lg">
             <a href="https://github.com/nerv-bit" target="_blank" className="hover:text-cyan-400 transition p-3">GitHub Organization (10+ repos)</a>
             <a href="https://github.com/nerv-bit/formal" target="_blank" className="hover:text-cyan-400 transition p-3">Lean 4 Formal Proofs (live)</a>
-            <a href="https://github.com/nerv-bit/circuits" target="_blank" className="hover:text-cyan-400 transition p-3">Halo2 Circuits</a>
-            <a href="https://github.com/nerv-bit/simulations" target="_blank" className="hover:text-cyan-400 transition p-3">10 000-node Simulator</a>
+            <a href="https://github.com/nerv-bit/circuits" target="_blank" className="hover:text-cyan-400 transition p-3">Post-Quantum Crypto</a>
+            <a href="https://github.com/nerv-bit/simulations" target="_blank" className="hover:text-cyan-400 transition p-3">10,000-node Simulator</a>
             <a href="mailto:namsjeev@gmail.com" className="hover:text-cyan-400 transition p-3">Contact → nerv.raj@gmail.com</a>
           </div>
         </section>
