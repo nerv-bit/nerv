@@ -92,17 +92,17 @@ export default function Home() {
             <div className="neural-card p-6">
               <div className="text-4xl mb-4">🧠</div>
               <h3 className="text-xl font-bold mb-3 gradient-text">Live, Breathing System</h3>
-              <p className="opacity-80">A self-adapting, economic nervous system that evolves organically.</p>
+              <p className="opacity-80">Endogenous intelligence – Nodes are rewarded for useful-work federated learning that perpetually improves the network's own encoders and predictors.</p>
             </div>
             <div className="neural-card p-6">
               <div className="text-4xl mb-4">⚡</div>
               <h3 className="text-xl font-bold mb-3 gradient-text">Neural Embeddings</h3>
-              <p className="opacity-80">State compression and verification through AI-native transformer models.</p>
+              <p className="opacity-80">Infinite scalability – >1 million sustained TPS with no theoretical upper bound via state compression and dynamic neural sharding. </p>
             </div>
             <div className="neural-card p-6">
               <div className="text-4xl mb-4">🔐</div>
               <h3 className="text-xl font-bold mb-3 gradient-text">Cryptography</h3>
-              <p className="opacity-80">Post-quantum, zero-trust security layered from the genesis block.</p>
+              <p className="opacity-80">Post-quantum security from genesis – Full NIST-standard lattice-based cryptography</p>
             </div>
           </div>
         </section>
