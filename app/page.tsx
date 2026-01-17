@@ -36,7 +36,13 @@ export default function Home() {
       width={840}
       height={320}
       priority
-      className="w-full h-auto drop-shadow-[0_0_30px_rgba(0,255,255,0.25)]"
+      className="w-full h-auto transition-all duration-500 ease-out"
+  style={{
+    animation: heroHovered ? 'nervGlowPulse 3.2s ease-in-out infinite' : 'none',
+    filter: heroHovered
+      ? 'drop-shadow(0 0 60px rgba(0, 255, 255, 0.55)) drop-shadow(0 0 120px rgba(168, 85, 247, 0.35))'
+      : 'drop-shadow(0 0 24px rgba(0, 255, 255, 0.25))',
+  }}
     />
   </div>
 
