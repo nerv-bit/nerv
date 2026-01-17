@@ -16,7 +16,7 @@ export default function Home() {
 
       {/* HERO SECTION - FORCED TO ABSOLUTE TOP */}
       <section 
-         className="absolute -top-24 left-1/2 transform -translate-x-1/2 w-full max-w-5xl px-4 text-center"
+         className="absolute top-[-4rem] sm:top-[-6rem] md:-top-24 left-1/2 transform -translate-x-1/2 w-full max-w-5xl px-4 text-center"
         onMouseEnter={() => setHeroHovered(true)}
         onMouseLeave={() => setHeroHovered(false)}
       >
@@ -29,7 +29,7 @@ export default function Home() {
         {/* Glass Hero Block - Minimal padding */}
         <div className="glass-hero mt-0 pt-4 pb-8">
         {/* NERV Logo Image */}
-  <div className="relative mx-auto mb-4 w-[280px] md:w-[420px]">
+  <div className="relative mx-auto mb-4 w-full max-w-[240px] sm:max-w-[280px] md:max-w-[420px] px-2">
     <Image
       src="/NERV Logo.png"
       alt="NERV — Neural Encrypted Virtual Relay"
@@ -39,9 +39,9 @@ export default function Home() {
       className="w-full h-auto transition-all duration-500 ease-out"
   style={{
     animation: heroHovered ? 'nervGlowPulse 3.2s ease-in-out infinite' : 'none',
-    filter: heroHovered
-      ? 'drop-shadow(0 0 60px rgba(0, 255, 255, 0.55)) drop-shadow(0 0 120px rgba(168, 85, 247, 0.35))'
-      : 'drop-shadow(0 0 24px rgba(0, 255, 255, 0.25))',
+filter: heroHovered
+  ? 'drop-shadow(0 0 40px rgba(0, 255, 255, 0.5)) drop-shadow(0 0 90px rgba(168, 85, 247, 0.3))'
+  : 'drop-shadow(0 0 20px rgba(0, 255, 255, 0.25))',
   }}
     />
   </div>
