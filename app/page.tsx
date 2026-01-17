@@ -28,18 +28,28 @@ export default function Home() {
 
         {/* Glass Hero Block - Minimal padding */}
         <div className="glass-hero mt-0 pt-4 pb-8">
-          <h1 className="text-7xl md:text-9xl font-bold mb-2 tracking-tighter">
-            NERV
-          </h1>
-          <div className="h-1 w-24 bg-gradient-to-r from-cyan-500 to-purple-500 mx-auto my-6 rounded-full"></div>
-          
-          {/* Original Hero Text */}
-          <p className="tagline text-2xl md:text-3xl mb-4 opacity-90">
-            The private, post-quantum, infinitely scalable blockchain
-          </p>
-          <p className="launch text-lg md:text-xl mb-12 opacity-80">
-            Fair launch October 2027 • No pre-mine • All code public today
-          </p>
+        {/* NERV Logo Image */}
+  <div className="relative mx-auto mb-4 w-[280px] md:w-[420px]">
+    <Image
+      src="/NERV Logo.png"
+      alt="NERV — Neural Encrypted Virtual Relay"
+      width={840}
+      height={320}
+      priority
+      className="w-full h-auto drop-shadow-[0_0_30px_rgba(0,255,255,0.25)]"
+    />
+  </div>
+
+  <div className="h-1 w-24 bg-gradient-to-r from-cyan-500 to-purple-500 mx-auto my-6 rounded-full"></div>
+
+  {/* Original Hero Text */}
+  <p className="tagline text-2xl md:text-3xl mb-4 opacity-90">
+    The private, post-quantum, infinitely scalable blockchain
+  </p>
+
+  <p className="launch text-lg md:text-xl mb-12 opacity-80">
+    Fair launch October 2027 • No pre-mine • All code public today
+  </p>
 
           {/* Original Buttons */}
           <div className="buttons flex flex-col sm:flex-row gap-6 justify-center mb-8">
