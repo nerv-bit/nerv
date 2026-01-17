@@ -16,7 +16,13 @@ export default function Home() {
 
       {/* HERO SECTION - FORCED TO ABSOLUTE TOP */}
       <section 
-         className="absolute top-[-4rem] sm:top-[-6rem] md:-top-24 left-1/2 transform -translate-x-1/2 w-full max-w-5xl px-4 text-center"
+         className="
+    relative pt-10
+    md:pt-0
+    md:absolute md:-top-24
+    md:left-1/2 md:-translate-x-1/2
+    w-full max-w-5xl px-4 text-center
+  "
         onMouseEnter={() => setHeroHovered(true)}
         onMouseLeave={() => setHeroHovered(false)}
       >
@@ -29,7 +35,7 @@ export default function Home() {
         {/* Glass Hero Block - Minimal padding */}
         <div className="glass-hero mt-0 pt-4 pb-8">
         {/* NERV Logo Image */}
-  <div className="relative mx-auto mb-4 w-full max-w-[240px] sm:max-w-[280px] md:max-w-[420px] px-2">
+<div className="relative mx-auto mb-4 w-full max-w-[220px] sm:max-w-[280px] md:max-w-[420px]">
     <Image
       src="/NERV Logo.png"
       alt="NERV — Neural Encrypted Virtual Relay"
@@ -81,7 +87,7 @@ filter: heroHovered
       </section>
 
       {/* MAIN CONTENT - Pushed down to avoid hero overlap */}
-      <div className="relative z-10 pt-[480px] md:pt-[520px]">
+     <div className="relative z-10 pt-8 md:pt-[520px]">
         
         {/* HIGH-LEVEL ARCHITECTURE SECTION */}
         <section className="architecture max-w-6xl mx-auto text-center px-4">
