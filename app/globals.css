@@ -163,3 +163,15 @@ footer p { margin:0.5rem 0; }
   transform: translateY(-4px);
   box-shadow: 0 10px 30px rgba(138, 43, 226, 0.4);
 }
+@keyframes nervGlowPulse {
+  0%, 100% {
+    filter:
+      drop-shadow(0 0 50px rgba(0, 255, 255, 0.45))
+      drop-shadow(0 0 110px rgba(168, 85, 247, 0.30));
+  }
+  50% {
+    filter:
+      drop-shadow(0 0 70px rgba(0, 255, 255, 0.65))
+      drop-shadow(0 0 150px rgba(168, 85, 247, 0.45));
+  }
+}
