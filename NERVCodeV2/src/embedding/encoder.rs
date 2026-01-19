@@ -15,7 +15,7 @@
 //! - Homomorphism-preserving low-error inference
 //! - Matches whitepaper: 512-byte embeddings, <1e-9 target error bound
 
-
+use crate::embedding::fixed_point::Fixed32_16;
 use crate::economy::fl_aggregation::GlobalGradient;  // Add this import at top if missing
 use crate::params::ENCODER_LEARNING_RATE;  // Suggest adding this constant in params.rs: pub const ENCODER_LEARNING_RATE: f32 = 1e-4;
 use crate::{Result, NervError};
@@ -44,9 +44,11 @@ pub const MAX_SEQ_LEN: usize = 4096;
 pub const VOCAB_SIZE: usize = 65536; // u16 tokens
 
 
-/// Neural embedding output (512 f32 values)
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct NeuralEmbedding(pub Vec<f32>);
+/// Canonical 512-dimensional neural state embedding (fixed-point)
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NeuralEmbedding {
+    pub values: [Fixed32_16; EMBEDDING_SIZE],
+}
 
 
 /// Quantized tensor (int8 symmetric quantization)

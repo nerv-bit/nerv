@@ -1,4 +1,4 @@
-Rust// tests/integration/test_blockchain_full_cycle.rs
+// tests/integration/test_blockchain_full_cycle.rs
 // ============================================================================
 // COMPREHENSIVE FULL-CYCLE BLOCKCHAIN INTEGRATION TEST
 // ============================================================================

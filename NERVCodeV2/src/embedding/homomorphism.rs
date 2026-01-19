@@ -54,6 +54,9 @@ pub enum HomomorphismError {
     
     #[error("Serialization error: {0}")]
     Serialization(String),
+
+    #[error("homomorphic error bound violated")]
+     ErrorBoundViolated,
 }
 
 
@@ -289,25 +292,34 @@ impl BatchDelta {
         hash
     }
     
-    /// Apply this batch delta to an embedding
-    pub fn apply_to_embedding(
-        &self,
-        embedding: &[FixedPoint32_16],
-    ) -> Result<Vec<FixedPoint32_16>> {
-        let dim = 512;
-        
-        if embedding.len() != dim || self.aggregated_delta.len() != dim {
-            return Err(HomomorphismError::DimensionMismatch(dim, embedding.len()));
-        }
-        
-        let mut result = Vec::with_capacity(dim);
-        
-        for i in 0..dim {
-            result.push(embedding[i].add(self.aggregated_delta[i]));
-        }
-        
-        Ok(result)
+   
+  /// Apply this batch delta to an embedding with strict fixed-point enforcement
+pub fn apply_to_embedding(
+    &self,
+    embedding: &[FixedPoint32_16],
+) -> Result<Vec<FixedPoint32_16>> {
+
+    let dim = self.aggregated_delta.len();
+
+    if embedding.len() != dim || self.aggregated_delta.len() != dim {
+        return Err(HomomorphismError::DimensionMismatch(
+            embedding.len(),
+            self.aggregated_delta.len(),
+        ));
     }
+
+    let mut result = Vec::with_capacity(dim);
+
+    for i in 0..dim {
+        let summed = embedding[i]
+            .checked_add(self.aggregated_delta[i])
+            .ok_or(HomomorphismError::Overflow)?;
+
+        result.push(summed);
+    }
+
+    Ok(result)
+}
     
     /// Verify that applying this batch produces a valid embedding
     pub fn verify_application(
@@ -1004,6 +1016,29 @@ pub mod utils {
             .map(|&fp| FixedPoint32_16::from_float(fp.to_float() / norm))
             .collect()
     }
+
+    pub fn verify_embedding_error_bound(
+    expected: &[FixedPoint32_16],
+    computed: &[FixedPoint32_16],
+    max_error: i64,
+) -> Result<()> {
+
+    if expected.len() != computed.len() {
+        return Err(HomomorphismError::DimensionMismatch(
+            expected.len(),
+            computed.len(),
+        ));
+    }
+
+    for i in 0..expected.len() {
+        let diff = (expected[i].0 - computed[i].0).abs();
+        if diff > max_error {
+            return Err(HomomorphismError::ErrorBoundViolated);
+        }
+    }
+
+    Ok(())
+}
 }
 
 

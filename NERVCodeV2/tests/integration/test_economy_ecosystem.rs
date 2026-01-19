@@ -1,4 +1,4 @@
-Rust// tests/integration/test_economy_ecosystem.rs
+// tests/integration/test_economy_ecosystem.rs
 // ============================================================================
 // COMPREHENSIVE ECONOMY ECOSYSTEM INTEGRATION TEST
 // ============================================================================
