@@ -28,7 +28,8 @@ We replace traditional Merkle trees with compact, homomorphic **neural state emb
 | **Whitepaper (v1.01)** | Complete technical specification (30 November 2025) | [NERV_Whitepaper_v1.01.pdf](NERV_Whitepaper_v1.01.pdf) |
 | **FAQ Document** | Addendum to the whitepaper | [NERV FAQ - Addendum to the Whitepaper.pdf](NERV%20FAQ%20-%20Addendum%20to%20the%20Whitepaper.pdf) |
 | **Project Landing Page** | Live project website | [https://nerv-3w4y.vercel.app](https://nerv-3w4y.vercel.app) |
-| **Project Codebase** | Complete Codebase  | (https://github.com/nerv-bit/nerv/tree/main/NERVCodeV2) |
+| **Project Codebase** | Complete Codebase & Tests | (https://github.com/nerv-bit/nerv/tree/main/NERVCodeV2) |
+| **Supplemental docs** | Outstanding items | (https://github.com/nerv-bit/nerv/tree/main/Supplemental%20docs) |
 | **License** | Dual MIT / Apache 2.0 | See [LICENSE-MIT.txt](LICENSE-MIT.txt) and [LICENSE-APACHE.txt](LICENSE-APACHE.txt) |
 
 ---
@@ -74,7 +75,8 @@ NERV belongs to the global privacy and open-source community. We invite cryptogr
 
 ### Ways to Contribute:
 - Open issues for questions, suggestions, or bug reports
-- Run encoder models, test homomorphism, simulate attacks, update code; perform reviews, audits, or provide documentation 
+- Run encoder models, integrate with TEE's, test homomorphism, simulate attacks, update code; perform reviews, audits, or provide documentation
+- Review Supplemental docs for outstanding items 
 - Follow progress on the project landing page and future community channels (to be announced)
 
 ---
