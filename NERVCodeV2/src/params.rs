@@ -13,7 +13,7 @@ use std::path::PathBuf;
 // FIXED CONSTANTS - Never change after genesis
 // ============================================================================
 
-/// Size of neural state embeddings in bytes (512 dimensions × 4 bytes/f32)
+/// Size of neural state embeddings in bytes (512-byte quantized, e.g., 512 int8 dimensions for storage efficiency)
 pub const EMBEDDING_SIZE: usize = 512;
 
 /// Maximum transactions per batch (optimal for homomorphic updates)
@@ -152,9 +152,9 @@ pub const MIXER_JITTER_MS: u64 = 200;
 pub const TOTAL_SUPPLY: u64 = 10_000_000_000;
 
 /// Emission schedule percentages
-pub const EMISSION_YEAR_1_2_PERCENT: f64 = 0.38;  // 38%
-pub const EMISSION_YEAR_3_5_PERCENT: f64 = 0.34;  // 34%
-pub const EMISSION_YEAR_6_10_PERCENT: f64 = 0.28; // 28%
+pub const EMISSION_YEAR_1_2_PERCENT: f64 = 0.19;  // 38% over 2 years
+pub const EMISSION_YEAR_3_5_PERCENT: f64 = 0.113;  // 34% over 3 years
+pub const EMISSION_YEAR_6_10_PERCENT: f64 = 0.056; // 28% over 5 years
 pub const TAIL_EMISSION_PERCENT: f64 = 0.005;     // 0.5% per year forever
 
 /// Reward distribution (from useful-work economy)
@@ -563,10 +563,10 @@ mod tests {
         assert!((error - 2.56e-7).abs() < 1e-10);
     }
     
-    #[test]
-    fn test_mixer_anonymity() {
-        let anonymity = mixer_anonymity_set(100, 0.33);
-        assert!(anonymity > 100_000.0); // >100k as claimed in whitepaper
+   #[test]
+   fn test_mixer_anonymity() {
+    let anonymity = mixer_anonymity_set(100, 0.33);
+    assert!(anonymity > 1_000_000.0); // >1M for global passive adversary as proven/claimed in whitepaper
     }
     
     #[test]

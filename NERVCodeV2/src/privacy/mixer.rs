@@ -66,7 +66,7 @@ impl Default for MixConfig {
         Self {
             hops: 5,
             cover_ratio: 5.0,
-            probabilistic_cover_ratio: 0.3,
+            probabilistic_cover_ratio: 0.5,
             jitter_mu_ms: 100,
             jitter_sigma_ms: 200,
             max_payload_size: 1024 * 1024, // 1MB

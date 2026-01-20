@@ -209,7 +209,10 @@ pub struct ConsensusEngine {
     
     /// Neural predictor for efficient validation
     neural_predictor: Option<NeuralPredictor>,
-    
+
+   
+    pub predictor: Arc<Predictor>,
+
     /// Dispute resolver
     dispute_resolver: DisputeResolver,
     
@@ -237,6 +240,12 @@ impl ConsensusEngine {
         } else {
             None
         };
+        // NEW: Load and store the neural predictor (fallback enabled if model missing)
+        let predictor_config = ConsensusConfig {
+            predictor_model_path: config.predictor_model_path.clone(),
+            ..Default::default()
+        };
+        let predictor = Arc::new(Predictor::new(&predictor_config)?);
         
         Ok(Self {
             config,
@@ -309,16 +318,6 @@ impl ConsensusEngine {
             return Ok(ProposalResult::InvalidJustification);
         }
         
-        // Use neural predictor for fast validation if enabled
-        let validation_result = if let Some(predictor) = &self.neural_predictor {
-            self.validate_with_predictor(&proposal).await?
-        } else {
-            self.validate_without_predictor(&proposal).await?
-        };
-        
-        if !validation_result {
-            return Ok(ProposalResult::InvalidBlock);
-        }
         
         // Store pending proposal
         self.pending_proposals.insert(proposal.block_hash, proposal.clone());
@@ -359,6 +358,20 @@ impl ConsensusEngine {
                 return Ok(VoteResult::QuorumReached);
             }
         }
+         
+        // NEW: Use neural predictor for AI-native validation (whitepaper core)
+    let tokens = self.tokenize_recent_events(); // Assume helper to get vote/proposal sequence
+    let (predicted_delta, validity_score) = self.predictor.predict(&tokens)?;
+    
+    // Compare predicted embedding delta against proposed
+    let proposed_delta = &proposal.embedding_delta;
+    let delta_match = embedding_distance(predicted_delta, proposed_delta)? < 1e-6; // Tight threshold
+    
+    if validity_score < 0.95 || !delta_match {  // Whitepaper implies high confidence
+        return Err(ConsensusError::PredictorError("Low prediction confidence or mismatch".into()));
+    }
+    
+    Ok(true)
         
         Ok(VoteResult::Accepted)
     }

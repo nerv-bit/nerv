@@ -28,6 +28,8 @@ pub struct PredictionConfig {
     
     /// Prediction horizon (steps ahead)
     pub prediction_horizon: usize,
+
+    pub overload_probability_threshold: f32,  // Added: Whitepaper's 0.92 for split triggers
     
     /// Input features count
     pub input_features: usize,
@@ -55,6 +57,7 @@ impl Default for PredictionConfig {
             model_path: "models/lstm_load_predictor_v1.onnx".to_string(),
             sequence_length: 60, // 60 minutes of history
             prediction_horizon: 12, // Predict 12 steps ahead (1 hour)
+            overload_probability_threshold: 0.92,
             input_features: 8, // 8 input features per timestep
             output_features: 4, // 4 output predictions
             training_window: 10080, // 1 week of data (assuming 1-minute intervals)

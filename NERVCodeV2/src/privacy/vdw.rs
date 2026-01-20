@@ -63,6 +63,11 @@ pub struct VerifiableDelayWitness {
     pub timestamp: u64,
    /// Hash of the neural state embedding
     pub embedding_hash: EmbeddingHash, // [u8; 32]
+    pub tx_hash: [u8; 32],  // Added: SHA-256 of private tx
+    pub shard_id: u64,  // Added: Shard identifier
+    pub tee_attestation: Vec<u8>,  // Added: TEE report
+    pub timestamp: u64,  // Added: Secure timestamp
+    pub monotonic_counter: u64,  // Added: Replay prevention
    /// Recursive ZK proof (folded Nova proof)
     pub recursive_proof: Vec,
    /// VDF output (proof of sequential work)

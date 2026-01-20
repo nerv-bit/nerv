@@ -175,7 +175,19 @@ async fn main() -> Result<()> {
     Arc::clone(&node.fl_aggregator),
     Arc::clone(&node.consensus),
     10_000,  // Update every ~10k blocks
+
+    
 );
+
+tokio::spawn(async move {
+        loop {
+            if let Err(e) = updater.check_and_apply_update().await {
+                warn!("Encoder update failed: {}", e);
+            }
+            tokio::time::sleep(Duration::from_secs(60)).await; // Or block-based trigger
+        }
+    });
+
 tokio::spawn(updater.run(current_height));
 
     // Wait for shutdown signal

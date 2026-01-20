@@ -267,6 +267,7 @@ pub struct WeightedQuorum {
     
     /// Pending encoder update proposal (hash + supporting power)
     pending_encoder_update: Arc<RwLock<Option<([u8; 32], u128)>>>,
+
     
     /// Encoder update quorum threshold (stricter than BFT - 80%)
     const ENCODER_UPDATE_QUORUM: f64 = 0.8;  // 80% of total voting power
