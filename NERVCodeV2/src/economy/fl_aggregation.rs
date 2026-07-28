@@ -820,6 +820,30 @@ impl FLAggregator {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GlobalGradient {
+    pub params: Vec<f32>,   // flattened gradient
+    pub epoch: u64,
+}
+
+impl GlobalGradient {
+    pub fn from_gradient_updates(updates: &[GradientUpdate]) -> Self {
+        // aggregate (average) gradients
+        let dim = updates[0].data.len();
+        let mut agg = vec![0.0f32; dim];
+        for u in updates {
+            for (i, &v) in u.data.iter().enumerate() {
+                agg[i] += v;
+            }
+        }
+        let count = updates.len() as f32;
+        for v in &mut agg {
+            *v /= count;
+        }
+        GlobalGradient { params: agg, epoch: 0 }
+    }
+}
+
 
 /// Gradient update structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
