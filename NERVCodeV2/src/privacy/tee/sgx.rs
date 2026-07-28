@@ -168,29 +168,39 @@ impl TEERuntime for SGXRuntime {
         Self::is_available()
     }
     
-    async fn perform_attestation(&self) -> Result<TEEAttestation, NervError> {
-        if !self.initialized {
-            return Err(NervError::TEEAttestation("Enclave not initialized".into()));
+       async fn perform_attestation(&self) -> Result<TEEAttestation, NervError> {
+        #[cfg(feature = "tee_real")]
+        {
+            // Generate a quote using DCAP
+            let target_info = sgx_dcap_ql::get_target_info()
+                .map_err(|e| NervError::TEEAttestation(format!("Failed to get target info: {:?}", e)))?;
+            // Prepare report data (e.g., hash of current state)
+            let report_data = [0u8; 64]; // in practice, fill with meaningful data
+            let report = sgx_dcap_ql::create_report(&target_info, &report_data)
+                .map_err(|e| NervError::TEEAttestation(format!("Failed to create report: {:?}", e)))?;
+            let quote = sgx_dcap_ql::get_quote(&report)
+                .map_err(|e| NervError::TEEAttestation(format!("Failed to get quote: {:?}", e)))?;
+            // Verify quote (optional, but we'll do it here)
+            let verification_result = sgx_dcap_quoteverify::verify_quote(&quote)
+                .map_err(|e| NervError::TEEAttestation(format!("Quote verification failed: {:?}", e)))?;
+            if !verification_result.is_valid() {
+                return Err(NervError::TEEAttestation("Quote invalid".into()));
+            }
+            // Build TEEAttestation
+            Ok(TEEAttestation::SGX(SGXAttestation {
+                report,
+                quote,
+                signature: vec![], // filled by DCAP
+                certificate_chain: vec![], // could be retrieved
+            }))
         }
-        
-        info!("Performing SGX DCAP remote attestation");
-        
-        let target_info = Targetinfo::default();
-        
-        let report = Report::for_target(&target_info, &[0u8; 64]);
-        
-        let quote = vec![0u8; 2048]; // Placeholder DCAP quote
-        
-        let signature = vec![0u8; 64];
-        let certificate_chain = vec![0u8; 4096];
-        
-        Ok(TEEAttestation::SGX(SGXAttestation {
-            report,
-            quote,
-            signature,
-            certificate_chain,
-        }))
+        #[cfg(not(feature = "tee_real"))]
+        {
+            // Fallback to mock
+            Ok(TEEAttestation::dummy())
+        }
     }
+
     
     async fn execute_blind_validation(&self, delta_data: &[u8]) -> Result<bool, NervError> {
         info!("Executing blind validation in SGX enclave ({} bytes)", delta_data.len());
