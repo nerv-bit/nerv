@@ -155,7 +155,8 @@ zeroize = "1.7"  # For secure key wiping
 rand = { version = "0.8", features = ["std_rng"] }
 
 # ---------- NETWORKING & DISTRIBUTED SYSTEMS ----------
-libp2p = { version = "0.53", features = ["tcp", "websocket", "noise", "yamux", "mplex", "quic"] }
+[dependencies]
+libp2p = { version = "0.53", features = ["tcp", "tokio", "noise", "yamux", "gossipsub", "kad", "identify", "ping", "request-response"] }
 kad = { version = "0.4", features = ["async-std"] }                 # Kademlia DHT
 quinn = "0.11"                                                      # QUIC implementation
 h3 = "0.0.5"                                                        # HTTP/3 for VDW serving
