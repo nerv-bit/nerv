@@ -360,3 +360,37 @@ footer p { margin:0.5rem 0; }
     font-size: 1rem;
   }
 }
+
+/* ═══════════════════════════════════════════════ */
+/* V1→V2 Evolution Callout                         */
+/* ═══════════════════════════════════════════════ */
+
+.evolution-callout {
+  background: linear-gradient(145deg, rgba(15, 25, 50, 0.6), rgba(5, 10, 25, 0.8));
+  border: 1px solid rgba(100, 200, 255, 0.12);
+  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle top accent line — matches the hero gradient divider */
+.evolution-callout::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.3), rgba(168, 85, 247, 0.3), transparent);
+}
+
+/* Faint bottom echo */
+.evolution-callout::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 15%;
+  right: 15%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.15), transparent);
+}
