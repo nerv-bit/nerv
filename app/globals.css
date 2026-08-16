@@ -175,3 +175,173 @@ footer p { margin:0.5rem 0; }
       drop-shadow(0 0 150px rgba(168, 85, 247, 0.45));
   }
 }
+
+/* ═══════════════════════════════════════════════ */
+/* Comparison Table — Neural / Cyber Theme         */
+/* ═══════════════════════════════════════════════ */
+
+.comparison-table-wrapper {
+  background: linear-gradient(145deg, rgba(10, 18, 40, 0.75), rgba(5, 8, 22, 0.9));
+  border: 1px solid rgba(100, 200, 255, 0.15);
+  border-radius: 16px;
+  padding: 2rem 1.5rem;
+  overflow-x: auto;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    0 0 30px rgba(0, 150, 255, 0.06),
+    inset 0 1px 0 rgba(100, 220, 255, 0.08);
+}
+
+.comparison-table {
+  min-width: 520px;
+  border-spacing: 0;
+}
+
+/* ── Header ── */
+.comparison-th {
+  padding: 0.85rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(100, 200, 255, 0.7);
+  border-bottom: 1px solid rgba(100, 200, 255, 0.15);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.comparison-th-first {
+  text-align: left;
+  padding-left: 1.25rem;
+}
+
+/* ── Body rows ── */
+.comparison-row td {
+  border-bottom: 1px solid rgba(100, 200, 255, 0.07);
+  transition: background 0.3s ease;
+}
+
+.comparison-row:last-child td {
+  border-bottom: none;
+}
+
+.comparison-row:hover td {
+  background: rgba(100, 200, 255, 0.04);
+}
+
+/* ── Cells ── */
+.comparison-td {
+  padding: 1.1rem 1rem;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.comparison-td-name {
+  text-align: left;
+  padding-left: 1.25rem;
+}
+
+/* ── Chain name labels ── */
+.comparison-chain-label {
+  font-weight: 700;
+  font-size: 1rem;
+  color: rgba(200, 215, 230, 0.85);
+  letter-spacing: 0.02em;
+}
+
+.comparison-chain-nerv {
+  background: linear-gradient(90deg, #00ffff, #9070ff, #00ffaa);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-shift 3s ease infinite;
+  font-size: 1.05rem;
+}
+
+/* ── NERV row glow ── */
+.comparison-row-nerv {
+  position: relative;
+}
+
+.comparison-row-nerv td {
+  background: rgba(0, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(0, 255, 255, 0.12);
+}
+
+.comparison-row-nerv:hover td {
+  background: rgba(0, 255, 255, 0.07);
+}
+
+.comparison-td-nerv {
+  /* subtle extra highlight per cell */
+}
+
+/* ── Badges (✓ / ✗) ── */
+.comparison-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 800;
+  margin-right: 0.45rem;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.comparison-badge-yes {
+  background: rgba(0, 255, 200, 0.12);
+  border: 1px solid rgba(0, 255, 200, 0.3);
+  color: #00ffc8;
+  box-shadow: 0 0 8px rgba(0, 255, 200, 0.15);
+}
+
+.comparison-badge-no {
+  background: rgba(255, 80, 80, 0.08);
+  border: 1px solid rgba(255, 80, 80, 0.2);
+  color: rgba(255, 100, 100, 0.7);
+}
+
+/* ── Cell text ── */
+.comparison-cell-text {
+  font-size: 0.88rem;
+  color: rgba(200, 220, 240, 0.85);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.comparison-cell-dim {
+  color: rgba(160, 180, 200, 0.5);
+}
+
+/* ── Responsive: stack on narrow screens ── */
+@media (max-width: 600px) {
+  .comparison-table-wrapper {
+    padding: 1.25rem 1rem;
+  }
+
+  .comparison-th,
+  .comparison-td {
+    padding: 0.7rem 0.5rem;
+    font-size: 0.78rem;
+  }
+
+  .comparison-badge {
+    width: 1.3rem;
+    height: 1.3rem;
+    font-size: 0.65rem;
+    margin-right: 0.3rem;
+  }
+
+  .comparison-cell-text {
+    font-size: 0.76rem;
+  }
+
+  .comparison-chain-label {
+    font-size: 0.88rem;
+  }
+}
