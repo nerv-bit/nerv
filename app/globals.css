@@ -194,13 +194,14 @@ footer p { margin:0.5rem 0; }
 }
 
 .comparison-table {
-  min-width: 520px;
-  border-spacing: 0;
+  min-width: 580px;
+  border-collapse: separate;
+  border-spacing: 1cm 0;          /* ← 1 cm horizontal gap between columns */
 }
 
 /* ── Header ── */
 .comparison-th {
-  padding: 0.85rem 1rem;
+  padding: 0.85rem 0.5rem;
   font-size: 0.8rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -213,7 +214,7 @@ footer p { margin:0.5rem 0; }
 
 .comparison-th-first {
   text-align: left;
-  padding-left: 1.25rem;
+  padding-left: 0.25rem;
 }
 
 /* ── Body rows ── */
@@ -232,17 +233,17 @@ footer p { margin:0.5rem 0; }
 
 /* ── Cells ── */
 .comparison-td {
-  padding: 1.1rem 1rem;
+  padding: 1.2rem 0.5rem;
   text-align: center;
   vertical-align: middle;
 }
 
 .comparison-td-name {
   text-align: left;
-  padding-left: 1.25rem;
+  padding-left: 0.25rem;
 }
 
-/* ── Chain name labels ── */
+/* ── Chain name labels (Solana/Sui, Monero/Zcash) ── */
 .comparison-chain-label {
   font-weight: 700;
   font-size: 1rem;
@@ -250,21 +251,23 @@ footer p { margin:0.5rem 0; }
   letter-spacing: 0.02em;
 }
 
+/* ── NERV chain label — special terminal font ── */
 .comparison-chain-nerv {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Courier New', monospace;
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
   background: linear-gradient(90deg, #00ffff, #9070ff, #00ffaa);
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: gradient-shift 3s ease infinite;
-  font-size: 1.05rem;
+  filter: drop-shadow(0 0 6px rgba(0, 255, 255, 0.35));
 }
 
 /* ── NERV row glow ── */
-.comparison-row-nerv {
-  position: relative;
-}
-
 .comparison-row-nerv td {
   background: rgba(0, 255, 255, 0.03);
   border-bottom: 1px solid rgba(0, 255, 255, 0.12);
@@ -274,74 +277,86 @@ footer p { margin:0.5rem 0; }
   background: rgba(0, 255, 255, 0.07);
 }
 
-.comparison-td-nerv {
-  /* subtle extra highlight per cell */
-}
-
 /* ── Badges (✓ / ✗) ── */
 .comparison-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.55rem;
-  height: 1.55rem;
+  width: 1.6rem;
+  height: 1.6rem;
   border-radius: 50%;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 800;
-  margin-right: 0.45rem;
+  margin-right: 0.5rem;
   vertical-align: middle;
   line-height: 1;
 }
 
 .comparison-badge-yes {
-  background: rgba(0, 255, 200, 0.12);
-  border: 1px solid rgba(0, 255, 200, 0.3);
-  color: #00ffc8;
-  box-shadow: 0 0 8px rgba(0, 255, 200, 0.15);
+  background: rgba(0, 230, 118, 0.15);
+  border: 1.5px solid rgba(0, 230, 118, 0.5);
+  color: #00e676;
+  box-shadow: 0 0 10px rgba(0, 230, 118, 0.2);
 }
 
 .comparison-badge-no {
-  background: rgba(255, 80, 80, 0.08);
-  border: 1px solid rgba(255, 80, 80, 0.2);
-  color: rgba(255, 100, 100, 0.7);
+  background: rgba(255, 61, 61, 0.12);
+  border: 1.5px solid rgba(255, 61, 61, 0.4);
+  color: #ff3d3d;
+  box-shadow: 0 0 8px rgba(255, 61, 61, 0.12);
 }
 
-/* ── Cell text ── */
-.comparison-cell-text {
-  font-size: 0.88rem;
-  color: rgba(200, 220, 240, 0.85);
+/* ── Cell text: BOLD GREEN for Yes values ── */
+.comparison-cell-yes {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #00e676;
   vertical-align: middle;
   white-space: nowrap;
 }
 
-.comparison-cell-dim {
-  color: rgba(160, 180, 200, 0.5);
+/* ── Cell text: BOLD RED for No / Transparent / Low values ── */
+.comparison-cell-no {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #ff3d3d;
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
-/* ── Responsive: stack on narrow screens ── */
+/* ── Responsive adjustments ── */
 @media (max-width: 600px) {
   .comparison-table-wrapper {
     padding: 1.25rem 1rem;
   }
 
+  .comparison-table {
+    border-spacing: 0.5cm 0;
+  }
+
   .comparison-th,
   .comparison-td {
-    padding: 0.7rem 0.5rem;
+    padding: 0.65rem 0.35rem;
     font-size: 0.78rem;
   }
 
   .comparison-badge {
-    width: 1.3rem;
-    height: 1.3rem;
-    font-size: 0.65rem;
+    width: 1.35rem;
+    height: 1.35rem;
+    font-size: 0.68rem;
     margin-right: 0.3rem;
   }
 
-  .comparison-cell-text {
-    font-size: 0.76rem;
+  .comparison-cell-yes,
+  .comparison-cell-no {
+    font-size: 0.78rem;
   }
 
   .comparison-chain-label {
     font-size: 0.88rem;
+  }
+
+  .comparison-chain-nerv {
+    font-size: 1rem;
   }
 }
