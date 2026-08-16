@@ -109,8 +109,8 @@ export default function Home() {
         {/* COMPARISON TABLE                                      */}
         {/* ═════════════════════════════════════════════════════ */}
         <section className="comparison py-12 max-w-5xl mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold mb-2 text-center">How NERV Compares</h2>
-          <p className="text-center text-sm opacity-60 mb-10">No compromises. Every pillar, by default.</p>
+          <h2 className="text-3xl md:text-4xl font-bold mb-2 text-center">Why NERV?</h2>
+          <p className="text-center text-sm opacity-60 mb-10">No compromises. By default, from genesis.</p>
 
           <div className="comparison-table-wrapper">
             <table className="comparison-table w-full">
