@@ -9,20 +9,14 @@ export default function Home() {
 
   return (
     <div className="relative min-h-screen bg-black text-white overflow-x-hidden">
-      {/* Neural Background - Absolutely positioned */}
+      {/* Neural Background */}
       <div className="absolute inset-0 z-0">
         <NeuralBackground isActive={heroHovered} />
       </div>
 
-      {/* HERO SECTION - FORCED TO ABSOLUTE TOP */}
+      {/* HERO SECTION */}
       <section
-        className="
-          relative pt-10
-          md:pt-0
-          md:absolute md:-top-24
-          md:left-1/2 md:-translate-x-1/2
-          w-full max-w-5xl px-4 text-center
-        "
+        className="relative pt-10 md:pt-0 md:absolute md:-top-24 md:left-1/2 md:-translate-x-1/2 w-full max-w-5xl px-4 text-center"
         onMouseEnter={() => setHeroHovered(true)}
         onMouseLeave={() => setHeroHovered(false)}
       >
@@ -32,9 +26,7 @@ export default function Home() {
         <div className="crypto-icon absolute left-[10%] bottom-1/3 text-xl opacity-0">{`{ }`}</div>
         <div className="crypto-icon absolute right-[10%] bottom-1/4 text-3xl opacity-0">🛡️</div>
 
-        {/* Glass Hero Block - Minimal padding */}
         <div className="glass-hero mt-0 pt-4 pb-8">
-          {/* NERV Logo Image */}
           <div className="relative mx-auto mb-4 w-full max-w-[220px] sm:max-w-[280px] md:max-w-[420px]">
             <Image
               src="/NERV Logo.png"
@@ -54,7 +46,6 @@ export default function Home() {
 
           <div className="h-1 w-24 bg-gradient-to-r from-cyan-500 to-purple-500 mx-auto my-6 rounded-full"></div>
 
-          {/* Original Hero Text */}
           <p className="tagline text-2xl md:text-3xl mb-4 opacity-90">
             Privacy by Default. Post-Quantum from Genesis. Infinite Scalability.
           </p>
@@ -63,7 +54,6 @@ export default function Home() {
             Fair launch October 2027 • No pre-mine • All code public today
           </p>
 
-          {/* Original Buttons */}
           <div className="buttons flex flex-col sm:flex-row gap-6 justify-center mb-8">
             <a
               href="https://github.com/nerv-bit/nerv/blob/main/NERV2.0/NERV%20Whitepaper%20V2.0.pdf"
@@ -86,11 +76,11 @@ export default function Home() {
         </div>
       </section>
 
-      {/* MAIN CONTENT - Pushed down to avoid hero overlap */}
+      {/* MAIN CONTENT */}
       <div className="relative z-10 pt-8 md:pt-[520px]">
 
         {/* ═══════════════════════════════════════════ */}
-        {/* CORE INNOVATIONS SECTION — NOW FIRST       */}
+        {/* CORE INNOVATIONS SECTION — FIRST            */}
         {/* ═══════════════════════════════════════════ */}
         <section className="promise py-12 text-center max-w-5xl mx-auto px-4">
           <h2 className="text-4xl font-bold mb-8">Core Pillars of NERV</h2>
@@ -116,14 +106,14 @@ export default function Home() {
         </section>
 
         {/* ═════════════════════════════════════════════════════ */}
-        {/* COMPARISON TABLE — Between Pillars & Architecture     */}
+        {/* COMPARISON TABLE                                      */}
         {/* ═════════════════════════════════════════════════════ */}
         <section className="comparison py-12 max-w-5xl mx-auto px-4">
           <h2 className="text-3xl md:text-4xl font-bold mb-2 text-center">How NERV Compares</h2>
           <p className="text-center text-sm opacity-60 mb-10">No compromises. Every pillar, by default.</p>
 
           <div className="comparison-table-wrapper">
-            <table className="comparison-table w-full border-collapse">
+            <table className="comparison-table w-full">
               <thead>
                 <tr>
                   <th className="comparison-th comparison-th-first">Blockchain</th>
@@ -134,72 +124,72 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody>
-                {/* Row: Solana / Sui */}
+                {/* Solana / Sui */}
                 <tr className="comparison-row">
                   <td className="comparison-td comparison-td-name">
                     <span className="comparison-chain-label">Solana / Sui</span>
                   </td>
                   <td className="comparison-td">
                     <span className="comparison-badge comparison-badge-no">✗</span>
-                    <span className="comparison-cell-text comparison-cell-dim">Transparent</span>
+                    <span className="comparison-cell-no">Transparent</span>
                   </td>
                   <td className="comparison-td">
                     <span className="comparison-badge comparison-badge-yes">✓</span>
-                    <span className="comparison-cell-text">High TPS</span>
+                    <span className="comparison-cell-yes">High TPS</span>
                   </td>
                   <td className="comparison-td">
                     <span className="comparison-badge comparison-badge-no">✗</span>
-                    <span className="comparison-cell-text comparison-cell-dim">No</span>
+                    <span className="comparison-cell-no">No</span>
                   </td>
                   <td className="comparison-td">
                     <span className="comparison-badge comparison-badge-no">✗</span>
-                    <span className="comparison-cell-text comparison-cell-dim">No</span>
+                    <span className="comparison-cell-no">No</span>
                   </td>
                 </tr>
 
-                {/* Row: Monero / Zcash */}
+                {/* Monero / Zcash */}
                 <tr className="comparison-row">
                   <td className="comparison-td comparison-td-name">
                     <span className="comparison-chain-label">Monero / Zcash</span>
                   </td>
                   <td className="comparison-td">
                     <span className="comparison-badge comparison-badge-yes">✓</span>
-                    <span className="comparison-cell-text">Private</span>
+                    <span className="comparison-cell-yes">Private</span>
                   </td>
                   <td className="comparison-td">
                     <span className="comparison-badge comparison-badge-no">✗</span>
-                    <span className="comparison-cell-text comparison-cell-dim">Low TPS</span>
+                    <span className="comparison-cell-no">Low TPS</span>
                   </td>
                   <td className="comparison-td">
                     <span className="comparison-badge comparison-badge-no">✗</span>
-                    <span className="comparison-cell-text comparison-cell-dim">No</span>
+                    <span className="comparison-cell-no">No</span>
                   </td>
                   <td className="comparison-td">
                     <span className="comparison-badge comparison-badge-no">✗</span>
-                    <span className="comparison-cell-text comparison-cell-dim">No</span>
+                    <span className="comparison-cell-no">No</span>
                   </td>
                 </tr>
 
-                {/* Row: NERV — highlighted */}
+                {/* NERV — highlighted */}
                 <tr className="comparison-row comparison-row-nerv">
                   <td className="comparison-td comparison-td-name">
-                    <span className="comparison-chain-label comparison-chain-nerv">NERV</span>
+                    <span className="comparison-chain-nerv">NERV</span>
                   </td>
                   <td className="comparison-td comparison-td-nerv">
                     <span className="comparison-badge comparison-badge-yes">✓</span>
-                    <span className="comparison-cell-text">Private</span>
+                    <span className="comparison-cell-yes">Private</span>
                   </td>
                   <td className="comparison-td comparison-td-nerv">
                     <span className="comparison-badge comparison-badge-yes">✓</span>
-                    <span className="comparison-cell-text">High TPS</span>
+                    <span className="comparison-cell-yes">High TPS</span>
                   </td>
                   <td className="comparison-td comparison-td-nerv">
                     <span className="comparison-badge comparison-badge-yes">✓</span>
-                    <span className="comparison-cell-text">Yes</span>
+                    <span className="comparison-cell-yes">Yes</span>
                   </td>
                   <td className="comparison-td comparison-td-nerv">
                     <span className="comparison-badge comparison-badge-yes">✓</span>
-                    <span className="comparison-cell-text">Yes</span>
+                    <span className="comparison-cell-yes">Yes</span>
                   </td>
                 </tr>
               </tbody>
@@ -208,7 +198,7 @@ export default function Home() {
         </section>
 
         {/* ═══════════════════════════════════════════ */}
-        {/* HIGH-LEVEL ARCHITECTURE — NOW AFTER TABLE   */}
+        {/* HIGH-LEVEL ARCHITECTURE — AFTER TABLE        */}
         {/* ═══════════════════════════════════════════ */}
         <section className="architecture max-w-6xl mx-auto text-center px-4">
           <h2 className="text-4xl font-bold mb-8">High-Level Architecture</h2>
