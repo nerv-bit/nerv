@@ -56,7 +56,7 @@ filter: heroHovered
 
   {/* Original Hero Text */}
   <p className="tagline text-2xl md:text-3xl mb-4 opacity-90">
-    The private, post-quantum, infinitely scalable blockchain
+    Privacy by Default. Post-Quantum from Genesis. Infinite Scalability.
   </p>
 
   <p className="launch text-lg md:text-xl mb-12 opacity-80">
@@ -66,13 +66,13 @@ filter: heroHovered
           {/* Original Buttons */}
           <div className="buttons flex flex-col sm:flex-row gap-6 justify-center mb-8">
             <a
-              href="https://github.com/nerv-bit/nerv/blob/main/NERV_Whitepaper_v1.01.pdf"
+              href="https://github.com/nerv-bit/nerv/blob/main/NERV2.0/NERV%20Whitepaper%20V2.0.pdf"
               className="btn primary bg-cyan-500 hover:bg-cyan-400 text-black font-semibold py-3 px-8 rounded-lg transition hover:scale-105"
             >
-              Read Whitepaper v1.01
+              Read Whitepaper v2.0
             </a>
             <a
-              href="https://github.com/nerv-bit/nerv"
+              href="https://github.com/nerv-bit/nerv/Nerv2.0"
               target="_blank"
               className="btn secondary border border-purple-500 text-white font-semibold py-3 px-8 rounded-lg transition hover:scale-105"
             >
@@ -81,7 +81,7 @@ filter: heroHovered
           </div>
 
           <p className="launch text-lg md:text-xl mb-12 opacity-80">
-            <span className="gradient-text font-semibold">NERV</span> delivers full privacy by default  via TEE-bound 5-hop mixing (&gt;1M TPS via dynamic neural sharding and verifiable embeddings in Halo2/Nova), post-quantum security from genesis, and a self-improving useful-work economy. Fully open-source, community-governed. Join us in building the <span className="gradient-text font-semibold">nervous system of the private internet</span>!
+            <span className="gradient-text font-semibold">NERV</span> delivers full privacy by default via Sphinx 5-hop mixnet (&gt;1M TPS via dynamic neural sharding and verifiable embeddings in Halo2/Nova), post-quantum security from genesis, and a self-improving useful-work economy. Fully open-source, community-governed. Join us in building the <span className="gradient-text font-semibold">nervous system of the private internet</span>!
           </p>
         </div>
       </section>
@@ -103,7 +103,7 @@ filter: heroHovered
             />
           </div>
           <p className="mt-4 text-sm opacity-70">
-            User → 5-hop TEE Mixer → Dynamic Neural Shards → AI-Native Consensus → 512-byte Embedding Root
+            User → 5-hop Sphinx Mixnet → Dynamic Neural Shards → AI-Native Consensus → 512-byte Embedding Root
           </p>
         </section>
 
@@ -112,19 +112,21 @@ filter: heroHovered
           <h2 className="text-4xl font-bold mb-8">Core Pillars of NERV</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="neural-card p-6">
-              <div className="text-4xl mb-4">🧠</div>
-              <h3 className="text-xl font-bold mb-3 gradient-text">Live, Breathing System</h3>
-              <p className="opacity-80">Endogenous intelligence – Nodes are rewarded for useful-work federated learning that perpetually improves the network's own encoders and predictors.</p>
+              <div className="text-4xl mb-4">⚡</div>
+              <h3 className="text-xl font-bold mb-3 gradient-text">Real-Time Self-Evolution</h3>
+              <p className="opacity-80"> 
+Every block, the network learns. Validators earn rewards by submitting gradients that reduce Huber loss — no 30-day federated learning rounds, no Shapley complexity. The network's Neural Weight Oscillator (NWO) adapts to shifting transaction patterns in real-time.
+</p>
             </div>
             <div className="neural-card p-6">
-              <div className="text-4xl mb-4">⚡</div>
-              <h3 className="text-xl font-bold mb-3 gradient-text">Neural Embeddings</h3>
-              <p className="opacity-80">Infinite scalability – Over 1 million sustained TPS with no theoretical upper bound via state compression and dynamic neural sharding. </p>
+              <div className="text-4xl mb-4">🧠</div>
+              <h3 className="text-xl font-bold mb-3 gradient-text">Neural state Embeddings</h3>
+              <p className="opacity-80">Replace Merkle trees with 512-byte homomorphic embeddings. State updates are O(1) additions, not O(log n) tree traversals. Dynamic neural sharding splits and merges like cells — no manual rebalancing, no theoretical TPS ceiling. </p>
             </div>
             <div className="neural-card p-6">
               <div className="text-4xl mb-4">🔐</div>
-              <h3 className="text-xl font-bold mb-3 gradient-text">Cryptography</h3>
-              <p className="opacity-80">Post-quantum security from genesis – Full NIST-standard lattice-based cryptography</p>
+              <h3 className="text-xl font-bold mb-3 gradient-text">Post-Quantum Cryptography</h3>
+              <p className="opacity-80">CRYSTALS-Dilithium-3 for signatures, ML-KEM-768 for encryption, BLAKE3 for hashing. No ECDSA, no RSA, no curves vulnerable to Shor's algorithm. Cryptographic agility built in for future upgrades.</p>
             </div>
           </div>
         </section>
@@ -134,7 +136,7 @@ filter: heroHovered
           <h2 className="text-4xl font-bold mb-8">Road to Mainnet (100% transparent)</h2>
           <div className="timeline-items max-w-2xl mx-auto text-lg space-y-4">
             <div><span className="font-bold">Dec 2025</span> Whitepaper + all code public</div>
-            <div><span className="font-bold">Q4 2026</span> First multi-vendor TEE mixer testnet</div>
+            <div><span className="font-bold">Q4 2026</span> Sphinx 5-hop mixnet testnet</div>
             <div><span className="font-bold">Q1 2027</span> Aurora public testnet (real metrics published)</div>
             <div><span className="font-bold">October 2027</span> Fair mainnet launch – zero pre-mine</div>
           </div>
