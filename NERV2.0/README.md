@@ -55,54 +55,6 @@ Threshold Signatures: BLS12-381 (strictly for validator signature aggregation)
 Building from Source
 NERV v2.0 requires Rust 1.75.0 or newer.
 
-1. Clone the repository
-git clone https://github.com/nerv-bit/nerv.gitcd nerv
-
-2. Build the node
-bash
-
-cargo build --release
-
-3. Generate a default configuration
-bash
-
-./target/release/nerv --generate-config
-This will create a nerv.toml file in your current directory. Modify the data_dir, network listen addresses, and privacy parameters as needed.
-
-Running a Node
-NERV nodes can run in three modes: Full, Validator, and Relay.
-
-Run a Full Node
-bash
-
-./target/release/nerv --config nerv.toml
-
-Run a Validator Node
-To participate in consensus and the Useful-Work economy (earning gradient rewards):
-
-bash
-
-./target/release/nerv --validator --seed-phrase "your_24_word_mnemonic"
-
-Run a Sphinx Mixnet Relay
-To participate in the privacy layer (earning routing fees):
-
-bash
-
-./target/release/nerv --relay --seed-phrase "your_24_word_mnemonic"
-Testing
-The NERV V2.0 codebase is rigorously tested to ensure mathematical exactness and production hardening. To run the complete test suite (unit + integration):
-
-bash
-
-cargo test --release --all
-To run tests for a specific module, such as the NWO Perceptron or the DKG ceremony:
-
-bash
-
-cargo test --test embedding_nwo_tests -- --nocapture
-cargo test --test dkg_threshold_tests -- --nocapture
-
 Roadmap to Production
 By adopting the NWO Paradigm, NERV V2.0 bypasses the "Research Phase" entirely. The code can be written today using existing, battle-tested libraries.
 
@@ -111,9 +63,61 @@ By adopting the NWO Paradigm, NERV V2.0 bypasses the "Research Phase" entirely. 
  Weeks 7-8: Privacy Layer (PQ-Sphinx, DKG threshold mempool)
  Weeks 9-10: AI & Launch (Adam/Huber backprop, 5-node testnet, Grafana monitoring)
  Auditing & Mainnet Launch: Formal verification and security audits.
+ 
 License
 NERV V2.0 is dual-licensed under either:
 
+
+📚 Key Resources
+Resource	Description	File/Link
+Whitepaper (v1.01)	Complete technical specification (15 August 2026):	NERV Whitepaper V2.0.pdf
+Addendum to the whitepaper:	NERV Whitepaper V2.0 - Addendum.pdf
+Project Landing Page	Live project website	https://nerv-3w4y.vercel.app
+Project Codebase	Complete Codebase & Tests	(https://github.com/nerv-bit/nerv/tree/main/NERV2.0/NERV2.0 Code)
+
+License	Dual MIT / Apache 2.0	See LICENSE-MIT.txt and LICENSE-APACHE.txt
+📊 Current Repository Status
+**⚠️ In Development **
+
+This monorepo is in development:
+
+✅ Core documentation (whitepaper, planning, testing)
+✅ Complete codebase
+🔄 No production node implementation yet – prototypes and circuits are under active development
+All code, circuits, datasets, and specifications will be released under MIT/Apache 2.0 as they become available.
+
+🎯 Ethos & Principles
+We are committed to:
+
+Uncompromising privacy as the default, not an opt-in
+Radical openness – Everything auditable, no hidden logic or allocations
+Provable fairness – Zero pre-mine, transparent emissions, community governance from genesis
+Post-quantum readiness – No legacy curves in critical paths
+Useful work over waste – Nodes earn by making the network smarter, not by burning energy or locking capital forever
+NERV belongs to the global privacy and open-source community. We invite cryptographers, systems engineers, privacy advocates, and builders to review, critique, audit, and contribute.
+
+Let's build the nervous system of private money!
+
+🤝 Getting Involved
+First Steps:
+Read the whitepaper first – it contains the complete technical specification
+Review the Addendum document for detailed design and mathematical formulations
+Star/Watch this repo for updates
+Review the code
+Ways to Contribute:
+Open issues for questions, suggestions, or bug reports
+Follow progress on the project landing page and future community channels (to be announced)
+
+🗓️ The Future
+Milestone	Target	Status
+Public Testnet	Q1 2027	Planned
+Mainnet Fair Launch	October 2027	Planned
+The nervous system of the private internet is being built in public. Join us!
+
+NERV Collective
+August 2026
+
+Quick Links: Whitepaper | FAQ | Website
 MIT License (LICENSE-MIT)
 Apache License, Version 2.0 (LICENSE-APACHE)
 at your option. This ensures maximum compatibility with the open-source ecosystem.
