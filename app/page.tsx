@@ -78,7 +78,22 @@ export default function Home() {
 
       {/* MAIN CONTENT */}
       <div className="relative z-10 pt-8 md:pt-[520px]">
-
+       {/* ═══════════════════════════════════════════════ */}
+        {/* V1.01 → V2.0 EVOLUTION CALLOUT                 */}
+        {/* ═══════════════════════════════════════════════ */}
+        <section className="py-6 max-w-5xl mx-auto px-4">
+          <div className="evolution-callout p-6 md:p-8 max-w-3xl mx-auto text-center">
+            <h3 className="text-lg md:text-xl font-bold mb-4 opacity-90">
+              From V1.01 → V2.0: <span className="gradient-text">The Paradigm Shift</span>
+            </h3>
+            <p className="text-sm md:text-base opacity-60 mb-3">
+              V1.01 proved privacy + scale + post-quantum security could coexist. But a 24-layer Transformer forced into linearity = 7.9M ZK constraints. Beautiful math. Not shippable.
+            </p>
+            <p className="text-sm md:text-base opacity-80">
+              V2.0: The <span className="gradient-text font-semibold">Neural Weight Oscillator</span> — a single-layer Perceptron is natively linear. <span className="font-bold text-cyan-300">0-error</span> homomorphism by definition. <span className="font-bold text-cyan-300">50K</span> constraints. Pure-crypto privacy. Production-ready today.
+            </p>
+          </div>
+        </section>
         {/* ═══════════════════════════════════════════ */}
         {/* CORE INNOVATIONS SECTION — FIRST            */}
         {/* ═══════════════════════════════════════════ */}
@@ -89,18 +104,18 @@ export default function Home() {
               <div className="text-4xl mb-4">⚡</div>
               <h3 className="text-xl font-bold mb-3 gradient-text">Real-Time Self-Evolution</h3>
               <p className="opacity-80">
-                Every block, the network learns. Validators earn rewards by submitting gradients that reduce Huber loss — no 30-day federated learning rounds, no Shapley complexity. The network&apos;s Neural Weight Oscillator (NWO) adapts to shifting transaction patterns in real-time.
+                Every block, the network learns. Validators earn rewards by submitting Adam optimizer gradients that reduce Huber loss — no 30-day federated learning rounds, no Shapley complexity. The network&apos;s Neural Weight Oscillator (NWO) adapts to shifting transaction patterns in real-time.
               </p>
             </div>
             <div className="neural-card p-6">
               <div className="text-4xl mb-4">🧠</div>
               <h3 className="text-xl font-bold mb-3 gradient-text">Neural State Embeddings</h3>
-              <p className="opacity-80">Replace Merkle trees with 512-byte homomorphic embeddings. State updates are O(1) additions, not O(log n) tree traversals. Dynamic neural sharding splits and merges like cells — no manual rebalancing, no theoretical TPS ceiling.</p>
+              <p className="opacity-80">Replace Merkle trees with 512-byte homomorphic embeddings produced by a single-layer NWO Perceptron — exact (<span className="font-bold text-cyan-300">0-error</span>) Transfer Homomorphism by mathematical definition, not approximation. State updates are O(1) vector additions. ZK circuit: only <span className="font-bold text-cyan-300">50K</span> constraints (99% reduction from 7.9M). Dynamic neural sharding splits and merges like cells — no manual rebalancing, no theoretical TPS ceiling.</p>
             </div>
             <div className="neural-card p-6">
               <div className="text-4xl mb-4">🔐</div>
               <h3 className="text-xl font-bold mb-3 gradient-text">Post-Quantum Cryptography</h3>
-              <p className="opacity-80">CRYSTALS-Dilithium-3 for signatures, ML-KEM-768 for encryption, BLAKE3 for hashing. No ECDSA, no RSA, no curves vulnerable to Shor&apos;s algorithm. Cryptographic agility built in for future upgrades.</p>
+              <p className="opacity-80">CRYSTALS-Dilithium-3 for signatures, ML-KEM-768 for encryption, BLAKE3 for hashing. Privacy is <span className="font-bold text-cyan-300">100% cryptographic</span> — no TEEs, no hardware trust assumptions, immune to side-channel attacks. No ECDSA, no RSA, no curves vulnerable to Shor&apos;s algorithm. Cryptographic agility built in for future upgrades.</p>
             </div>
           </div>
         </section>
@@ -213,7 +228,7 @@ export default function Home() {
             />
           </div>
           <p className="mt-4 text-sm opacity-70">
-            User → 5-hop Sphinx Mixnet → Dynamic Neural Shards → AI-Native Consensus → 512-byte Embedding Root
+            User → PQ-Sphinx 5-hop Mixnet → Threshold Decrypted Mempool → NWO Perceptron Execution → Adam/Huber Weight Update → 512-byte Embedding Root + VDW
           </p>
         </section>
 
