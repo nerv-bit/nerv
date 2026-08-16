@@ -72,7 +72,7 @@ filter: heroHovered
               Read Whitepaper v2.0
             </a>
             <a
-              href="https://github.com/nerv-bit/nerv/Nerv2.0"
+              href="https://github.com/nerv-bit/nerv/tree/main/NERV2.0"
               target="_blank"
               className="btn secondary border border-purple-500 text-white font-semibold py-3 px-8 rounded-lg transition hover:scale-105"
             >
