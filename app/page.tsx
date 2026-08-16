@@ -15,14 +15,14 @@ export default function Home() {
       </div>
 
       {/* HERO SECTION - FORCED TO ABSOLUTE TOP */}
-      <section 
-         className="
-    relative pt-10
-    md:pt-0
-    md:absolute md:-top-24
-    md:left-1/2 md:-translate-x-1/2
-    w-full max-w-5xl px-4 text-center
-  "
+      <section
+        className="
+          relative pt-10
+          md:pt-0
+          md:absolute md:-top-24
+          md:left-1/2 md:-translate-x-1/2
+          w-full max-w-5xl px-4 text-center
+        "
         onMouseEnter={() => setHeroHovered(true)}
         onMouseLeave={() => setHeroHovered(false)}
       >
@@ -34,34 +34,34 @@ export default function Home() {
 
         {/* Glass Hero Block - Minimal padding */}
         <div className="glass-hero mt-0 pt-4 pb-8">
-        {/* NERV Logo Image */}
-<div className="relative mx-auto mb-4 w-full max-w-[220px] sm:max-w-[280px] md:max-w-[420px]">
-    <Image
-      src="/NERV Logo.png"
-      alt="NERV — Neural Encrypted Virtual Relay"
-      width={840}
-      height={320}
-      priority
-      className="w-full h-auto transition-all duration-500 ease-out"
-  style={{
-    animation: heroHovered ? 'nervGlowPulse 3.2s ease-in-out infinite' : 'none',
-filter: heroHovered
-  ? 'drop-shadow(0 0 40px rgba(0, 255, 255, 0.5)) drop-shadow(0 0 90px rgba(168, 85, 247, 0.3))'
-  : 'drop-shadow(0 0 20px rgba(0, 255, 255, 0.25))',
-  }}
-    />
-  </div>
+          {/* NERV Logo Image */}
+          <div className="relative mx-auto mb-4 w-full max-w-[220px] sm:max-w-[280px] md:max-w-[420px]">
+            <Image
+              src="/NERV Logo.png"
+              alt="NERV — Neural Encrypted Virtual Relay"
+              width={840}
+              height={320}
+              priority
+              className="w-full h-auto transition-all duration-500 ease-out"
+              style={{
+                animation: heroHovered ? 'nervGlowPulse 3.2s ease-in-out infinite' : 'none',
+                filter: heroHovered
+                  ? 'drop-shadow(0 0 40px rgba(0, 255, 255, 0.5)) drop-shadow(0 0 90px rgba(168, 85, 247, 0.3))'
+                  : 'drop-shadow(0 0 20px rgba(0, 255, 255, 0.25))',
+              }}
+            />
+          </div>
 
-  <div className="h-1 w-24 bg-gradient-to-r from-cyan-500 to-purple-500 mx-auto my-6 rounded-full"></div>
+          <div className="h-1 w-24 bg-gradient-to-r from-cyan-500 to-purple-500 mx-auto my-6 rounded-full"></div>
 
-  {/* Original Hero Text */}
-  <p className="tagline text-2xl md:text-3xl mb-4 opacity-90">
-    Privacy by Default. Post-Quantum from Genesis. Infinite Scalability.
-  </p>
+          {/* Original Hero Text */}
+          <p className="tagline text-2xl md:text-3xl mb-4 opacity-90">
+            Privacy by Default. Post-Quantum from Genesis. Infinite Scalability.
+          </p>
 
-  <p className="launch text-lg md:text-xl mb-12 opacity-80">
-    Fair launch October 2027 • No pre-mine • All code public today
-  </p>
+          <p className="launch text-lg md:text-xl mb-12 opacity-80">
+            Fair launch October 2027 • No pre-mine • All code public today
+          </p>
 
           {/* Original Buttons */}
           <div className="buttons flex flex-col sm:flex-row gap-6 justify-center mb-8">
@@ -87,13 +87,133 @@ filter: heroHovered
       </section>
 
       {/* MAIN CONTENT - Pushed down to avoid hero overlap */}
-     <div className="relative z-10 pt-8 md:pt-[520px]">
-        
-        {/* HIGH-LEVEL ARCHITECTURE SECTION */}
+      <div className="relative z-10 pt-8 md:pt-[520px]">
+
+        {/* ═══════════════════════════════════════════ */}
+        {/* CORE INNOVATIONS SECTION — NOW FIRST       */}
+        {/* ═══════════════════════════════════════════ */}
+        <section className="promise py-12 text-center max-w-5xl mx-auto px-4">
+          <h2 className="text-4xl font-bold mb-8">Core Pillars of NERV</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="neural-card p-6">
+              <div className="text-4xl mb-4">⚡</div>
+              <h3 className="text-xl font-bold mb-3 gradient-text">Real-Time Self-Evolution</h3>
+              <p className="opacity-80">
+                Every block, the network learns. Validators earn rewards by submitting gradients that reduce Huber loss — no 30-day federated learning rounds, no Shapley complexity. The network&apos;s Neural Weight Oscillator (NWO) adapts to shifting transaction patterns in real-time.
+              </p>
+            </div>
+            <div className="neural-card p-6">
+              <div className="text-4xl mb-4">🧠</div>
+              <h3 className="text-xl font-bold mb-3 gradient-text">Neural State Embeddings</h3>
+              <p className="opacity-80">Replace Merkle trees with 512-byte homomorphic embeddings. State updates are O(1) additions, not O(log n) tree traversals. Dynamic neural sharding splits and merges like cells — no manual rebalancing, no theoretical TPS ceiling.</p>
+            </div>
+            <div className="neural-card p-6">
+              <div className="text-4xl mb-4">🔐</div>
+              <h3 className="text-xl font-bold mb-3 gradient-text">Post-Quantum Cryptography</h3>
+              <p className="opacity-80">CRYSTALS-Dilithium-3 for signatures, ML-KEM-768 for encryption, BLAKE3 for hashing. No ECDSA, no RSA, no curves vulnerable to Shor&apos;s algorithm. Cryptographic agility built in for future upgrades.</p>
+            </div>
+          </div>
+        </section>
+
+        {/* ═════════════════════════════════════════════════════ */}
+        {/* COMPARISON TABLE — Between Pillars & Architecture     */}
+        {/* ═════════════════════════════════════════════════════ */}
+        <section className="comparison py-12 max-w-5xl mx-auto px-4">
+          <h2 className="text-3xl md:text-4xl font-bold mb-2 text-center">How NERV Compares</h2>
+          <p className="text-center text-sm opacity-60 mb-10">No compromises. Every pillar, by default.</p>
+
+          <div className="comparison-table-wrapper">
+            <table className="comparison-table w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="comparison-th comparison-th-first">Blockchain</th>
+                  <th className="comparison-th">Privacy</th>
+                  <th className="comparison-th">Scalability</th>
+                  <th className="comparison-th">Post-Quantum</th>
+                  <th className="comparison-th">Self-Improving</th>
+                </tr>
+              </thead>
+              <tbody>
+                {/* Row: Solana / Sui */}
+                <tr className="comparison-row">
+                  <td className="comparison-td comparison-td-name">
+                    <span className="comparison-chain-label">Solana / Sui</span>
+                  </td>
+                  <td className="comparison-td">
+                    <span className="comparison-badge comparison-badge-no">✗</span>
+                    <span className="comparison-cell-text comparison-cell-dim">Transparent</span>
+                  </td>
+                  <td className="comparison-td">
+                    <span className="comparison-badge comparison-badge-yes">✓</span>
+                    <span className="comparison-cell-text">High TPS</span>
+                  </td>
+                  <td className="comparison-td">
+                    <span className="comparison-badge comparison-badge-no">✗</span>
+                    <span className="comparison-cell-text comparison-cell-dim">No</span>
+                  </td>
+                  <td className="comparison-td">
+                    <span className="comparison-badge comparison-badge-no">✗</span>
+                    <span className="comparison-cell-text comparison-cell-dim">No</span>
+                  </td>
+                </tr>
+
+                {/* Row: Monero / Zcash */}
+                <tr className="comparison-row">
+                  <td className="comparison-td comparison-td-name">
+                    <span className="comparison-chain-label">Monero / Zcash</span>
+                  </td>
+                  <td className="comparison-td">
+                    <span className="comparison-badge comparison-badge-yes">✓</span>
+                    <span className="comparison-cell-text">Private</span>
+                  </td>
+                  <td className="comparison-td">
+                    <span className="comparison-badge comparison-badge-no">✗</span>
+                    <span className="comparison-cell-text comparison-cell-dim">Low TPS</span>
+                  </td>
+                  <td className="comparison-td">
+                    <span className="comparison-badge comparison-badge-no">✗</span>
+                    <span className="comparison-cell-text comparison-cell-dim">No</span>
+                  </td>
+                  <td className="comparison-td">
+                    <span className="comparison-badge comparison-badge-no">✗</span>
+                    <span className="comparison-cell-text comparison-cell-dim">No</span>
+                  </td>
+                </tr>
+
+                {/* Row: NERV — highlighted */}
+                <tr className="comparison-row comparison-row-nerv">
+                  <td className="comparison-td comparison-td-name">
+                    <span className="comparison-chain-label comparison-chain-nerv">NERV</span>
+                  </td>
+                  <td className="comparison-td comparison-td-nerv">
+                    <span className="comparison-badge comparison-badge-yes">✓</span>
+                    <span className="comparison-cell-text">Private</span>
+                  </td>
+                  <td className="comparison-td comparison-td-nerv">
+                    <span className="comparison-badge comparison-badge-yes">✓</span>
+                    <span className="comparison-cell-text">High TPS</span>
+                  </td>
+                  <td className="comparison-td comparison-td-nerv">
+                    <span className="comparison-badge comparison-badge-yes">✓</span>
+                    <span className="comparison-cell-text">Yes</span>
+                  </td>
+                  <td className="comparison-td comparison-td-nerv">
+                    <span className="comparison-badge comparison-badge-yes">✓</span>
+                    <span className="comparison-cell-text">Yes</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* ═══════════════════════════════════════════ */}
+        {/* HIGH-LEVEL ARCHITECTURE — NOW AFTER TABLE   */}
+        {/* ═══════════════════════════════════════════ */}
         <section className="architecture max-w-6xl mx-auto text-center px-4">
           <h2 className="text-4xl font-bold mb-8">High-Level Architecture</h2>
           <div className="w-full rounded-xl overflow-hidden shadow-lg">
-            <Image 
+            <Image
               src="https://cdn.prod.website-files.com/64c231f464b91d6bd0303294/6711029566dc1475c0a37d98_66f258e47f53e2e2341aaae0_66d16bf1edcb81f15215c5b6_66d16b305dedb7e05c1b0920_diagram-export-8-30-2024-12_18_02-PM.png"
               alt="NERV Blockchain Architecture"
               width={1200}
@@ -105,30 +225,6 @@ filter: heroHovered
           <p className="mt-4 text-sm opacity-70">
             User → 5-hop Sphinx Mixnet → Dynamic Neural Shards → AI-Native Consensus → 512-byte Embedding Root
           </p>
-        </section>
-
-        {/* CORE INNOVATIONS SECTION */}
-        <section className="promise py-12 text-center max-w-5xl mx-auto px-4">
-          <h2 className="text-4xl font-bold mb-8">Core Pillars of NERV</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="neural-card p-6">
-              <div className="text-4xl mb-4">⚡</div>
-              <h3 className="text-xl font-bold mb-3 gradient-text">Real-Time Self-Evolution</h3>
-              <p className="opacity-80"> 
-Every block, the network learns. Validators earn rewards by submitting gradients that reduce Huber loss — no 30-day federated learning rounds, no Shapley complexity. The network's Neural Weight Oscillator (NWO) adapts to shifting transaction patterns in real-time.
-</p>
-            </div>
-            <div className="neural-card p-6">
-              <div className="text-4xl mb-4">🧠</div>
-              <h3 className="text-xl font-bold mb-3 gradient-text">Neural state Embeddings</h3>
-              <p className="opacity-80">Replace Merkle trees with 512-byte homomorphic embeddings. State updates are O(1) additions, not O(log n) tree traversals. Dynamic neural sharding splits and merges like cells — no manual rebalancing, no theoretical TPS ceiling. </p>
-            </div>
-            <div className="neural-card p-6">
-              <div className="text-4xl mb-4">🔐</div>
-              <h3 className="text-xl font-bold mb-3 gradient-text">Post-Quantum Cryptography</h3>
-              <p className="opacity-80">CRYSTALS-Dilithium-3 for signatures, ML-KEM-768 for encryption, BLAKE3 for hashing. No ECDSA, no RSA, no curves vulnerable to Shor's algorithm. Cryptographic agility built in for future upgrades.</p>
-            </div>
-          </div>
         </section>
 
         {/* TIMELINE SECTION */}
