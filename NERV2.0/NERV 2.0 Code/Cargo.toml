@@ -1,0 +1,182 @@
+[package]
+name = "nerv"
+version = "2.0.0"
+edition = "2021"
+authors = ["NERV Foundation <dev@nerv.network>"]
+license = "MIT OR Apache-2.0"
+description = "NERV v2.0 — The Self-Evolving Blockchain via Neural Weight Oscillator Paradigm & Pure-Cryptographic Privacy"
+repository = "https://github.com/nerv-bit/nerv"
+readme = "README.md"
+keywords = ["blockchain", "post-quantum", "privacy", "neural", "nwo"]
+categories = ["cryptography::cryptocurrencies", "network-programming"]
+rust-version = "1.75.0"
+
+[dependencies]
+# ── Async runtime ──────────────────────────────────────────────────────
+tokio = { version = "1.35", features = ["full"] }
+futures = "0.3.30"
+async-trait = "0.1.77"
+pin-project = "1.1"
+
+# ── Serialization ─────────────────────────────────────────────────────
+serde = { version = "1.0", features = ["derive", "rc"] }
+serde_json = "1.0"
+serde_bytes = "0.11"
+bincode = { version = "1.3", features = ["i128"] }
+toml = "0.8"
+prost = "0.12"
+prost-types = "0.12"
+
+# ── Post-Quantum Cryptography (Open Quantum Safe) ─────────────────────
+oqs = { version = "0.9", features = ["dilithium3", "ml_kem_768", "sphincs_sha256_192f_simple"] }
+
+# ── Symmetric / Hash Cryptography ─────────────────────────────────────
+blake3 = "1.5"
+sha3 = "0.10"
+hmac = "0.12"
+chacha20poly1305 = "0.10"
+
+# ── Constant-time & Secure Memory ────────────────────────────────────
+subtle = "2.5"
+zeroize = { version = "1.7", features = ["derive", "aarch64"] }
+secrecy = { version = "0.8", features = ["serde"] }
+
+# ── Randomness ────────────────────────────────────────────────────────
+rand = "0.8"
+rand_chacha = "0.3"
+rand_core = "0.6"
+
+# ── ZK Proof System ──────────────────────────────────────────────────
+halo2_proofs = { git = "https://github.com/privacy-scaling-explorations/halo2.git", tag = "v0.3.0" }
+halo2curves = { git = "https://github.com/privacy-scaling-explorations/halo2curves.git", tag = "0.1.0" }
+
+# ── Elliptic Curves (BLS12-381 for threshold signatures) ─────────────
+bls12_381 = "0.8"
+group = "0.13"
+ff = "0.13"
+pairing = "0.23"
+
+# ── Networking ────────────────────────────────────────────────────────
+libp2p = { version = "0.53", features = [
+    "tcp", "quic", "noise", "yamux", "gossipsub",
+    "kad", "identify", "ping", "relay", "dcutr",
+    "autonat", "metrics"
+] }
+multiaddr = "0.18"
+
+# ── Storage ───────────────────────────────────────────────────────────
+rocksdb = { version = "0.22", features = ["multi-threaded-cf", "lz4"] }
+
+# ── Concurrency ───────────────────────────────────────────────────────
+rayon = "1.8"
+parking_lot = { version = "0.12", features = ["deadlock_detection", "serde"] }
+crossbeam = "0.8"
+dashmap = "5.5"
+
+# ── Logging & Tracing ────────────────────────────────────────────────
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "chrono", "parking_lot"] }
+tracing-error = "0.2"
+
+# ── CLI ───────────────────────────────────────────────────────────────
+clap = { version = "4.4", features = ["derive", "env", "unicode", "wrap_help"] }
+
+# ── Error Handling ────────────────────────────────────────────────────
+thiserror = "1.0"
+anyhow = "1.0"
+
+# ── Encoding ──────────────────────────────────────────────────────────
+hex = { version = "0.4", features = ["serde"] }
+base64 = { version = "0.21", features = ["alloc"] }
+bytes = { version = "1.5", features = ["serde"] }
+
+# ── Numeric ───────────────────────────────────────────────────────────
+num-traits = "0.2"
+num-integer = "0.1"
+
+# ── Time ──────────────────────────────────────────────────────────────
+chrono = { version = "0.4", features = ["serde"] }
+
+# ── Metrics ───────────────────────────────────────────────────────────
+prometheus = "0.13"
+metrics = "0.21"
+metrics-exporter-prometheus = "0.12"
+
+# ── HTTP (for VDW serving & RPC) ──────────────────────────────────────
+axum = { version = "0.7", features = ["http2", "quic", "macros"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "compression-gzip"] }
+hyper = { version = "1.1", features = ["http2"] }
+
+# ── Algebra / Reed-Solomon ────────────────────────────────────────────
+gf256 = "1.0"
+
+# ── Misc ──────────────────────────────────────────────────────────────
+static_assertions = "1.1"
+once_cell = "1.19"
+itertools = "0.12"
+either = "1.9"
+smallvec = { version = "1.11", features = ["serde", "union"] }
+arrayvec = "0.7"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.4"
+tokio-test = "0.4"
+tempfile = "3.9"
+assert_matches = "1.5"
+pretty_assertions = "1.4"
+
+[build-dependencies]
+prost-build = "0.12"
+
+[[bench]]
+name = "embedding_bench"
+harness = false
+
+[[bench]]
+name = "circuit_bench"
+harness = false
+
+[[bench]]
+name = "sphinx_bench"
+harness = false
+
+[profile.dev]
+opt-level = 1
+debug = 2
+incremental = true
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+opt-level = 3
+debug = false
+
+[profile.release-with-debug]
+inherits = "release"
+debug = 2
+strip = "none"
+
+[profile.bench]
+lto = "thin"
+codegen-units = 1
+opt-level = 3
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "target-cpu=x86-64-v3", "-C", "link-arg=-fuse-ld=mold"]
+
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "target-cpu=native"]
+
+
+[build]
+jobs = -1  # Use all available cores
+
+
+[env]
+# Ensure liboqs is found during build
+LIBOQS_LIBRARY_PATH = { value = "", relative = true }
