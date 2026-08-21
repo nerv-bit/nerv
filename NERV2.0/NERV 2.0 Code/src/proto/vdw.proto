@@ -1,0 +1,53 @@
+// Verifiable Delay Witness (VDW) wire format for NERV v2.0.
+// Designed for compact serialization and CDN-friendly byte-range access.
+
+
+syntax = "proto3";
+package nerv.v2;
+
+
+// A Verifiable Delay Witness — the user's permanent, offline-verifiable
+// receipt of transaction inclusion.
+message Vdw {
+ // SHA3-256 hash of the blinded transaction payload (32 bytes).
+ bytes tx_hash = 1;
+
+
+ // Shard identifier where the transaction was executed.
+ uint64 shard_id = 2;
+
+
+ // Lattice height (block height) of inclusion.
+ uint64 lattice_height = 3;
+
+
+ // Halo2 recursive proof of correct delta application (~400 bytes).
+ bytes delta_proof = 4;
+
+
+ // BLAKE3 hash of the canonical embedding root after this batch (32 bytes).
+ bytes embedding_root = 5;
+
+
+ // Dilithium-3 signature from the attesting validator (2,433 bytes).
+ bytes dilithium_signature = 6;
+
+
+ // Aggregated BLS12-381 threshold signature over the embedding root (48 bytes).
+ bytes bls_threshold_sig = 7;
+
+
+ // Timestamp of inclusion (Unix epoch milliseconds).
+ uint64 timestamp_ms = 8;
+
+
+ // Protocol version (always 2 for NERV v2.0).
+ uint32 version = 9;
+}
+
+
+// Batch of VDWs for efficient distribution.
+message VdwBatch {
+ repeated Vdw witnesses = 1;
+ bytes batch_root = 2;  // BLAKE3 merkle root of all VDWs in this batch
+}
