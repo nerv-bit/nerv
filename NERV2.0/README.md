@@ -96,7 +96,7 @@ By adopting the NWO Paradigm, NERV V2.0 bypasses the "Research Phase" entirely. 
 | **Whitepaper (v2.0)** | Complete technical specification (15 August 2026) | [NERV Whitepaper V2.0.pdf](NERV%20Whitepaper%20V2.0.pdf) |
 | **Addendum to the whitepaper** | Detailed design and mathematical formulations | [NERV Whitepaper V2.0 - Addendum.pdf](NERV%20Whitepaper%20V2.0%20-%20Addendum.pdf) |
 | **Project Landing Page** | Live project website | [https://nerv-3w4y.vercel.app](https://nerv-3w4y.vercel.app) |
-| **Project Codebase** | Complete Codebase & Tests | [NERV2.0 Code](https://github.com/nerv-bit/nerv/tree/main/NERV2.0/NERV2.0%20Code) |
+| **Project Codebase** | Complete Codebase & Tests | [NERV2.0 Code](https://github.com/nerv-bit/nerv/tree/main/NERV2.0/NERV%202.0%20Code) |
 | **License** | Dual MIT / Apache 2.0 | See [LICENSE-MIT.txt](LICENSE-MIT.txt) and [LICENSE-APACHE.txt](LICENSE-APACHE.txt) |
 
 ---
