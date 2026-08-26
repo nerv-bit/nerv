@@ -26,16 +26,45 @@
 //!
 //! Each LatentLedger Lite proof is an IVC step. Nova folds them:
 //!
-//! ```text
+//! 
 //! proof_1 ─┐
 //!           ├── fold ── proof_{1,2} ─┐
 //! proof_2 ─┘                        │
 //!                                    ├── fold ── proof_{1,2,3} ── ...
 //! proof_3 ──────────────────────────┘
-//! ```
+//! 
 //!
 //! The final compressed proof is ~750 bytes regardless of how many
 //! individual proofs were folded.
+//!
+//! # Null-Space Check Propagation (V2.0 Appendix C)
+//!
+//! The Null-Space Exclusion Gate in `LatentLedgerLiteCircuit` enforces
+//! that each individual `δ(tx) ≠ 0_vector`. This guarantee propagates
+//! through Nova folding:
+//!
+//! 1. **At proof creation**: Each `CircuitProof` is generated via
+//!    `create_proof()`, which enforces the null-space gate.
+//! 2. **At folding time**: `fold_proofs`, `fold_compressed_with_proof`,
+//!    and `fold_batch` perform a defense-in-depth check that each
+//!    individual delta is non-zero before folding.
+//! 3. **At verification time**: The verification key encodes the
+//!    null-space gate. A folded proof is valid only if ALL individual
+//!    proofs satisfied the gate.
+//!
+//! ## Important: Aggregate Zero ≠ Null-Space Attack
+//!
+//! The aggregated delta `Δ_B = Σ δ(tx_i)` CAN be zero even when all
+//! individual deltas are non-zero. For example:
+//!
+//! - δ₁ = [+1, 0, 0, ...]  (Alice sends 1 NERV to Bob)
+//! - δ₂ = [-1, 0, 0, ...]  (Carol sends 1 NERV to Dave)
+//! - Δ_B = [0, 0, 0, ...]   (legitimate cancellation)
+//!
+//! This is a valid economic scenario, NOT a null-space attack. The
+//! null-space check is **per-transaction** (each δᵢ ≠ 0), not
+//! **per-batch** (Δ_B can be 0). The folding layer checks individual
+//! deltas only, never the aggregate.
 
 use crate::{EMBEDDING_DIM, NervError, NervResult, BlockHeight, EmbeddingRoot};
 use crate::embedding::fixed_point::FixedPoint64;
@@ -130,6 +159,23 @@ impl NovaCompressedProof {
     ///
     /// This is the homomorphic root reconciliation check that the
     /// compressed proof attests to.
+    ///
+    /// # Note on Null-Space Check
+    ///
+    /// This check is **independent** of the Null-Space Exclusion Gate.
+    /// The root transition verifies the *correctness* of the state update
+    /// (that the embedding root changed as expected). The null-space
+    /// gate verifies the *non-triviality* of each individual transaction
+    /// (that each δᵢ ≠ 0). Both checks are needed for full security:
+    ///
+    /// - Root transition: ensures the aggregate was applied correctly
+    /// - Null-space gate: ensures no phantom transactions were included
+    ///
+    /// A valid root transition with a zero aggregated_delta (from
+    /// legitimate cancellation) is acceptable — the state didn't
+    /// change because the transactions cancelled, not because they
+    /// were phantom transactions.
+
     pub fn verify_root_transition(&self) -> bool {
         let start_embedding = EmbeddingRoot::from_bytes(self.start_root.as_bytes().clone());
         // In production, we'd load the actual embedding from the start_root
@@ -179,6 +225,66 @@ impl NovaCompressedProof {
 /// O(n) where n is the number of cross-terms in the relaxing R1CS,
 /// typically O(circuit_size). This is much cheaper than
 /// re-proving from scratch.
+// ─── Null-Space Defense-in-Depth Helper ───────────────────────────────────
+
+/// Check if an `EmbeddingDelta` is the zero vector (all 64 dimensions zero).
+///
+/// Used as a defense-in-depth check during folding to ensure that no
+/// individual delta in the batch is a null-space attack vector (where
+/// `W·ΔS = 0`, creating a phantom transaction that doesn't alter the
+/// global state embedding).
+///
+/// # Important
+///
+/// This function checks **individual** deltas only. The **aggregate**
+/// of multiple non-zero deltas CAN be zero (legitimate economic
+/// cancellation), which is NOT a null-space attack and should NOT
+/// be rejected. The null-space check is per-transaction, not per-batch.
+fn is_zero_delta(delta: &EmbeddingDelta) -> bool {
+    (0..EMBEDDING_DIM).all(|i| {
+        delta
+            .get(i)
+            .map(|v| v == FixedPoint64::ZERO)
+            .unwrap_or(true)
+    })
+}
+/// Fold two circuit proofs into a single compressed proof.
+///
+/// This is the core Nova folding operation. Given two proofs
+/// `π1` and `π2` (which may themselves be compressed proofs from
+/// previous folding), produce a single proof `π_{1,2}` that attests
+/// to the correctness of both.
+///
+/// # Null-Space Protection
+///
+/// Both individual deltas (`delta1`, `delta2`) are checked to be
+/// non-zero before folding. This is a defense-in-depth measure that
+/// mirrors the Null-Space Exclusion Gate in the ZK circuit. In
+/// production, the Nova folding protocol also verifies each IVC step
+/// (including the null-space gate) as part of folding.
+///
+/// Note: The aggregated delta `Δ_B = delta1 + delta2` CAN be zero
+/// if the individual deltas cancel out (legitimate economic scenario).
+/// This is NOT rejected — only individual zero deltas are rejected.
+///
+/// # Arguments
+///
+/// * `proof1` - The first proof (and its associated delta)
+/// * `delta1` - The first delta (must be non-zero)
+/// * `proof2` - The second proof (and its associated delta)
+/// * `delta2` - The second delta (must be non-zero)
+/// * `weight_commitment` - Hash of the weights (must be same for both)
+///
+/// # Returns
+///
+/// A `NovaCompressedProof` representing the folded proof.
+///
+/// # Errors
+///
+/// Returns `NervError::Circuit` if:
+/// - Either delta is the zero vector (null-space attack)
+/// - The proofs have different weight commitments
+/// - The weight commitment doesn't match the expected value
 pub fn fold_proofs(
     proof1: &CircuitProof,
     delta1: &EmbeddingDelta,
@@ -198,7 +304,37 @@ pub fn fold_proofs(
         ));
     }
 
-    // Aggregate the deltas (linearity makes this trivial)
+    // ── Defense-in-Depth: Null-Space Exclusion Check ───────────
+    //
+    // Reject zero deltas before folding. Each individual delta must
+    // be non-zero (passed the Null-Space Exclusion Gate in the ZK
+    // circuit). This catches placeholder-phase attacks where a
+    // malicious party hand-crafts a CircuitProof struct with a
+    // zero delta and submits it directly to fold_proofs.
+    //
+    // In production Halo2 + Nova, the folding protocol verifies
+    // each IVC step (including the s_null_check gate) as part of
+    // folding, making this check redundant but harmless.
+    if is_zero_delta(delta1) {
+        return Err(NervError::Circuit(
+            "null-space attack detected during folding: \
+             delta1 is the zero vector (W·ΔS + b_tx = 0); \
+             phantom transactions that do not alter the global \
+             state embedding cannot be folded".into()
+        ));
+    }
+    if is_zero_delta(delta2) {
+        return Err(NervError::Circuit(
+            "null-space attack detected during folding: \
+             delta2 is the zero vector (W·ΔS + b_tx = 0); \
+             phantom transactions that do not alter the global \
+             state embedding cannot be folded".into()
+        ));
+    }
+
+    // Aggregate the deltas (linearity makes this trivial).
+    // Note: The aggregate CAN be zero (legitimate cancellation) —
+    // this is NOT a null-space attack and is accepted.
     let aggregated_delta = delta1.add(delta2);
 
     // Compute the Nova folded proof
@@ -244,10 +380,24 @@ pub fn fold_proofs(
     ))
 }
 
+
 /// Fold an existing compressed proof with a new circuit proof.
 ///
 /// This enables incremental folding: start with a single proof,
 /// then fold in additional proofs one at a time.
+///
+/// # Null-Space Protection
+///
+/// The new individual delta (`new_delta`) is checked to be non-zero
+/// before folding. The compressed proof's `aggregated_delta` is NOT
+/// checked — it is a sum of previously-verified non-zero deltas and
+/// may legitimately be zero (economic cancellation).
+///
+/// # Errors
+///
+/// Returns `NervError::Circuit` if:
+/// - `new_delta` is the zero vector (null-space attack)
+/// - Weight commitment mismatch between compressed and new proof
 pub fn fold_compressed_with_proof(
     compressed: &NovaCompressedProof,
     new_proof: &CircuitProof,
@@ -260,7 +410,23 @@ pub fn fold_compressed_with_proof(
         ));
     }
 
+    // ── Defense-in-Depth: Null-Space Exclusion Check ───────────
+    //
+    // Check only the NEW individual delta (not the compressed
+    // aggregated_delta, which may legitimately be zero from prior
+    // cancellations). The new delta must be non-zero — it represents
+    // a single transaction that must alter the global state embedding.
+    if is_zero_delta(new_delta) {
+        return Err(NervError::Circuit(
+            "null-space attack detected during incremental folding: \
+             new_delta is the zero vector (W·ΔS + b_tx = 0); \
+             phantom transactions cannot be folded into the \
+             compressed proof".into()
+        ));
+    }
+
     // Aggregate deltas
+    // Note: The result CAN be zero (legitimate cancellation) — accepted.
     let aggregated_delta = compressed.aggregated_delta.add(new_delta);
 
     // Compute folded proof
@@ -299,17 +465,36 @@ pub fn fold_compressed_with_proof(
 /// Fold a batch of proofs into a single compressed proof.
 ///
 /// This is the primary entry point for block producers who need
-/// to fold all proof in a batch before committing.
+/// to fold all proofs in a batch before committing.
+///
+/// # Null-Space Protection
+///
+/// Each individual delta in the batch is checked to be non-zero
+/// before folding. This catches any phantom transactions that
+/// might have bypassed the per-proof null-space gate (e.g., via
+/// a hand-crafted CircuitProof struct in the placeholder phase).
+///
+/// The aggregated delta `Δ_B = Σ δ(tx_i)` CAN be zero if individual
+/// non-zero deltas cancel out. This is a legitimate economic scenario
+/// (e.g., equal inflows and outflows in a batch) and is NOT rejected.
 ///
 /// # Arguments
 ///
 /// * `proofs` - The proofs to fold
-/// * `deltas` - The corresponding deltas
+/// * `deltas` - The corresponding deltas (each must be non-zero)
 /// * `weight_commitment` - Hash of the current weights
 ///
 /// # Returns
 ///
 /// A single `NovaCompressedProof` attesting to all proofs.
+///
+/// # Errors
+///
+/// Returns `NervError::Circuit` if:
+/// - Any individual delta is the zero vector (null-space attack)
+/// - Proof count != delta count
+/// - The batch is empty
+/// - Any proof has a mismatched weight commitment
 pub fn fold_batch(
     proofs: &[CircuitProof],
     deltas: &[EmbeddingDelta],
@@ -335,7 +520,28 @@ pub fn fold_batch(
         }
     }
 
+    // ── Defense-in-Depth: Null-Space Exclusion Check ───────────
+    //
+    // Check each individual delta is non-zero. A zero delta means
+    // W·ΔS + b_tx = 0_vector — a phantom transaction that does not
+    // alter the global state embedding. This is the null-space attack
+    // described in V2.0 Appendix C.
+    //
+    // We check individual deltas, NOT the aggregate. The aggregate
+    // Δ_B = Σ δ(tx_i) can legitimately be zero (economic cancellation
+    // from non-zero individual deltas).
+    for (i, delta) in deltas.iter().enumerate() {
+        if is_zero_delta(delta) {
+            return Err(NervError::Circuit(format!(
+                "null-space attack detected in batch at index {}: \
+                 delta is the zero vector (W·ΔS + b_tx = 0); \
+                 phantom transactions cannot be folded", i
+            )));
+        }
+    }
+
     // Aggregate all deltas (linear — order independent)
+    // Note: The aggregate CAN be zero (legitimate cancellation) — accepted.
     let aggregated_delta = crate::embedding::homomorphism::aggregate_batch_deltas(deltas)?;
 
     // Build compressed proof
@@ -398,7 +604,18 @@ pub fn fold_batch(
 /// * `trusted_start_root` - A known-good starting root (from light client)
 ///
 /// # Returns
+////// # Null-Space Guarantee
 ///
+/// If this function returns `Ok(())`, the compressed proof attests
+/// that ALL individual deltas folded into this proof were non-zero
+/// (passed the Null-Space Exclusion Gate). This guarantee is
+/// cryptographic in production (the Nova folding protocol verifies
+/// each IVC step, including `s_null_check`) and defense-in-depth in
+/// the placeholder (individual deltas are checked at fold time).
+///
+/// Note: The `aggregated_delta` in the compressed proof CAN be zero
+/// (legitimate economic cancellation). This is NOT a null-space
+/// violation — the null-space check is per-transaction, not per-batch.
 /// `Ok(())` if the proof is valid.
 ///
 /// # Verification Time
@@ -495,7 +712,7 @@ mod tests {
         let delta = perceptron.compute_delta(&features).unwrap();
         let weight_hash = weights.compute_hash();
 
-        let proof = create_proof::<halo2curves::bn256::Fr>(
+        let proof = create_proof(
             &pk, &weights, features.as_slice(), &delta,
         ).unwrap();
 
@@ -641,6 +858,105 @@ mod tests {
             let right = c123_right.aggregated_delta.get(i).unwrap().to_f64();
             assert!((left - right).abs() < 1e-6, "delta mismatch at dim {i}");
         }
+    }
+
+    #[test]
+    fn test_fold_rejects_zero_delta_null_space_attack() {
+        // An attacker attempts to fold a proof with a zero delta
+        // (phantom transaction where W·ΔS = 0). The folding layer
+        // must reject this before any folding occurs.
+        let (p1, d1, wh) = make_test_proof();
+        let zero_delta = EmbeddingDelta::splat(FixedPoint64::ZERO);
+
+        // fold_proofs must reject the zero delta
+        let result = fold_proofs(&p1, &d1, &p1, &zero_delta, &wh);
+        assert!(
+            result.is_err(),
+            "folding a zero delta (null-space attack) must be rejected"
+        );
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("null-space"),
+            "error should mention null-space, got: {err_msg}"
+        );
+
+        // Also test the reverse order
+        let result_rev = fold_proofs(&p1, &zero_delta, &p1, &d1, &wh);
+        assert!(
+            result_rev.is_err(),
+            "folding a zero delta in either position must be rejected"
+        );
+    }
+
+    #[test]
+    fn test_fold_batch_rejects_zero_delta_at_any_index() {
+        // A batch with one zero delta among valid deltas must be
+        // rejected, identifying which index had the null-space attack.
+        let (p1, d1, wh) = make_test_proof();
+        let (p2, d2, _) = make_test_proof();
+        let (p3, _, _) = make_test_proof();
+        let zero_delta = EmbeddingDelta::splat(FixedPoint64::ZERO);
+
+        let proofs = vec![p1, p2, p3];
+        let deltas = vec![d1, d2, zero_delta];
+
+        let result = fold_batch(&proofs, &deltas, &wh);
+        assert!(result.is_err(), "batch with zero delta must be rejected");
+
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("index 2"),
+            "error should identify the offending index, got: {err_msg}"
+        );
+        assert!(
+            err_msg.contains("null-space"),
+            "error should mention null-space, got: {err_msg}"
+        );
+    }
+
+    #[test]
+    fn test_fold_accepts_zero_aggregate_legitimate_cancellation() {
+        // Two non-zero deltas that cancel out (e.g., +1 and -1).
+        // This is a legitimate economic scenario, NOT a null-space attack.
+        // The aggregate Δ_B = 0 is valid because each individual δᵢ ≠ 0.
+        //
+        // Example: Alice sends 1 NERV to Bob (δ₁ = +1 in Bob's dimension)
+        //          Carol sends 1 NERV to Dave (δ₂ = -1 in Carol's dimension)
+        //          Aggregate: Δ_B = 0 (the batch net effect is zero)
+        //          But each transaction is real and non-zero.
+        let (p1, _d1, wh) = make_test_proof();
+        let (p2, _d2, _) = make_test_proof();
+
+        let d_positive = EmbeddingDelta::splat(FixedPoint64::from_int(1));
+        let d_negative = EmbeddingDelta::splat(FixedPoint64::from_int(-1));
+
+        // Folding should succeed — individual deltas are non-zero
+        let result = fold_proofs(&p1, &d_positive, &p2, &d_negative, &wh);
+        assert!(
+            result.is_ok(),
+            "folding non-zero deltas that cancel to zero should succeed \
+             (legitimate cancellation, not null-space attack)"
+        );
+
+        let compressed = result.unwrap();
+
+        // The aggregated delta should be zero (legitimate cancellation)
+        for i in 0..EMBEDDING_DIM {
+            assert_eq!(
+                compressed.aggregated_delta.get(i).unwrap().to_f64(),
+                0.0,
+                "aggregated delta should be zero from cancellation at dim {i}"
+            );
+        }
+
+        // Verify the compressed proof — should still be valid
+        let trusted_root = compressed.start_root;
+        let verify_result = verify_compressed_proof(&compressed, &wh, &trusted_root);
+        assert!(
+            verify_result.is_ok(),
+            "compressed proof with zero aggregate (from cancellation) \
+             should verify successfully"
+        );
     }
 }
 
