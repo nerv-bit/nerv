@@ -68,7 +68,7 @@ multiaddr = "0.18"
 rocksdb = { version = "0.22", features = ["multi-threaded-cf", "lz4"] }
 
 # ── Concurrency ───────────────────────────────────────────────────────
-rayon = "1.8"
+rayon = "1.10"
 parking_lot = { version = "0.12", features = ["deadlock_detection", "serde"] }
 crossbeam = "0.8"
 dashmap = "5.5"
