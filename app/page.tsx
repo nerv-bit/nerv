@@ -71,7 +71,7 @@ export default function Home() {
           </div>
 
           <p className="launch text-lg md:text-xl mb-12 opacity-80">
-            <span className="gradient-text font-semibold">NERV</span> delivers full privacy by default via Sphinx 5-hop mixnet (&gt;1M TPS via dynamic neural sharding and verifiable embeddings in Halo2/Nova), post-quantum security from genesis, and a self-improving useful-work economy. Fully open-source, community-governed. Join us in building the <span className="gradient-text font-semibold">nervous system of the private internet</span>!
+            <span className="gradient-text font-semibold">NERV</span> is the first Layer 1 blockchain that offers privacy by default (no addresses, amounts, or metadata ever visible), infinite scalability (&gt;1 million transactions per second, no ceiling), and post-quantum security from genesis. No pre-mine, no VC allocation, no foundation treasury. Join us in building the <span className="gradient-text font-semibold">nervous system of the private internet</span>!
           </p>
         </div>
       </section>
