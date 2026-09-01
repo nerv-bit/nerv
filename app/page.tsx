@@ -59,10 +59,10 @@ export default function Home() {
               href="https://github.com/nerv-bit/nerv/blob/main/NERV2.0/NERV%20Whitepaper%20V2.0.pdf"
               className="btn primary bg-cyan-500 hover:bg-cyan-400 text-black font-semibold py-3 px-8 rounded-lg transition hover:scale-105"
             >
-              Read Whitepaper v2.0
+              Read Whitepaper v3.0
             </a>
             <a
-              href="https://github.com/nerv-bit/nerv/tree/main/NERV2.0"
+              href="https://github.com/nerv-bit/nerv/blob/main/NERV3.0/NERV%20Whitepaper%20V3.0.pdf"
               target="_blank"
               className="btn secondary border border-purple-500 text-white font-semibold py-3 px-8 rounded-lg transition hover:scale-105"
             >
