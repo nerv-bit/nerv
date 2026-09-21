@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import Image from "next/image";
-import NeuralBackground from "./NeuralBackground';
+import { useState } from 'react';
+import Image from 'next/image';
+import NeuralBackground from './NeuralBackground';
 
 export default function Home() {
   const [heroHovered, setHeroHovered] = useState(false);
@@ -47,11 +47,11 @@ export default function Home() {
           <div className="h-1 w-24 bg-gradient-to-r from-cyan-500 to-purple-500 mx-auto my-6 rounded-full"></div>
 
           <p className="tagline text-2xl md:text-3xl mb-4 opacity-90">
-            Privacy by Construction. Post-Quantum from Genesis. First-Class Sharding.
+            Privacy by Default. Post-Quantum from Genesis. Infinite Scalability.
           </p>
 
           <p className="launch text-lg md:text-xl mb-12 opacity-80">
-            Fair launch H2 2028 • Zero supply at genesis • All code public today
+            Fair launch October 2027 • No pre-mine • All code public today
           </p>
 
           <div className="buttons flex flex-col sm:flex-row gap-6 justify-center mb-8">
@@ -62,7 +62,7 @@ export default function Home() {
               Read Whitepaper v3.0
             </a>
             <a
-              href="https://github.com/nerv-bit/nerv/tree/main/NERV3.0"
+              href="https://github.com/nerv-bit/nerv/blob/main/NERV3.0/NERV%20Whitepaper%20V3.0.pdf"
               target="_blank"
               className="btn secondary border border-purple-500 text-white font-semibold py-3 px-8 rounded-lg transition hover:scale-105"
             >
@@ -71,7 +71,7 @@ export default function Home() {
           </div>
 
           <p className="launch text-lg md:text-xl mb-12 opacity-80">
-            <span className="gradient-text font-semibold">NERV</span> is the first Layer 1 blockchain where the authoritative state is a cryptographic commitment — not a neural embedding, not a Merkle tree, but 32 bytes of BLAKE3. Every proof binds to it. Every validator checks against it. The neural layer is a derived, provably-consistent accelerator that can be deleted without affecting a single coin. Zero supply at genesis (no pre-mine, no VC allocation, no foundation treasury). Join us in building the <span className="gradient-text font-semibold">nervous system of the private internet</span>!
+            <span className="gradient-text font-semibold">NERV</span> is the first Layer 1 blockchain that offers privacy by default (no addresses, amounts, or metadata ever visible), infinite scalability (&gt;1 million transactions per second, no ceiling), and post-quantum security from genesis. No pre-mine, no VC allocation, no foundation treasury. Join us in building the <span className="gradient-text font-semibold">nervous system of the private internet</span>!
           </p>
         </div>
       </section>
@@ -79,22 +79,21 @@ export default function Home() {
       {/* MAIN CONTENT */}
       <div className="relative z-10 pt-8 md:pt-[520px]">
        {/* ═══════════════════════════════════════════════ */}
-        {/* V2.0 → V3.0 EVOLUTION CALLOUT                 */}
+        {/* V1.01 → V2.0 EVOLUTION CALLOUT                 */}
         {/* ═══════════════════════════════════════════════ */}
         <section className="py-6 max-w-5xl mx-auto px-4">
           <div className="evolution-callout p-6 md:p-8 max-w-3xl mx-auto text-center">
             <h3 className="text-lg md:text-xl font-bold mb-4 opacity-90">
-              From V2.0 → V3.0: <span className="gradient-text">The Provable Foundation</span>
+              From V1.01 → V2.0: <span className="gradient-text">The Paradigm Shift</span>
             </h3>
             <p className="text-sm md:text-base opacity-60 mb-3">
-              V2.0 put a neural embedding at the center of the state root. Pedersen commitments and BLS signatures left discrete-log assumptions in the consensus path. The proof system (Halo2) bound ledger soundness to Shor-vulnerable math. Beautiful design. Not quantum-proof.
+              V1.01 proved privacy + scale + post-quantum security could coexist. But a 24-layer Transformer forced into linearity = 7.9M ZK constraints. Beautiful math. Not shippable.
             </p>
             <p className="text-sm md:text-base opacity-80">
-              V3.0: <span className="gradient-text font-semibold">The commitment is the truth</span>. All-FRI transparent STARKs — no elliptic curves, no trusted setups, no ceremonies. The ciphertext is the commitment (Pedersen deleted). <span className="font-bold text-cyan-300">Zero</span> EC assumptions. <span className="font-bold text-cyan-300">Zero</span> trusted setups. Every security-critical primitive is hash- or lattice-based. Production-ready today.
+              V2.0: The <span className="gradient-text font-semibold">Neural Weight Oscillator</span> — a single-layer Perceptron is natively linear. <span className="font-bold text-cyan-300">0-error</span> homomorphism by definition. <span className="font-bold text-cyan-300">50K</span> constraints. Pure-crypto privacy. Production-ready today.
             </p>
           </div>
         </section>
-
         {/* ═══════════════════════════════════════════ */}
         {/* CORE INNOVATIONS SECTION — FIRST            */}
         {/* ═══════════════════════════════════════════ */}
@@ -102,21 +101,21 @@ export default function Home() {
           <h2 className="text-4xl font-bold mb-8">Core Pillars of NERV</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="neural-card p-6">
-              <div className="text-4xl mb-4">🔒</div>
-              <h3 className="text-xl font-bold mb-3 gradient-text">Commitment-First Custody</h3>
+              <div className="text-4xl mb-4">⚡</div>
+              <h3 className="text-xl font-bold mb-3 gradient-text">Real-Time Self-Evolution</h3>
               <p className="opacity-80">
-                The state commitment C<sub>t</sub> is a 32-byte BLAKE3 hash over every note, every nullifier, every cross-shard transit entry. Every transaction proves validity against an anchor of C<sub>t</sub>. The neural embedding is derived from public data, committed separately, and consulted by nothing canonical. <span className="font-bold text-cyan-300">Delete the entire knowledge layer</span> and the chain still validates from genesis — enforced by CI, not policy.
+                Every block, the network learns. Validators earn rewards by submitting Adam optimizer gradients that reduce Huber loss — no 30-day federated learning rounds, no Shapley complexity. The network&apos;s Neural Weight Oscillator (NWO) adapts to shifting transaction patterns in real-time.
               </p>
             </div>
             <div className="neural-card p-6">
-              <div className="text-4xl mb-4">⚡</div>
-              <h3 className="text-xl font-bold mb-3 gradient-text">Native STARK Engine</h3>
-              <p className="opacity-80">Transparent AIR-STARK proofs over Goldilocks and its degree-2 extension, with FRI for polynomial commitment and Fiat–Shamir via BLAKE3. No elliptic curves, no pairings, no trusted setups. The whole-transaction proof (~<span className="font-bold text-cyan-300">170K constraints</span>) covers custody, delta, and seal statements in one transcript. Wallet proving: <span className="font-bold text-cyan-300">0.8–2s</span> on a laptop. Verification: <span className="font-bold text-cyan-300">0.2ms</span> on any device.</p>
+              <div className="text-4xl mb-4">🧠</div>
+              <h3 className="text-xl font-bold mb-3 gradient-text">Neural State Embeddings</h3>
+              <p className="opacity-80">Replace Merkle trees with 512-byte homomorphic embeddings produced by a single-layer NWO Perceptron — exact (<span className="font-bold text-cyan-300">0-error</span>) Transfer Homomorphism by mathematical definition, not approximation. State updates are O(1) vector additions. ZK circuit: only <span className="font-bold text-cyan-300">50K</span> constraints (99% reduction from 7.9M). Dynamic neural sharding splits and merges like cells — no manual rebalancing, no theoretical TPS ceiling.</p>
             </div>
             <div className="neural-card p-6">
-              <div className="text-4xl mb-4">🌐</div>
-              <h3 className="text-xl font-bold mb-3 gradient-text">First-Class Sharding</h3>
-              <p className="opacity-80">64 shards at genesis, scaling to 1,024. Cross-shard transactions are sets of legs under one whole-transaction proof. The transit-log protocol makes cross-shard atomicity a construction — <span className="font-bold text-cyan-300">no locks, no coordinators, no trusted relayers</span>. Issue legs are permissionlessly completable by anyone, forever. The scaling path to 1M+ TPS is horizontal: more shards, not deeper math.</p>
+              <div className="text-4xl mb-4">🔐</div>
+              <h3 className="text-xl font-bold mb-3 gradient-text">Post-Quantum Cryptography</h3>
+              <p className="opacity-80">CRYSTALS-Dilithium-3 for signatures, ML-KEM-768 for encryption, BLAKE3 for hashing. Privacy is <span className="font-bold text-cyan-300">100% cryptographic</span> — no TEEs, no hardware trust assumptions, immune to side-channel attacks. No ECDSA, no RSA, no curves vulnerable to Shor&apos;s algorithm. Cryptographic agility built in for future upgrades.</p>
             </div>
           </div>
         </section>
@@ -126,7 +125,7 @@ export default function Home() {
         {/* ═════════════════════════════════════════════════════ */}
         <section className="comparison py-12 max-w-5xl mx-auto px-4">
           <h2 className="text-3xl md:text-4xl font-bold mb-2 text-center">Why NERV?</h2>
-          <p className="text-center text-sm opacity-60 mb-10">No compromises. By construction, from genesis.</p>
+          <p className="text-center text-sm opacity-60 mb-10">No compromises. By default, from genesis.</p>
 
           <div className="comparison-table-wrapper">
             <table className="comparison-table w-full">
@@ -136,7 +135,7 @@ export default function Home() {
                   <th className="comparison-th">Privacy</th>
                   <th className="comparison-th">Scalability</th>
                   <th className="comparison-th">Post-Quantum</th>
-                  <th className="comparison-th">Provable State</th>
+                  <th className="comparison-th">Self-Improving</th>
                 </tr>
               </thead>
               <tbody>
@@ -158,8 +157,8 @@ export default function Home() {
                     <span className="comparison-cell-no">No</span>
                   </td>
                   <td className="comparison-td">
-                    <span className="comparison-badge comparison-badge-yes">✓</span>
-                    <span className="comparison-cell-yes">Merkle Root</span>
+                    <span className="comparison-badge comparison-badge-no">✗</span>
+                    <span className="comparison-cell-no">No</span>
                   </td>
                 </tr>
 
@@ -181,8 +180,8 @@ export default function Home() {
                     <span className="comparison-cell-no">No</span>
                   </td>
                   <td className="comparison-td">
-                    <span className="comparison-badge comparison-badge-yes">✓</span>
-                    <span className="comparison-cell-yes">Merkle Root</span>
+                    <span className="comparison-badge comparison-badge-no">✗</span>
+                    <span className="comparison-cell-no">No</span>
                   </td>
                 </tr>
 
@@ -197,15 +196,15 @@ export default function Home() {
                   </td>
                   <td className="comparison-td comparison-td-nerv">
                     <span className="comparison-badge comparison-badge-yes">✓</span>
-                    <span className="comparison-cell-yes">Sharded</span>
+                    <span className="comparison-cell-yes">High TPS</span>
                   </td>
                   <td className="comparison-td comparison-td-nerv">
                     <span className="comparison-badge comparison-badge-yes">✓</span>
-                    <span className="comparison-cell-yes">All-PQ</span>
+                    <span className="comparison-cell-yes">Yes</span>
                   </td>
                   <td className="comparison-td comparison-td-nerv">
                     <span className="comparison-badge comparison-badge-yes">✓</span>
-                    <span className="comparison-cell-yes">C_t + Advisory</span>
+                    <span className="comparison-cell-yes">Yes</span>
                   </td>
                 </tr>
               </tbody>
@@ -229,7 +228,7 @@ export default function Home() {
             />
           </div>
           <p className="mt-4 text-sm opacity-70">
-            User → PQ-Sphinx 5-hop Mixnet → Threshold Decrypted Aggregate → Deterministic Executor → C<sub>t</sub> Commitment Update → Advisory Embedding (e<sub>t</sub> + D<sub>t</sub>) → Recursive Batch Proof + 600-byte Inclusion Witness
+            User → PQ-Sphinx 5-hop Mixnet → Threshold Decrypted Mempool → NWO Perceptron Execution → Adam/Huber Weight Update → 512-byte Embedding Root + VDW
           </p>
         </section>
 
@@ -237,10 +236,10 @@ export default function Home() {
         <section className="timeline py-12 text-center max-w-4xl mx-auto px-4">
           <h2 className="text-4xl font-bold mb-8">Road to Mainnet (100% transparent)</h2>
           <div className="timeline-items max-w-2xl mx-auto text-lg space-y-4">
-            <div><span className="font-bold">Aug 2026</span> Whitepaper v3.0 + complete codebase public</div>
-            <div><span className="font-bold">Q1 2027</span> 8-shard testnet zero (live mixnet, DKG rotation drills)</div>
-            <div><span className="font-bold">Q2 2028</span> 64-shard incentivized testnet (real metrics published)</div>
-            <div><span className="font-bold">H2 2028</span> Fair mainnet launch – zero supply at genesis</div>
+            <div><span className="font-bold">Dec 2025</span> Whitepaper + all code public</div>
+            <div><span className="font-bold">Q4 2026</span> Sphinx 5-hop mixnet testnet</div>
+            <div><span className="font-bold">Q1 2027</span> Aurora public testnet (real metrics published)</div>
+            <div><span className="font-bold">October 2027</span> Fair mainnet launch – zero pre-mine</div>
           </div>
         </section>
 
@@ -248,10 +247,10 @@ export default function Home() {
         <section className="links py-12 text-center max-w-4xl mx-auto px-4">
           <h2 className="text-4xl font-bold mb-8">Join the nervous system</h2>
           <div className="link-grid max-w-4xl mx-auto grid md:grid-cols-2 gap-4 text-lg">
-            <a href="https://github.com/nerv-bit" target="_blank" className="hover:text-cyan-400 transition p-3">GitHub Organization (15 crates, 4 binaries)</a>
-            <a href="https://github.com/nerv-bit/nerv/blob/main/NERV3.0/NERV%20Whitepaper%20V3.0.pdf" target="_blank" className="hover:text-cyan-400 transition p-3">Whitepaper v3.0 (complete)</a>
-            <a href="https://github.com/nerv-bit/nerv/blob/main/NERV3.0/specs/errata.md" target="_blank" className="hover:text-cyan-400 transition p-3">Errata Register (living)</a>
-            <a href="https://github.com/nerv-bit/nerv/blob/main/NERV3.0/tests/nerv-testkit" target="_blank" className="hover:text-cyan-400 transition p-3">Multinode Testkit (T5–T7)</a>
+            <a href="https://github.com/nerv-bit" target="_blank" className="hover:text-cyan-400 transition p-3">GitHub Organization (10+ repos)</a>
+            <a href="https://github.com/nerv-bit/formal" target="_blank" className="hover:text-cyan-400 transition p-3">Lean 4 Formal Proofs (live)</a>
+            <a href="https://github.com/nerv-bit/circuits" target="_blank" className="hover:text-cyan-400 transition p-3">Post-Quantum Crypto</a>
+            <a href="https://github.com/nerv-bit/simulations" target="_blank" className="hover:text-cyan-400 transition p-3">10,000-node Simulator</a>
             <a href="mailto:namsjeev@gmail.com" className="hover:text-cyan-400 transition p-3">Contact → Nerv@myself.com</a>
           </div>
         </section>
@@ -259,7 +258,7 @@ export default function Home() {
         {/* FOOTER */}
         <footer className="py-8 text-center text-sm opacity-70 border-t border-gray-800 mt-8 max-w-4xl mx-auto px-4">
           <p>© 2025–2028 NERV • All specifications, code, and proofs are MIT/Apache 2.0 or public domain</p>
-          <p>No tokens exist yet • Zero supply at genesis • No private sales • No foundation treasury</p>
+          <p>No tokens exist yet • No private sales • No foundation treasury</p>
         </footer>
       </div>
     </div>
