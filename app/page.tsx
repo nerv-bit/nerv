@@ -71,7 +71,7 @@ export default function Home() {
           </div>
 
           <p className="launch text-lg md:text-xl mb-12 opacity-80">
-            <span className="gradient-text font-semibold">NERV</span> is the first Layer 1 blockchain where the authoritative state is a cryptographic commitment — not a neural embedding, not a Merkle tree, but 32 bytes of BLAKE3. Every proof binds to it. Every validator checks against it. The neural layer is a derived, provably-consistent accelerator that can be deleted without affecting a single coin. Zero supply at genesis (no pre-mine, no VC allocation, no foundation treasury). Join us in building the <span className="gradient-text font-semibold">nervous system of the private internet</span>!
+            <span className="gradient-text font-semibold">NERV</span> is the first Layer 1 blockchain where the authoritative state is a cryptographic commitment — not a neural embedding, not a Merkle tree, but 32 bytes of BLAKE3. Every proof binds to it. Every validator checks against it. The neural layer is a derived, provably-consistent accelerator that can be deleted without affecting a single coin. Zero supply at genesis - no pre-mine, no VC allocation, no foundation treasury. Join us in building the <span className="gradient-text font-semibold">nervous system of the private internet</span>!
           </p>
         </div>
       </section>
@@ -90,7 +90,7 @@ export default function Home() {
               V2.0 put a neural embedding at the center of the state root. Pedersen commitments and BLS signatures left discrete-log assumptions in the consensus path. The Halo2 proof system bound ledger soundness to Shor-vulnerable math. Beautiful design. Not quantum-proof.
             </p>
             <p className="text-sm md:text-base opacity-80">
-              V3.0: The <span className="gradient-text font-semibold">commitment is the truth</span>. All-FRI transparent STARKs — no elliptic curves, no trusted setups, no ceremonies. The ciphertext is the commitment<span className="font-bold text-cyan-300">0-error</span>Pedersen deleted<span className="font-bold text-cyan-300">50K</span> trusted setups. Every security-critical primitive is hash- or lattice-based. Production-ready today.
+              V3.0: The <span className="gradient-text font-semibold">commitment is the truth</span>. All-FRI transparent STARKs — no elliptic curves, no trusted setups, no ceremonies. The ciphertext is the commitment. Pedersen deleted, no trusted setups. Every security-critical primitive is hash- or lattice-based. Production-ready today.
             </p>
           </div>
         </section>
@@ -104,18 +104,18 @@ export default function Home() {
               <div className="text-4xl mb-4">⚡</div>
               <h3 className="text-xl font-bold mb-3 gradient-text">Real-Time Self-Evolution</h3>
               <p className="opacity-80">
-                Transparent AIR-STARK proofs over Goldilocks and its degree-2 extension, with FRI for polynomial commitment and Fiat–Shamir via BLAKE3. No elliptic curves, no pairings, no trusted setups. The whole-transaction proof (~<span className="font-bold text-cyan-300">170K constraints</span>) covers custody, delta, and seal statements in one transcript. Wallet proving: <span className="font-bold text-cyan-300">0.8–2s</span> on a laptop. Verification: <span className="font-bold text-cyan-300">0.2ms</span> on any device.
+                Transparent AIR-STARK proofs over Goldilocks and its degree-2 extension, with FRI for polynomial commitment and Fiat–Shamir via BLAKE3. No elliptic curves, no pairings, no trusted setups. The whole-transaction proof covers custody, delta, and seal statements in one transcript. Wallet proving: <span className="font-bold text-cyan-300">0.8–2s</span> on a laptop. Verification: <span className="font-bold text-cyan-300">0.2ms</span> on any device.
               </p>
             </div>
             <div className="neural-card p-6">
               <div className="text-4xl mb-4">🌐</div>
               <h3 className="text-xl font-bold mb-3 gradient-text">Neural State Embeddings</h3>
-              <p className="opacity-80">64 shards at genesis, scaling to 1,024. Cross-shard transactions are sets of legs under one whole-transaction proof. The transit-log protocol makes cross-shard atomicity a construction — <span className="font-bold text-cyan-300">no locks, no coordinators, no trusted relayers</span>. Issue legs are permissionlessly completable by anyone, forever. The scaling path to 1M+ TPS is horizontal: more shards, not deeper math.</p>
+              <p className="opacity-80">64 shards at genesis, scaling to 1,024. Cross-shard transactions are sets of legs under one whole-transaction proof. The transit-log protocol makes cross-shard atomicity a construction — no locks, no coordinators, no trusted relayers</span>. Issue legs are permissionlessly completable by anyone, forever. The scaling path to 1M+ TPS is horizontal: more shards, not deeper math.</p>
             </div>
             <div className="neural-card p-6">
               <div className="text-4xl mb-4">🔐</div>
               <h3 className="text-xl font-bold mb-3 gradient-text">Post-Quantum Cryptography</h3>
-              <p className="opacity-80">The state commitment C<sub>t</sub> is a 32-byte BLAKE3 hash over every note, every nullifier, every cross-shard transit entry. Every transaction proves validity against an anchor of C<sub>t</sub>. The neural embedding is derived from public data, committed separately, and consulted by nothing canonical. <span className="font-bold text-cyan-300">Delete the entire knowledge layer</span> and the chain still validates from genesis — enforced by CI, not policy. </p>
+              <p className="opacity-80">The state commitment Ct is a 32-byte BLAKE3 hash over every note, every nullifier, every cross-shard transit entry. Every transaction proves validity against an anchor of Ct. The neural embedding is derived from public data, committed separately, and consulted by nothing canonical. <span className="font-bold text-cyan-300">Delete the entire knowledge layer</span> and the chain still validates from genesis — enforced by CI, not policy. </p>
             </div>
           </div>
         </section>
