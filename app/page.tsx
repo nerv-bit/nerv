@@ -47,7 +47,7 @@ export default function Home() {
           <div className="h-1 w-24 bg-gradient-to-r from-cyan-500 to-purple-500 mx-auto my-6 rounded-full"></div>
 
           <p className="tagline text-2xl md:text-3xl mb-4 opacity-90">
-            Privacy by Construction. Post-Quantum from Genesis. First-Class Sharding->High scalability.
+            Privacy by Construction. Post-Quantum from Genesis. First-Class Sharding. High scalability.
           </p>
 
           <p className="launch text-lg md:text-xl mb-12 opacity-80">
