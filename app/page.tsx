@@ -108,7 +108,7 @@ export default function Home() {
               </p>
             </div>
             <div className="neural-card p-6">
-              <div className="text-4xl mb-4">🌐</div>
+              <div className="text-4xl mb-4">🧠</div>
               <h3 className="text-xl font-bold mb-3 gradient-text">Neural State Embeddings</h3>
               <p className="opacity-80">64 shards at genesis, scaling to 1,024. Cross-shard transactions are sets of legs under one whole-transaction proof. The transit-log protocol makes cross-shard atomicity a construction — no locks, no coordinators, no trusted relayers</span>. Issue legs are permissionlessly completable by anyone, forever. The scaling path to 1M+ TPS is horizontal: more shards, not deeper math.</p>
             </div>
