@@ -228,7 +228,7 @@ export default function Home() {
             />
           </div>
           <p className="mt-4 text-sm opacity-70">
-            User → PQ-Sphinx 5-hop Mixnet → Threshold Decrypted Aggregate → Deterministic Executor → C<sub>t</sub> Commitment Update → Advisory Embedding → Recursive Batch Proof + 600-byte Inclusion Witness
+            User → PQ-Sphinx 5-hop Mixnet → Threshold Decrypted Aggregate → Deterministic Executor → Ct Commitment Update → Advisory Embedding → Recursive Batch Proof + 600-byte Inclusion Witness
           </p>
         </section>
 
@@ -236,7 +236,7 @@ export default function Home() {
         <section className="timeline py-12 text-center max-w-4xl mx-auto px-4">
           <h2 className="text-4xl font-bold mb-8">Road to Mainnet (100% transparent)</h2>
           <div className="timeline-items max-w-2xl mx-auto text-lg space-y-4">
-            <div><span className="font-bold">Aug 2026</span> Whitepaper + all code public</div>
+            <div><span className="font-bold">Aug 2026</span> Whitepaper and all code public</div>
             <div><span className="font-bold">Q1 2027</span> 8-shard testnet zero - live mixnet, DKG rotation drills</div>
             <div><span className="font-bold">Q2 2027</span>64-shard incentivized testnet - real metrics published</div>
             <div><span className="font-bold">Q4 2027</span> Fair mainnet launch – zero pre-mine</div>
