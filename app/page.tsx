@@ -84,13 +84,13 @@ export default function Home() {
         <section className="py-6 max-w-5xl mx-auto px-4">
           <div className="evolution-callout p-6 md:p-8 max-w-3xl mx-auto text-center">
             <h3 className="text-lg md:text-xl font-bold mb-4 opacity-90">
-              From V1.01 → V2.0: <span className="gradient-text">The Paradigm Shift</span>
+              From V2.0 → V3.0: <span className="gradient-text">The Paradigm Shift</span>
             </h3>
             <p className="text-sm md:text-base opacity-60 mb-3">
-              V1.01 proved privacy + scale + post-quantum security could coexist. But a 24-layer Transformer forced into linearity = 7.9M ZK constraints. Beautiful math. Not shippable.
+              V2.0 put a neural embedding at the center of the state root. Pedersen commitments and BLS signatures left discrete-log assumptions in the consensus path. The Halo2 proof system bound ledger soundness to Shor-vulnerable math. Beautiful design. Not quantum-proof.
             </p>
             <p className="text-sm md:text-base opacity-80">
-              V2.0: The <span className="gradient-text font-semibold">Neural Weight Oscillator</span> — a single-layer Perceptron is natively linear. <span className="font-bold text-cyan-300">0-error</span> homomorphism by definition. <span className="font-bold text-cyan-300">50K</span> constraints. Pure-crypto privacy. Production-ready today.
+              V3.0: The <span className="gradient-text font-semibold">commitment is the truth</span> — All-FRI transparent STARKs — no elliptic curves, no trusted setups, no ceremonies. The ciphertext is the commitment - Pedersen deleted.<span className="font-bold text-cyan-300">Zero</span> trusted setups. Every security-critical primitive is hash- or lattice-based. Production-ready today.
             </p>
           </div>
         </section>
