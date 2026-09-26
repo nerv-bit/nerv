@@ -90,7 +90,7 @@ export default function Home() {
               V2.0 put a neural embedding at the center of the state root. Pedersen commitments and BLS signatures left discrete-log assumptions in the consensus path. The Halo2 proof system bound ledger soundness to Shor-vulnerable math. Beautiful design. Not quantum-proof.
             </p>
             <p className="text-sm md:text-base opacity-80">
-              V3.0: The <span className="gradient-text font-semibold">commitment is the truth</span> — All-FRI transparent STARKs — no elliptic curves, no trusted setups, no ceremonies. The ciphertext is the commitment - Pedersen deleted.<span className="font-bold text-cyan-300">Zero</span> trusted setups. Every security-critical primitive is hash- or lattice-based. Production-ready today.
+              V3.0: The <span className="gradient-text font-semibold">commitment is the truth</span> — All-FRI transparent STARKs — no elliptic curves, no trusted setups, no ceremonies. The ciphertext is the commitment - Pedersen deleted. <span className="font-bold text-cyan-300">Zero</span> trusted setups. Every security-critical primitive is hash- or lattice-based. Production-ready today.
             </p>
           </div>
         </section>
@@ -101,10 +101,10 @@ export default function Home() {
           <h2 className="text-4xl font-bold mb-8">Core Pillars of NERV</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="neural-card p-6">
-              <div className="text-4xl mb-4">⚡</div>
-              <h3 className="text-xl font-bold mb-3 gradient-text">Real-Time Self-Evolution</h3>
+              <div className="text-4xl mb-4">🔒</div>
+              <h3 className="text-xl font-bold mb-3 gradient-text">Commitment-first</h3>
               <p className="opacity-80">
-                Every block, the network learns. Validators earn rewards by submitting Adam optimizer gradients that reduce Huber loss — no 30-day federated learning rounds, no Shapley complexity. The network&apos;s Neural Weight Oscillator (NWO) adapts to shifting transaction patterns in real-time.
+                The state commitment C<sub>t</sub> is a 32-byte BLAKE3 hash over every note, every nullifier, every cross-shard transit entry. Every transaction proves validity against an anchor of C<sub>t</sub>. The neural embedding is derived from public data, committed separately, and consulted by nothing canonical. <span className="font-bold text-cyan-300">Delete the entire knowledge layer</span> and the chain still validates from genesis — enforced by CI, not policy.
               </p>
             </div>
             <div className="neural-card p-6">
