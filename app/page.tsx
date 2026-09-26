@@ -102,20 +102,20 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="neural-card p-6">
               <div className="text-4xl mb-4">🔒</div>
-              <h3 className="text-xl font-bold mb-3 gradient-text">Commitment-first</h3>
+              <h3 className="text-xl font-bold mb-3 gradient-text">Commitment-First</h3>
               <p className="opacity-80">
                 The state commitment C<sub>t</sub> is a 32-byte BLAKE3 hash over every note, every nullifier, every cross-shard transit entry. Every transaction proves validity against an anchor of C<sub>t</sub>. The neural embedding is derived from public data, committed separately, and consulted by nothing canonical. <span className="font-bold text-cyan-300">Delete the entire knowledge layer</span> and the chain still validates from genesis — enforced by CI, not policy.
               </p>
             </div>
             <div className="neural-card p-6">
-              <div className="text-4xl mb-4">🧠</div>
-              <h3 className="text-xl font-bold mb-3 gradient-text">Neural State Embeddings</h3>
-              <p className="opacity-80">Replace Merkle trees with 512-byte homomorphic embeddings produced by a single-layer NWO Perceptron — exact (<span className="font-bold text-cyan-300">0-error</span>) Transfer Homomorphism by mathematical definition, not approximation. State updates are O(1) vector additions. ZK circuit: only <span className="font-bold text-cyan-300">50K</span> constraints (99% reduction from 7.9M). Dynamic neural sharding splits and merges like cells — no manual rebalancing, no theoretical TPS ceiling.</p>
+              <div className="text-4xl mb-4">⚡</div>
+              <h3 className="text-xl font-bold mb-3 gradient-text">Native STARK Engine</h3>
+              <p className="opacity-80">Transparent AIR-STARK proofs over Goldilocks and its degree-2 extension, with FRI for polynomial commitment and Fiat–Shamir via BLAKE3. No elliptic curves, no pairings, no trusted setups. The whole-transaction proof (~<span className="font-bold text-cyan-300">170K constraints</span>) covers custody, delta, and seal statements in one transcript. Wallet proving: <span className="font-bold text-cyan-300">0.8–2s</span> on a laptop. Verification: <span className="font-bold text-cyan-300">0.2ms</span> on any device.</p>
             </div>
             <div className="neural-card p-6">
-              <div className="text-4xl mb-4">🔐</div>
-              <h3 className="text-xl font-bold mb-3 gradient-text">Post-Quantum Cryptography</h3>
-              <p className="opacity-80">CRYSTALS-Dilithium-3 for signatures, ML-KEM-768 for encryption, BLAKE3 for hashing. Privacy is <span className="font-bold text-cyan-300">100% cryptographic</span> — no TEEs, no hardware trust assumptions, immune to side-channel attacks. No ECDSA, no RSA, no curves vulnerable to Shor&apos;s algorithm. Cryptographic agility built in for future upgrades.</p>
+              <div className="text-4xl mb-4">🌐</div>
+              <h3 className="text-xl font-bold mb-3 gradient-text">First-Class Sharding</h3>
+              <p className="opacity-80">64 shards at genesis, scaling to 1,024. Cross-shard transactions are sets of legs under one whole-transaction proof. The transit-log protocol makes cross-shard atomicity a construction — <span className="font-bold text-cyan-300">no locks, no coordinators, no trusted relayers</span>. Issue legs are permissionlessly completable by anyone, forever. The scaling path to 1M+ TPS is horizontal: more shards, not deeper math.</p>
             </div>
           </div>
         </section>
@@ -135,7 +135,7 @@ export default function Home() {
                   <th className="comparison-th">Privacy</th>
                   <th className="comparison-th">Scalability</th>
                   <th className="comparison-th">Post-Quantum</th>
-                  <th className="comparison-th">Self-Improving</th>
+                  <th className="comparison-th">Provable state</th>
                 </tr>
               </thead>
               <tbody>
@@ -158,7 +158,7 @@ export default function Home() {
                   </td>
                   <td className="comparison-td">
                     <span className="comparison-badge comparison-badge-no">✗</span>
-                    <span className="comparison-cell-no">No</span>
+                    <span className="comparison-cell-no">Merkle Root</span>
                   </td>
                 </tr>
 
@@ -181,7 +181,7 @@ export default function Home() {
                   </td>
                   <td className="comparison-td">
                     <span className="comparison-badge comparison-badge-no">✗</span>
-                    <span className="comparison-cell-no">No</span>
+                    <span className="comparison-cell-no">Merkle Root</span>
                   </td>
                 </tr>
 
@@ -204,7 +204,7 @@ export default function Home() {
                   </td>
                   <td className="comparison-td comparison-td-nerv">
                     <span className="comparison-badge comparison-badge-yes">✓</span>
-                    <span className="comparison-cell-yes">Yes</span>
+                    <span className="comparison-cell-yes">C_t + Advisory</span>
                   </td>
                 </tr>
               </tbody>
@@ -228,7 +228,7 @@ export default function Home() {
             />
           </div>
           <p className="mt-4 text-sm opacity-70">
-            User → PQ-Sphinx 5-hop Mixnet → Threshold Decrypted Mempool → NWO Perceptron Execution → Adam/Huber Weight Update → 512-byte Embedding Root + VDW
+            User → PQ-Sphinx 5-hop Mixnet → Threshold Decrypted Aggregate → Deterministic Executor → C<sub>t</sub> Commitment Update → Advisory Embedding (e<sub>t</sub> + D<sub>t</sub>) → Recursive Batch Proof + 600-byte Inclusion Witness
           </p>
         </section>
 
