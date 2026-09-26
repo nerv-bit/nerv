@@ -47,7 +47,7 @@ export default function Home() {
           <div className="h-1 w-24 bg-gradient-to-r from-cyan-500 to-purple-500 mx-auto my-6 rounded-full"></div>
 
           <p className="tagline text-2xl md:text-3xl mb-4 opacity-90">
-            Privacy by Default. Post-Quantum from Genesis. Infinite Scalability.
+            Privacy by Construction. Post-Quantum from Genesis. First-class sharding.
           </p>
 
           <p className="launch text-lg md:text-xl mb-12 opacity-80">
@@ -62,7 +62,7 @@ export default function Home() {
               Read Whitepaper v3.0
             </a>
             <a
-              href="https://github.com/nerv-bit/nerv/blob/main/NERV3.0/NERV%20Whitepaper%20V3.0.pdf"
+              href="https://github.com/nerv-bit/nerv/blob/main/NERV3.0/"
               target="_blank"
               className="btn secondary border border-purple-500 text-white font-semibold py-3 px-8 rounded-lg transition hover:scale-105"
             >
@@ -71,7 +71,7 @@ export default function Home() {
           </div>
 
           <p className="launch text-lg md:text-xl mb-12 opacity-80">
-            <span className="gradient-text font-semibold">NERV</span> is the first Layer 1 blockchain that offers privacy by default (no addresses, amounts, or metadata ever visible), infinite scalability (&gt;1 million transactions per second, no ceiling), and post-quantum security from genesis. No pre-mine, no VC allocation, no foundation treasury. Join us in building the <span className="gradient-text font-semibold">nervous system of the private internet</span>!
+            <span className="gradient-text font-semibold">NERV</span> is the first Layer 1 blockchain where the authoritative state is a cryptographic commitment — not a neural embedding, not a Merkle tree, but 32 bytes of BLAKE3. Every proof binds to it. Every validator checks against it. The neural layer is a derived, provably-consistent accelerator. No pre-mine, no VC allocation, no foundation treasury. Join us in building the <span className="gradient-text font-semibold">nervous system of the private internet</span>!
           </p>
         </div>
       </section>
@@ -79,7 +79,7 @@ export default function Home() {
       {/* MAIN CONTENT */}
       <div className="relative z-10 pt-8 md:pt-[520px]">
        {/* ═══════════════════════════════════════════════ */}
-        {/* V1.01 → V2.0 EVOLUTION CALLOUT                 */}
+        {/* V2.0 → V3.0 EVOLUTION CALLOUT                 */}
         {/* ═══════════════════════════════════════════════ */}
         <section className="py-6 max-w-5xl mx-auto px-4">
           <div className="evolution-callout p-6 md:p-8 max-w-3xl mx-auto text-center">
