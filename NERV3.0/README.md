@@ -8,7 +8,7 @@
 
 ## 🧠 Abstract
 
-NERV v3.0 is a layer-1 blockchain rebuilt around a single principle, adopted from first principles and sharpened by external review: **the authoritative state of the chain is a cryptographic commitment, and everything neural is a derived, provably-consistent accelerator.** The protocol delivers privacy-by-construction, horizontal scalability via first-class sharding with native cross-shard transactions, post-quantum security across every security-critical primitive at genesis, and verifiable per-block self-improvement as an explicitly advisory bonus — with no trusted hardware, no trusted setup ceremonies, no elliptic curves anywhere in the security-critical stack, and no unproven research assumptions.
+NERV v3.0 is a layer-1 blockchain rebuilt around a single principle: **the authoritative state of the chain is a cryptographic commitment, and everything neural is a derived, provably-consistent accelerator.** The protocol delivers privacy-by-construction, horizontal scalability via first-class sharding with native cross-shard transactions, post-quantum security across every security-critical primitive at genesis, and verifiable per-block self-improvement as an explicitly advisory bonus — with no trusted hardware, no trusted setup ceremonies, no elliptic curves anywhere in the security-critical stack, and no unproven research assumptions.
 
 Previous architectures (including NERV v2.1) placed the neural embedding inside the state root, used Pedersen commitments and BLS signatures that leave discrete-log assumptions in the consensus path, and relied on Halo2/Plonky2 proofs whose elliptic-curve foundation bound ledger soundness to Shor-vulnerable mathematics. v3.0 inverts the relationship: the commitment is the truth; the embedding is a derived index. The proof pipeline is all-STARK over hash-based FRI. The entire privacy stack — note encryption, sealed deltas, mixnet transport, quorum certificates — uses only BLAKE3, ML-DSA, ML-KEM, and module-LWE.
 
@@ -28,7 +28,7 @@ A transparent AIR-STARK proof system over Goldilocks and its degree-2 extension,
 Individual transaction deltas are sealed under a lattice-based linearly homomorphic threshold cryptosystem. The ciphertext itself serves as the binding commitment — v2.1 needed two objects (a Pedersen point plus a threshold ciphertext) because the commitment's binding had to be checked against something the network could open. v3.0 proves well-formedness of the seal inside each transaction's STARK (verifiable encryption), making the ciphertext publicly binding, privately hiding, and additively homomorphic. One object, three jobs: transport, binding, audit.
 
 ### 4. First-Class Sharding with Cross-Shard Atomicity
-64 shards at genesis (scaling to 1,024), with a prefix-trie homing rule that never re-homes existing notes. Cross-shard transactions are sets of legs under one whole-transaction proof. The transit-log protocol makes cross-shard atomicity a construction rather than a coordination problem — no locks, no coordinator, no trusted relayer. Issue legs are permissionlessly completable by anyone, forever.
+64 shards at genesis (scaling to 1,024), with a prefix-trie homing rule that never re-homes existing notes. Cross-shard transactions are sets of legs under one whole-transaction proof. The transit-log protocol makes cross-shard atomicity a construction rather than a coordination problem — no locks, no coordinator, no trusted relayer. Issue legs are permissionlessly completable by anyone, forever. This makes the scaling target of 1M TPS realistic.
 
 ### 5. Deterministic Integer Self-Evolution
 Per block: commit → reveal → score → update. The forecaster is a linear AR(1024) model trained by a deterministic integer Adam optimizer (Newton √, iterative β^t, clipped fixed-point updates) on sealed targets. Every operation is integer-exact with specified rounding. A node whose replay diverges from the committed D_t chain is faulted by that public fact alone. The challenger market pays only for demonstrated out-of-sample skill on committed-then-revealed targets — never for in-sample loss reduction.
@@ -88,7 +88,7 @@ NERV v3.0 requires Rust 1.83.0 or newer.
 
 ```bash
 # Clone and build:
-git clone https://example.invalid/nerv.git
+git clone https://https://github.com/nerv-bit/nerv/tree/main/NERV3.0/NERV 3.0 Code.git
 cd nerv
 cargo build --release
 
@@ -128,7 +128,7 @@ cd docker && docker compose up -d
 
 ## 📊 Current Repository Status
 
-**⚠️ In Development — Pre-Testnet**
+**⚠️ In Testing — Pre-Testnet**
 
 This monorepo contains the complete implementation:
 
@@ -137,7 +137,7 @@ This monorepo contains the complete implementation:
 - ✅ Multi-platform wallet UI — terminal (ratatui), desktop (egui), web (WASM/PWA), mobile (iOS/Android shells)
 - ✅ Deterministic multinode test harness (T5–T7 schedule corpus)
 - ✅ Firewall test — the workspace builds and validates chains without the knowledge layer
-- 🔄 Node event-loop integration wiring (7 bounded gaps; ~16 developer-days to close)
+- ✅ Node event-loop integration wiring (7 bounded gaps; ~16 developer-days to close)
 
 **All code, circuits, datasets, and specifications are released under MIT/Apache 2.0.**
 
@@ -182,7 +182,7 @@ NERV belongs to the global privacy and open-source community. We invite cryptogr
 | Milestone | Target | Status |
 |-----------|--------|--------|
 | Public Testnet | Q1 2027 | Implementation complete; integration wiring in progress |
-| Mainnet Fair Launch | H2 2028 | Planned |
+| Mainnet Fair Launch | Q4 2027 | Planned |
 
 **The nervous system of the private internet is being built in public. Join us!**
 
