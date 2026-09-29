@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- NERV is dark-first; the night variant is identical to day. -->
+    <style name="Theme.Nerv" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@color/nerv_bg</item>
+        <item name="android:navigationBarColor">@color/nerv_bg</item>
+        <item name="android:windowBackground">@color/nerv_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

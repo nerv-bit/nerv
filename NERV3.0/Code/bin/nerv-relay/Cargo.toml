@@ -1,0 +1,30 @@
+
+[package]
+name = "nerv-relay"
+description = "NERV mixnet relay binary: peel → jitter → forward"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+
+[[bin]]
+name = "nerv-relay"
+path = "src/main.rs"
+
+
+[dependencies]
+nerv-core = { path = "../../crates/nerv-core" }
+nerv-crypto = { path = "../../crates/nerv-crypto" }
+nerv-net = { path = "../../crates/nerv-net" }
+clap = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+getrandom = { workspace = true }
+
+
+[lints]
+workspace = true

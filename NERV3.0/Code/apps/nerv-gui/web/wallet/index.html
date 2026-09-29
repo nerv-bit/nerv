@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0D1117">
+    <meta name="description" content="NERV — Post-Quantum Privacy Wallet">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="assets/nerv_logo.png">
+    <link rel="apple-touch-icon" href="assets/nerv_logo.png">
+    <title>NERV Wallet</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- ═══════════════════════════════════════════════════════
+         NERV Wallet — Web counterpart to the Android + iOS
+         shells (erratum 205). Hosts the WASM-built eframe UI
+         inside the canvas + a native HTML/CSS chrome mirroring
+         the mobile shells:
+            ┌──────────────────────────────────────┐
+            │  ⊛ NERV                ● SYNCED   🔒 │  ← top bar
+            ├──────────────────────────────────────┤
+            │                                      │
+            │           <canvas> (eframe)          │  ← WASM
+            │                                      │
+            ├──────────────────────────────────────┤
+            │  ◧   ↗   ↙   👛   🧠   ⏱   ⚙   ?    │  ← bottom nav
+            └──────────────────────────────────────┘
+         The bridge lets the eframe UI inside the canvas call
+         native web APIs (haptics via Vibration API, clipboard,
+         share sheet) and lets the bottom nav drive wallet-core
+         `Navigate(screen)` actions via `nervBridgeFromNative`.
+         ═══════════════════════════════════════════════════════ -->
+
+    <!-- Splash overlay (shown while WASM bundle is loading). -->
+    <div id="splash" class="splash">
+        <div class="splash-glow"></div>
+        <div class="splash-content">
+            <img class="splash-logo" src="assets/nerv_logo.png" alt="NERV logo">
+            <div class="splash-wordmark">NERV</div>
+            <div class="splash-tagline">Post-Quantum Privacy Wallet</div>
+        </div>
+        <div class="splash-footer">Loading NERV…</div>
+    </div>
+
+    <!-- Lock screen (mock for Web — production uses real biometric). -->
+    <div id="lock" class="lock hidden">
+        <div class="lock-glow"></div>
+        <div class="lock-content">
+            <img class="lock-logo" src="assets/nerv_logo.png" alt="NERV logo">
+            <div class="lock-wordmark">NERV</div>
+            <div class="lock-tagline">Post-Quantum Privacy Wallet</div>
+            <button id="lock-unlock" class="lock-button">
+                <span class="lock-icon">👆</span>
+                <span class="lock-label">Unlock</span>
+            </button>
+            <div class="lock-help">
+                Tap to unlock. NERV never sees your seed or biometric data.
+            </div>
+        </div>
+    </div>
+
+    <!-- Top bar (brand + sync + lock). -->
+    <header id="topbar" class="topbar hidden">
+        <div class="topbar-inner">
+            <div class="topbar-brand">
+                <img class="topbar-logo" src="assets/nerv_logo.png" alt="NERV logo">
+                <span class="topbar-wordmark">NERV</span>
+            </div>
+            <div class="topbar-status">
+                <span id="sync-badge" class="sync-badge sync-badge--synced">
+                    <span class="sync-dot"></span>
+                    <span class="sync-label">Synced</span>
+                </span>
+                <button id="lock-button" class="icon-button" aria-label="Lock wallet">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div class="topbar-border"></div>
+    </header>
+
+    <!-- Main: the WASM canvas. -->
+    <main id="main" class="main hidden">
+        <canvas id="canvas"></canvas>
+        <div id="error" class="error"></div>
+    </main>
+
+    <!-- Bottom navigation (8 screens). -->
+    <nav id="bottomnav" class="bottomnav hidden">
+        <div class="bottomnav-border"></div>
+        <div class="bottomnav-items" id="bottomnav-items">
+            <!-- Populated by JS in renderBottomNav(). -->
+        </div>
+    </nav>
+
+    <!-- Snackbar host (overlay, level-coloured). -->
+    <div id="snackbar" class="snackbar" role="status" aria-live="polite"></div>
+
+    <script src="bridge.js"></script>
+    <script type="module">
+        import init, {
+            nerv_navigate,
+            nerv_lock,
+            nerv_active_screen,
+            nerv_set_active_screen,
+        } from './pkg/nerv_gui.js';
+
+        // -------- Splash + lock phase machine --------
+        const splashEl = document.getElementById('splash');
+        const lockEl   = document.getElementById('lock');
+        const topbarEl = document.getElementById('topbar');
+        const mainEl   = document.getElementById('main');
+        const bottomEl = document.getElementById('bottomnav');
+        const canvas   = document.getElementById('canvas');
+        const errorEl  = document.getElementById('error');
+
+        function setVisible(el, visible) {
+            el.classList.toggle('hidden', !visible);
+        }
+
+        // Splash auto-dismisses after min duration (or sooner on ready).
+        setTimeout(() => {
+            setVisible(splashEl, false);
+            setVisible(lockEl, true);
+        }, 800);
+
+        // Lock → wallet transition.
+        document.getElementById('lock-unlock').addEventListener('click', () => {
+            setVisible(lockEl, false);
+            setVisible(topbarEl, true);
+            setVisible(mainEl, true);
+            setVisible(bottomEl, true);
+            renderBottomNav(NervBridge.activeScreen());
+        });
+
+        // Lock button (top bar) → back to lock.
+        document.getElementById('lock-button').addEventListener('click', () => {
+            NervBridge.postNativeEvent('lock', '');
+            setVisible(lockEl, true);
+            setVisible(topbarEl, false);
+            setVisible(mainEl, false);
+            setVisible(bottomEl, false);
+        });
+
+        function showError(msg) {
+            errorEl.textContent = msg;
+            errorEl.classList.add('error--visible');
+        }
+
+        // -------- WASM boot --------
+        async function start() {
+            try {
+                await init().then((wasm) => {
+                    // Expose the wasm_bindgen-exported bridge
+                    // functions on `window` so the chrome's `bridge.js`
+                    // listener (registered earlier) can dispatch nav
+                    // and lock events into the eframe UI. The exports
+                    // are also already module-level imports above, but
+                    // we re-publish them on `window` for cross-script
+                    // access.
+                    window.nerv_navigate = nerv_navigate;
+                    window.nerv_lock = nerv_lock;
+                    window.nerv_active_screen = nerv_active_screen;
+                    window.nerv_set_active_screen = nerv_set_active_screen;
+
+                    // Push the active screen into the eframe UI on
+                    // cold-start so the WASM canvas renders the
+                    // right tab on the first frame.
+                    try {
+                        nerv_set_active_screen(NervBridge.activeScreen());
+                    } catch (_) { /* pre-init — fine */ }
+
+                    wasm.run(canvas).then(() => {
+                        // Notify native chrome that WASM is ready.
+                        NervBridge.postNativeEvent('ready', '');
+                    }).catch((e) => {
+                        showError('Failed to start: ' + e);
+                    });
+                });
+            } catch (e) {
+                showError('Failed to load WASM: ' + e);
+            }
+        }
+
+        // -------- Service worker for offline support --------
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        }
+
+        start();
+    </script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# NERV Relay — multi-stage build.
+FROM rust:1.83-slim AS builder
+
+WORKDIR /build
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY crates/nerv-core/ crates/nerv-core/
+COPY crates/nerv-crypto/ crates/nerv-crypto/
+COPY crates/nerv-net/ crates/nerv-net/
+COPY bin/nerv-relay/ bin/nerv-relay/
+COPY specs/ specs/
+COPY tests/nerv-conformance/ tests/nerv-conformance/
+COPY xtask/ xtask/
+
+RUN cargo build --release --bin nerv-relay
+
+FROM debian:bookworm-slim
+COPY --from=builder /build/target/release/nerv-relay /usr/local/bin/nerv-relay
+
+EXPOSE 7010
+ENTRYPOINT ["nerv-relay"]
+CMD ["--listen", "0.0.0.0:7010"]

@@ -1,0 +1,31 @@
+[package]
+name = "nerv-crypto"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "NERV PQ primitive door (DSR-3): ML-DSA-65, ML-KEM-768, ChaCha20-Poly1305, KDFs, quorum certificates, hash sortition"
+
+[lints]
+workspace = true
+
+[lib]
+name = "nerv_crypto"
+path = "src/lib.rs"
+
+[dependencies]
+nerv-core = { path = "../nerv-core" }
+fips203 = { workspace = true }
+fips204 = { workspace = true }
+chacha20poly1305 = { workspace = true }
+hkdf = { workspace = true }
+sha2 = { workspace = true }
+pbkdf2 = { workspace = true }
+blake3 = { workspace = true }
+zeroize = { workspace = true }
+rayon = { workspace = true }
+thiserror = { workspace = true }
+rand = { workspace = true }
+rand_core = { workspace = true }
+rand_chacha = { workspace = true }

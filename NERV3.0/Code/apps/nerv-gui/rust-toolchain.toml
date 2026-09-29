@@ -1,0 +1,19 @@
+# Rust toolchain for the NERV Wallet web build (erratum 205).
+#
+# This file overrides the workspace root's 1.83 pin (which the rest
+# of the NERV codebase accepts) for the `nerv-gui` crate specifically.
+# `wasm-pack build --target web` requires Rust 1.85+ edition2024
+# (clap 4.6.7, eframe 0.29, etc.). When the user moves the codebase
+# to GitHub at `NERV3.0/apps/nerv-gui/`, copy this file alongside.
+#
+# Rustup walks up from the current directory looking for a
+# `rust-toolchain.toml`; the closest one wins. Putting it here
+# means `cargo` / `wasm-pack` invocations from `apps/nerv-gui/`
+# (and its descendants) use 1.85, while the rest of the workspace
+# keeps using 1.83.
+
+[toolchain]
+channel = "1.85.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"
+targets = ["wasm32-unknown-unknown"]

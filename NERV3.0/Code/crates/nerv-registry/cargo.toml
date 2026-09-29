@@ -1,0 +1,33 @@
+[package]
+name = "nerv-registry"
+description = "NERV global validity registry (WP §5.5): the validated-tx pool, aggregator bundles, T_τ interval construction, the folding schedule, degraded-mode attestations, and inclusion challenges"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+
+[lib]
+name = "nerv_registry"
+path = "src/lib.rs"
+
+
+[dependencies]
+nerv-core = { path = "../nerv-core" }
+nerv-codec = { path = "../nerv-codec" }
+nerv-crypto = { path = "../nerv-crypto" }
+nerv-custody = { path = "../nerv-custody" }
+nerv-proofs = { path = "../nerv-proofs" }
+nerv-seal = { path = "../nerv-seal" }
+nerv-state = { path = "../nerv-state" }
+thiserror = { workspace = true }
+
+
+[dev-dependencies]
+blake3 = { workspace = true }
+proptest = { workspace = true }
+
+
+[lints]
+workspace = true

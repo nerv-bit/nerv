@@ -1,0 +1,61 @@
+[workspace]
+
+
+[package]
+name = "nerv-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+
+[package.metadata]
+cargo-fuzz = true
+
+
+[dependencies]
+libfuzzer-sys = "0.13"
+nerv-core = { path = "../crates/nerv-core" }
+nerv-crypto = { path = "../crates/nerv-crypto" }
+nerv-seal = { path = "../crates/nerv-seal" }
+nerv-net = { path = "../crates/nerv-net" }
+nerv-proofs = { path = "../crates/nerv-proofs" }
+
+
+[[bin]]
+name = "codec"
+path = "fuzz_targets/codec.rs"
+test = false
+doc = false
+bench = false
+
+
+[[bin]]
+name = "sphinx_peel"
+path = "fuzz_targets/sphinx_peel.rs"
+test = false
+doc = false
+bench = false
+
+
+[[bin]]
+name = "seal_digitize"
+path = "fuzz_targets/seal_digitize.rs"
+test = false
+doc = false
+bench = false
+
+
+[[bin]]
+name = "ring_ntt"
+path = "fuzz_targets/ring_ntt.rs"
+test = false
+doc = false
+bench = false
+
+
+[[bin]]
+name = "fold_dedup"
+path = "fuzz_targets/fold_dedup.rs"
+test = false
+doc = false
+bench = false

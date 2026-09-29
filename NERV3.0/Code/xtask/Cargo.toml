@@ -1,0 +1,17 @@
+[package]
+name = "xtask"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+cargo_metadata = { workspace = true }
+walkdir = { workspace = true }
+nerv-conformance = { path = "../tests/nerv-conformance" }

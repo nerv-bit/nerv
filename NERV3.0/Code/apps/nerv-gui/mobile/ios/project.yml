@@ -1,0 +1,49 @@
+name: Nerv
+options:
+  bundleIdPrefix: org.nerv
+  deploymentTarget:
+    iOS: '15.0'
+  developmentLanguage: en
+  groupSortPosition: top
+
+settings:
+  base:
+    MARKETING_VERSION: '0.1.0'
+    CURRENT_PROJECT_VERSION: '1'
+    SWIFT_VERSION: '5.9'
+    IPHONEOS_DEPLOYMENT_TARGET: '15.0'
+    ENABLE_BITCODE: NO
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ''
+    SUPPORTS_MACCATALYST: NO
+    TARGETED_DEVICE_FAMILY: '1,2'
+
+targets:
+  Nerv:
+    type: application
+    platform: iOS
+    deploymentTarget: '15.0'
+    sources:
+      - path: App.swift
+      - path: NervWallet
+      - path: Resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.nerv.wallet
+        INFOPLIST_FILE: Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
+        SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
+        GCC_TREAT_WARNINGS_AS_ERRORS: NO
+        # The release signing config is provisioned separately by
+        # the testnet operator; for local builds, code-signing is
+        # optional (xcodebuild will ad-hoc sign).
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGN_IDENTITY: ''
+    info:
+      path: Info.plist
+    dependencies:
+      # No external Swift deps; the wallet is in Rust (WASM bundle
+      # is bundled at app build time by `build_ios.sh`).

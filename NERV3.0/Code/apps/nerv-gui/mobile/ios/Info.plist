@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Bundle identity. -->
+    <key>CFBundleName</key>
+    <string>NERV</string>
+    <key>CFBundleDisplayName</key>
+    <string>NERV</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleVersion</key>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$(MARKETING_VERSION)</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+
+    <!-- Permissions / usage descriptions.
+         - Face ID: protects access to the wallet
+         - Camera: future QR-code address scanning
+         - Photo Library: future avatar / metadata -->
+    <key>NSFaceIDUsageDescription</key>
+    <string>Face ID protects your NERV wallet — your seed never leaves the device.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>NERV uses the camera to scan QR-code recipient addresses.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>NERV can save transaction receipts to your photo library.</string>
+
+    <!-- Device capabilities. -->
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>arm64</string>
+    </array>
+
+    <!-- Orientation: portrait-only (mobile wallet UX). -->
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+
+    <!-- Status bar: stay light against the dark chrome. -->
+    <key>UIStatusBarStyle</key>
+    <string>UIStatusBarStyleLightContent</string>
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <true/>
+
+    <!-- Background modes: none (the wallet is foreground-only). -->
+
+    <!-- Appearance. -->
+    <key>UIUserInterfaceStyle</key>
+    <string>Dark</string>
+
+    <!-- Launch screen. -->
+    <key>UILaunchScreen</key>
+    <dict>
+        <key>UIColorName</key>
+        <string>nervSplashBg</string>
+    </dict>
+
+    <!-- iCloud / Backup: opt-out. The wallet's seed must not leave
+         the device through iCloud Keychain or any other backup
+         channel. The encrypted IndexedDB inside the WKWebView
+         process is sandboxed; the seed is wiped on Lock. -->
+    <key>NSUbiquitousContainers</key>
+    <dict/>
+    <key>NSURLTypes</key>
+    <array/>
+
+    <!-- Privacy manifest (iOS 17+). We declare the required-reason
+         API usage (UserDefaults + system fonts + SF Symbols) so the
+         app store submission is well-formed. -->
+    <key>NSPrivacyTracking</key>
+    <false/>
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+</dict>
+</plist>

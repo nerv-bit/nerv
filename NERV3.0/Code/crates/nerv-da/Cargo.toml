@@ -1,0 +1,27 @@
+[package]
+name = "nerv-da"
+description = "NERV data availability (WP §8.7): 2D Reed–Solomon erasure coding, blob commitments, sampled availability, fraud evidence"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+
+[lib]
+name = "nerv_da"
+path = "src/lib.rs"
+
+
+[dependencies]
+nerv-core = { path = "../nerv-core" }
+thiserror = { workspace = true }
+
+
+[dev-dependencies]
+blake3 = { workspace = true }
+proptest = { workspace = true }
+
+
+[lints]
+workspace = true

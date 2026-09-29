@@ -1,0 +1,34 @@
+[package]
+name = "nerv-aggregator"
+description = "NERV prover-market node: subscribe → native-verify → fold → submit"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+
+[[bin]]
+name = "nerv-aggregator"
+path = "src/main.rs"
+
+
+[dependencies]
+nerv-core = { path = "../../crates/nerv-core" }
+nerv-crypto = { path = "../../crates/nerv-crypto" }
+nerv-custody = { path = "../../crates/nerv-custody" }
+nerv-codec = { path = "../../crates/nerv-codec" }
+nerv-seal = { path = "../../crates/nerv-seal" }
+nerv-proofs = { path = "../../crates/nerv-proofs" }
+nerv-registry = { path = "../../crates/nerv-registry" }
+nerv-net = { path = "../../crates/nerv-net" }
+clap = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+getrandom = { workspace = true }
+
+
+[lints]
+workspace = true

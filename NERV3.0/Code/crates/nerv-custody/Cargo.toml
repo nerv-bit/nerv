@@ -1,0 +1,23 @@
+[package]
+name = "nerv-custody"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "NERV ledger of record (WP §3): note commitments, the note commitment tree, the key hierarchy, note sealing"
+
+[lints]
+workspace = true
+
+[lib]
+name = "nerv_custody"
+path = "src/lib.rs"
+
+
+[dependencies]
+nerv-core = { path = "../nerv-core" }
+nerv-crypto = { path = "../nerv-crypto" }
+thiserror = { workspace = true }
+zeroize = { workspace = true }
+

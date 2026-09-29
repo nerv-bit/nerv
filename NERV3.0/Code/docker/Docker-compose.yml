@@ -1,0 +1,82 @@
+
+# A local NERV network for development and testing.
+services:
+  node:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.node
+    ports:
+      - "7000:7000"
+    volumes:
+      - node-data:/data
+    environment:
+      - RUST_LOG=info
+    command:
+      - --role
+      - validator
+      - --listen
+      - 0.0.0.0:7000
+      - --data-dir
+      - /data
+      - --peers
+      - relay-1:7010,relay-2:7010
+
+  relay-1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.relay
+    ports:
+      - "7010:7010"
+    environment:
+      - RUST_LOG=info
+
+  relay-2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.relay
+    ports:
+      - "7011:7010"
+    environment:
+      - RUST_LOG=info
+
+  relay-3:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.relay
+    ports:
+      - "7012:7010"
+    environment:
+      - RUST_LOG=info
+
+  relay-4:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.relay
+    ports:
+      - "7013:7010"
+    environment:
+      - RUST_LOG=info
+
+  relay-5:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.relay
+    ports:
+      - "7014:7010"
+    environment:
+      - RUST_LOG=info
+
+  aggregator:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.aggregator
+    ports:
+      - "7020:7020"
+    environment:
+      - RUST_LOG=info
+    depends_on:
+      - node
+
+volumes:
+  node-data:
+

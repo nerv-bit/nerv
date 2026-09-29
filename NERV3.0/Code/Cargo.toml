@@ -1,0 +1,152 @@
+# ============================================================================
+# NERV v3.0 — Workspace root
+# ----------------------------------------------------------------------------
+# The codebase's shape is a dependency direction (design doc, DSR-1). This
+# file pins that policy: every external crate is declared exactly once in
+# [workspace.dependencies]; members inherit. Cargo.lock (committed after
+# `make bootstrap`) plus --locked (CI, from M0) is the true reproducibility
+# pin; the version requirements below are policy, not the freeze.
+#
+# MEMBERSHIP POLICY — members grow chunk by chunk, never ahead of their
+# implementation (no stub crates):
+#   chunk  2: crates/nerv-core          chunk  3: crates/nerv-crypto
+#   chunk  4: crates/nerv-custody       chunk  5: crates/nerv-custody (fin.)
+#   chunk  6: crates/nerv-codec         chunks 7-9: crates/nerv-seal
+#   chunks 10-12: crates/nerv-proofs    chunk 12.5: nerv-stark (in nerv-proofs)
+#   chunk 13: crates/nerv-state         chunk 14: registry, consensus
+#   chunk 15: da, net I                 chunk 16: net II
+#   chunk 17: economy, knowledge        chunk 18: governance, witness
+#   chunk 19: wallet, nerv-cli          chunk 20: testkit, bins, fuzz
+#
+# Unused [workspace.dependencies] entries are inert until a member inherits
+# them (cargo resolves only member dependency sets); each entry is verified
+# against crates.io the first time its owning chunk lands.
+#
+# PROOF SYSTEM: native nerv-stark engine inside nerv-proofs (Option B,
+# register 57) — the plonky3 family is excised entirely; no p3-* entries.
+# ============================================================================
+
+[workspace]
+resolver = "2"
+exclude = ["fuzz"]
+members = [
+    "crates/nerv-core",
+    "crates/nerv-crypto",
+    "crates/nerv-custody",
+    "crates/nerv-codec",
+    "crates/nerv-seal",
+    "crates/nerv-proofs",
+    "crates/nerv-state",
+    "crates/nerv-registry",
+    "crates/nerv-consensus",
+    "crates/nerv-da",
+    "crates/nerv-net",
+    "crates/nerv-economy",
+    "crates/nerv-knowledge",
+    "crates/nerv-witness",
+    "crates/nerv-governance",
+    "crates/nerv-wallet",
+    "crates/nerv-wallet-core",
+    "apps/nerv-tui",
+    "apps/nerv-gui",
+    "bin/nerv-cli",
+    "bin/nerv-node",
+    "bin/nerv-relay",
+    "bin/nerv-aggregator",
+    "tests/nerv-testkit",
+    "xtask",
+    "tests/nerv-conformance",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://example.invalid/nerv"   # replace at publicization; not load-bearing
+publish = false
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = "deny"
+float_arithmetic = "deny"   # P5: consensus-adjacent code is integer-exact. (The M1 float
+                            # oracle in nerv-knowledge tests re-allows locally, DSR-11.)
+unwrap_used = "warn"
+expect_used = "warn"
+
+# ---------------------------------------------------------------------------
+# External dependency policy (single declaration point; fallbacks declared
+# alongside primaries so the swap is a one-line diff, per the design doc).
+# ---------------------------------------------------------------------------
+[workspace.dependencies]
+# --- consumed by current members -------------------------------------------
+blake3           = "1.5"
+serde            = { version = "1", features = ["derive"] }
+toml             = "0.8"
+clap             = { version = "4.5", features = ["derive"] }
+thiserror        = "2"
+anyhow           = "1"
+cargo_metadata   = "0.18"
+walkdir          = "2"
+
+# --- future members (inert until inherited) ---------------------------------
+# Cryptography (nerv-crypto, chunk 3):
+fips203 = "=0.4.0"             # seeded keygen (d‖z) + explicit-randomness encapsulation, as coded in nerv-crypto/src/provider.rs
+fips204 = "=0.1.0"             # deterministic keygen via seeded ChaCha8Rng (fips204 0.1.0 has no KeyPair-from-seed); sign/verify/SerDes
+
+chacha20poly1305       = "0.10"
+hkdf                   = "0.12"
+hmac                   = "0.12"
+sha2                   = "0.10"
+pbkdf2                 = "0.12"
+bip39                  = "1"
+zeroize                = "1"
+rand                   = "0.8"
+rand_core              = "0.6"
+rand_chacha            = "0.3"             # crates.io name uses underscores; rust identifier matches
+getrandom              = "0.2"
+
+# Networking (nerv-net, chunks 15-16):
+libp2p                 = { version = "0.53", features = ["gossipsub", "quic", "identify", "kad", "request-response", "tokio", "macros"] }
+
+# Runtime and plumbing:
+tokio                  = { version = "1", features = ["full"] }
+tracing                = "0.1"
+tracing-subscriber     = { version = "0.3", features = ["env-filter"] }
+rayon                  = "1"
+dashmap                = "5"
+figment                = "0.10"
+metrics                = "0.21"
+metrics-exporter-prometheus = "0.12"
+
+# Storage (nerv-state, chunk 13):
+rocksdb                = "0.21"                # fallback: parity-db behind store's single seam
+parity-db              = "0.4"
+
+# Erasure coding (nerv-da, chunk 15):
+reed-solomon-simd      = "2"                   # fallback: reed-solomon-erasure
+reed-solomon-erasure   = "6"
+
+# Diagnostics-only (banned on the consensus path by review check):
+serde_json             = "1"
+postcard               = "1"
+
+# Testing and tooling:
+proptest               = "1"
+criterion              = "0.5"
+
+# BANNED OUTRIGHT (enforced structurally by deny.toml, not just here):
+#   any crate introducing elliptic-curve, pairing, or trusted-setup machinery:
+#   k256, p256, p384, p521, secp256k1, curve25519-dalek, ed25519-dalek,
+#   bls12_381, blst, pairing, ark-{ec,ff,bls12-381,bn254}, halo2-*, bellman,
+#   dusk-plonk, snow, ring, aws-lc-rs, ... (P1; WP §9.4 as a dependency policy)
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+overflow-checks = true                  # D-06: arithmetic faults loudly and identically everywhere
+
+[profile.dev.package."*"]
+opt-level = 2

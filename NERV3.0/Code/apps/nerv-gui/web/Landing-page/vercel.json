@@ -1,0 +1,83 @@
+{
+  "_comment": "NERV landing page Vercel config (erratum 205). This file lives at app/vercel.json on GitHub. Vercel's Root Directory for this project is `app/`; the buildCommand escapes to ../build.sh to orchestrate the monorepo (landing page + wallet).",
+
+  "buildCommand": "bash ../build.sh",
+
+  "framework": "nextjs",
+
+  "outputDirectory": ".next",
+
+  "cleanUrls": true,
+  "trailingSlash": false,
+
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "no-referrer"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
+      ]
+    },
+    {
+      "source": "/wallet/(.*)",
+      "headers": [
+        {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "require-corp"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        }
+      ]
+    },
+    {
+      "source": "/wallet/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Service-Worker-Allowed",
+          "value": "/"
+        }
+      ]
+    },
+    {
+      "source": "/wallet/manifest.json",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json"
+        }
+      ]
+    }
+  ],
+
+  "_rewrites_comment": "The wallet's static files live in app/public/wallet/ (served at /wallet/*). The only rewrite needed is for the bare /wallet URL (no trailing file) — Next.js serves /wallet/index.html for /wallet/ but a rewrite is needed for the exact /wallet path.",
+  "rewrites": [
+    {
+      "source": "/wallet",
+      "destination": "/wallet/index.html"
+    },
+    {
+      "source": "/wallet/",
+      "destination": "/wallet/index.html"
+    }
+  ]
+}

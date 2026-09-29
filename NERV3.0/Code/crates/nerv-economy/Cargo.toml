@@ -1,0 +1,26 @@
+[package]
+name = "nerv-economy"
+description = "NERV emission, fees, and staking (WP §12): the genesis-committed schedule, the emission ledger, the claim rail, fee splits, the validator subsidy, and the supply identity"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "nerv_economy"
+path = "src/lib.rs"
+
+[dependencies]
+nerv-core = { path = "../nerv-core" }
+nerv-crypto = { path = "../nerv-crypto" }
+nerv-custody = { path = "../nerv-custody" }
+thiserror = { workspace = true }
+
+
+[dev-dependencies]
+blake3 = { workspace = true }
+
+
+[lints]
+workspace = true

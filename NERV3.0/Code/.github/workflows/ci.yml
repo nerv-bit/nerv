@@ -1,0 +1,152 @@
+name: NERV CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-Dwarnings"
+
+jobs:
+  # The determinism matrix (DSR-11): the same chain on three architectures.
+  determinism:
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --target ${{ matrix.target }} -p nerv-state
+      - run: cargo test --target ${{ matrix.target }} -p nerv-state
+
+  # The firewall test (DSR-1 / Axiom 3).
+  firewall:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: The manifest-graph check
+        run: cargo test -p nerv-knowledge the_firewall_is_a_build_rule -- --nocapture
+      - name: The delete test (full workspace build without nerv-knowledge)
+        run: cargo test -p nerv-knowledge --release -- --ignored the_workspace_builds_without_nerv_knowledge --nocapture
+
+  # The conformance suite.
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Full conformance run
+        run: cargo test -p nerv-conformance
+
+  # The testkit (T5–T7 schedule corpus).
+  testkit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: The TLA+ schedule corpus
+        run: cargo test -p nerv-testkit
+
+  # Unit tests across all crates (Linux).
+  test-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: All tests
+        run: cargo test --workspace
+
+  # Unit tests (macOS: the native GUI).
+  test-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Core tests
+        run: cargo test -p nerv-core -p nerv-crypto -p nerv-custody -p nerv-seal -p nerv-state -p nerv-economy
+
+  # Unit tests (Windows).
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Core tests
+        run: cargo test -p nerv-core -p nerv-crypto -p nerv-custody -p nerv-seal -p nerv-state -p nerv-economy
+
+  # The WASM wallet build.
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - run: cargo install wasm-pack
+      - name: Build the WASM wallet
+        run: |
+          cd apps/nerv-gui
+          wasm-pack build --target web --release --out-dir pkg
+
+  # Fuzz targets (scheduled, not per-PR).
+  fuzz:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - name: Run fuzz targets
+        run: |
+          cd fuzz
+          cargo fuzz run codec -- -max_total_time=60
+          cargo fuzz run sphinx_peel -- -max_total_time=60
+          cargo fuzz run seal_digitize -- -max_total_time=60
+          cargo fuzz run ring_ntt -- -max_total_time=60
+
+  # Release builds (on tags).
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test-linux, determinism, firewall, conformance]
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: nerv-node-linux-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact: nerv-node-macos-arm64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: nerv-node-windows-x86_64.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Build release binaries
+        run: cargo build --release --target ${{ matrix.target }} --bin nerv-node --bin nerv-relay --bin nerv-aggregator --bin nerv-cli
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: target/${{ matrix.target }}/release/nerv-node*

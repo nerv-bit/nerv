@@ -1,0 +1,100 @@
+# cargo-deny policy — the P1 audit as a dependency policy (requires cargo-deny >= 0.14).
+# Run: cargo deny check   (Makefile target: make deny)
+
+[advisories]
+version = 2
+yanked = "deny"
+vulnerability = "deny"
+unmaintained = "warn"
+
+[licenses]
+version = 2
+confidence-threshold = 0.93
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "0BSD",
+    "CC0-1.0",
+    "Unlicense",
+    "Unicode-3.0",
+    "Unicode-DFS-1.6",
+    "Zlib",
+    "MPL-2.0",
+]
+
+# ---------------------------------------------------------------------------
+# P1 BAN LIST — no elliptic-curve, pairing, or trusted-setup machinery in the
+# workspace dependency graph, transitively included. This is the §9.4 audit
+# enforced by the build. `skip` is the ONLY escape valve and requires a
+# governance-recorded exception (none exist today).
+#
+# KNOWN ENGINEERING RISK (flagged now, resolved at chunk 15): libp2p QUIC
+# pulls rustls/ring, which contains EC code paths. Chunk 15 must either
+# present a PQ-only transport feature set or record a review-governed skip
+# here with the rationale and an issue reference. Until then the ban stands
+# and the workspace simply does not inherit those crates.
+# ---------------------------------------------------------------------------
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+highlight = "all"
+
+deny = [
+    # ECDSA / curves
+    { name = "k256",             reason = "P1: secp256k1 elliptic curves" },
+    { name = "p256",             reason = "P1: NIST P-256 elliptic curves" },
+    { name = "p384",             reason = "P1: NIST P-384 elliptic curves" },
+    { name = "p521",             reason = "P1: NIST P-521 elliptic curves" },
+    { name = "primeorder",       reason = "P1: prime-order curve framework" },
+    { name = "elliptic-curve",   reason = "P1: generic EC machinery" },
+    { name = "secp256k1",        reason = "P1: libsecp256k1 bindings" },
+    { name = "curve25519-dalek", reason = "P1: Curve25519 group arithmetic" },
+    { name = "x25519-dalek",     reason = "P1: X25519 Diffie-Hellman" },
+    { name = "ed25519-dalek",    reason = "P1: Ed25519 signatures" },
+    { name = "ed25519-zebra",    reason = "P1: Ed25519 signatures" },
+    { name = "jubjub",           reason = "P1: Jubjub curve" },
+    { name = "redjubjub", reason = "P1: RedJubjub signatures" },  
+    # Pairings / BLS
+    { name = "bls12_381",        reason = "P1: BLS12-381 pairing curve" },
+    { name = "blst",             reason = "P1: BLS12-381 library" },
+    { name = "pairing",          reason = "P1: pairing library" },
+    { name = "ark-bls12-381",    reason = "P1: arkworks BLS12-381" },
+    { name = "ark-bn254",        reason = "P1: arkworks BN254" },
+    { name = "ark-ec",           reason = "P1: arkworks elliptic curves" },
+    { name = "ark-ff",           reason = "P1: arkworks curve-field machinery" },
+    { name = "ark-poly",         reason = "P1: arkworks pairing-adjacent stack" },
+    # EC-based proof systems / trusted-setup machinery
+    { name = "halo2-proofs",     reason = "P1: Halo2 (discrete-log IPA/pairing)" },
+    { name = "halo2curves",      reason = "P1: Halo2 curve library" },
+    { name = "bellman",          reason = "P1: groth16 (pairings)" },
+    { name = "dusk-plonk",       reason = "P1: PLONK (pairings)" },
+    { name = "bulletproofs",     reason = "P1: Bulletproofs (discrete log)" },
+    # Transport-layer EC carriers
+    { name = "snow",             reason = "P1: Noise protocol (x25519-based)" },
+    { name = "ring",             reason = "P1: contains EC (p256/x25519) code paths" },
+    { name = "aws-lc-rs",        reason = "P1: contains EC code paths" },
+    { name = "aws-lc-sys",       reason = "P1: contains EC code paths" },
+  
+
+
+
+]
+
+skip = [
+    # EMPTY BY POLICY. Every entry here is a governance-visible exception with
+    # an issue reference and a removal plan. There are none today.
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+# The single permitted git source: the Plonky3 release train (erratum 84;
+# one rev for the whole family; vendored at M0 per the reproducible-build
+# policy). Removal plan: retire when the family's registry coverage
+# matches the pinned rev.
+allow-git = ["https://github.com/Plonky3/Plonky3"]
+

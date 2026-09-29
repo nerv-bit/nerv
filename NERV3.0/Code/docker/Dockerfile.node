@@ -1,0 +1,30 @@
+# NERV Node — multi-stage build.
+# Stage 1: build the Rust binary.
+FROM rust:1.83-slim AS builder
+
+WORKDIR /build
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY crates/ crates/
+COPY bin/nerv-node/ bin/nerv-node/
+COPY specs/ specs/
+COPY tests/nerv-conformance/ tests/nerv-conformance/
+COPY xtask/ xtask/
+
+RUN cargo build --release --bin nerv-node
+
+# Stage 2: the minimal runtime image.
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /build/target/release/nerv-node /usr/local/bin/nerv-node
+
+# The data directory (mount a volume here).
+VOLUME /data
+
+EXPOSE 7000
+
+ENTRYPOINT ["nerv-node"]
+CMD ["--role", "validator", "--listen", "0.0.0.0:7000", "--data-dir", "/data"]

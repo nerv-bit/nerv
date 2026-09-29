@@ -1,0 +1,19 @@
+[package]
+name = "nerv-codec"
+description = "NERV identity layer: the frozen codec W, per-leg feature vectors, and weight generation (WP §7)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+nerv-core = { path = "../nerv-core" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+blake3 = { workspace = true }
+proptest = { workspace = true }
+
+[lints]
+workspace = true

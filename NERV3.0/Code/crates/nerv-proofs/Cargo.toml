@@ -1,0 +1,24 @@
+[package]
+name = "nerv-proofs"
+description = "NERV proof fabric: transaction STARKs, chips, the native nerv-stark engine, folding (WP §5)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+nerv-core = { path = "../nerv-core" }
+nerv-custody = { path = "../nerv-custody" }
+nerv-codec = { path = "../nerv-codec" }
+nerv-seal = { path = "../nerv-seal" }
+thiserror = { workspace = true }
+rayon = { workspace = true }
+
+[dev-dependencies]
+blake3 = { workspace = true }
+proptest = { workspace = true }
+
+[lints]
+workspace = true
+

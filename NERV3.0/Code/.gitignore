@@ -1,0 +1,3 @@
+/target
+*.tmp
+# NOTE: Cargo.lock IS committed (reproducible builds; produced by `make bootstrap`).

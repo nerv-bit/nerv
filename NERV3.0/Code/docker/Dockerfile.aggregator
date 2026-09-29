@@ -1,0 +1,19 @@
+# NERV Aggregator — multi-stage build.
+FROM rust:1.83-slim AS builder
+
+WORKDIR /build
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY crates/ crates/
+COPY bin/nerv-aggregator/ bin/nerv-aggregator/
+COPY specs/ specs/
+COPY tests/nerv-conformance/ tests/nerv-conformance/
+COPY xtask/ xtask/
+
+RUN cargo build --release --bin nerv-aggregator
+
+FROM debian:bookworm-slim
+COPY --from=builder /build/target/release/nerv-aggregator /usr/local/bin/nerv-aggregator
+
+EXPOSE 7020
+ENTRYPOINT ["nerv-aggregator"]
+CMD ["--listen", "0.0.0.0:7020"]

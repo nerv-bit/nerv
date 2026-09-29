@@ -1,0 +1,396 @@
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Inter', sans-serif; background:#0d1117; color:#c9d1d9; line-height:1.6; }
+a { color:#58a6ff; text-decoration:none; }
+a:hover { text-decoration:underline; }
+
+.hero {
+  min-height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center;
+  text-align:center; padding:2rem; background:radial-gradient(circle at center, #1a1f2e 0%, #0d1117 80%);
+}
+h1 { font-size:7rem; font-weight:800; background:linear-gradient(90deg,#58a6ff,#f97583); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.tagline { font-size:1.8rem; margin:1.5rem 0; color:#8b949e; }
+.launch { font-size:1.2rem; color:#58a6ff; margin-bottom:3rem; }
+
+.buttons { display:flex; gap:1.5rem; flex-wrap:wrap; justify-content:center; }
+.btn { padding:1rem 2rem; border-radius:0.6rem; font-weight:600; font-size:1.1rem; }
+.primary { background:#238636; color:white; }
+.primary:hover { background:#2ea043; }
+.secondary { border:1px solid #30363d; color:#c9d1d9; }
+.secondary:hover { background:#21262d; }
+
+.promise {
+  padding:6rem 2rem; background:#161b22;
+  text-align:center;
+}
+.grid {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:2rem; max-width:1000px; margin:3rem auto;
+  font-size:1.3rem; font-weight:600;
+}
+
+.timeline {
+  padding:6rem 2rem; text-align:center;
+}
+.timeline h2 { font-size:2.2rem; margin-bottom:3rem; }
+.timeline-items {
+  max-width:700px; margin:0 auto; text-align:left; font-size:1.2rem;
+}
+.timeline-items div {
+  padding:1rem 0; border-left:3px solid #30363d; padding-left:1.5rem; margin:1.5rem 0;
+}
+.timeline-items span {
+  background:#238636; color:white; padding:0.2rem 0.6rem; border-radius:0.4rem; font-size:0.9rem; font-weight:600;
+}
+
+.links {
+  padding:6rem 2rem; background:#0d1117; text-align:center;
+}
+.links h2 { font-size:2rem; margin-bottom:3rem; }
+.link-grid {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:1.5rem; max-width:1000px; margin:0 auto;
+}
+.link-grid a {
+  padding:1.5rem; border:1px solid #30363d; border-radius:0.8rem; display:block; background:#161b22;
+}
+.link-grid a:hover { background:#21262d; border-color:#58a6ff; }
+
+footer {
+  padding:4rem 2rem; text-align:center; color:#8b949e; font-size:0.9rem; background:#010409;
+}
+footer p { margin:0.5rem 0; }
+@keyframes glowPulse {
+  0%, 100% {
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+  }
+  50% {
+    text-shadow: 0 0 30px rgba(0, 255, 255, 0.8), 0 0 40px rgba(138, 43, 226, 0.5);
+  }
+}
+
+@keyframes shadowPulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(0, 255, 255, 0.6);
+  }
+}
+
+.glow-pulse {
+  animation: glowPulse 6s infinite;
+}
+
+.shadow-pulse {
+  animation: shadowPulse 8s infinite;
+}
+
+/* Enhanced button hovers - adjust if your project uses Tailwind */
+.btn-primary:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 30px rgba(0, 255, 255, 0.4);
+}
+/* === New Neural & Cryptographic Visual Styles === */
+/* Hero container with glass effect */
+.glass-hero {
+  background: rgba(10, 15, 30, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(100, 200, 255, 0.2);
+  border-radius: 24px;
+  padding: 3rem 2.5rem;
+  position: relative;
+  z-index: 20;
+  transition: all 0.5s ease;
+  max-width: 900px;
+  margin: 2rem auto;
+}
+
+/* Hover-triggered "breathing" glow for the hero */
+.glass-hero:hover {
+  border-color: rgba(100, 200, 255, 0.4);
+  box-shadow:
+    0 0 40px rgba(0, 200, 255, 0.15),
+    inset 0 0 20px rgba(100, 220, 255, 0.05);
+}
+
+/* Cryptography theme: Animated gradient text for key terms */
+.gradient-text {
+  background: linear-gradient(90deg, #00ffff, #9070ff, #00ffaa);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-shift 3s ease infinite;
+}
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+}
+
+/* Neural theme: Card styling for innovations */
+.neural-card {
+  background: linear-gradient(145deg, rgba(15, 25, 50, 0.7), rgba(5, 10, 25, 0.9));
+  border: 1px solid rgba(100, 200, 255, 0.15);
+  border-radius: 16px;
+  transition: all 0.4s ease;
+}
+.neural-card:hover {
+  border-color: rgba(100, 220, 255, 0.4);
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0, 100, 255, 0.2);
+}
+
+/* Cryptographic icon fade-in (for hover state) */
+.crypto-icon {
+  opacity: 0;
+  transition: opacity 0.8s ease;
+  filter: drop-shadow(0 0 6px rgba(0, 255, 255, 0.5));
+}
+.glass-hero:hover .crypto-icon {
+  opacity: 0.7;
+}
+
+.btn-secondary:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 30px rgba(138, 43, 226, 0.4);
+}
+@keyframes nervGlowPulse {
+  0%, 100% {
+    filter:
+      drop-shadow(0 0 50px rgba(0, 255, 255, 0.45))
+      drop-shadow(0 0 110px rgba(168, 85, 247, 0.30));
+  }
+  50% {
+    filter:
+      drop-shadow(0 0 70px rgba(0, 255, 255, 0.65))
+      drop-shadow(0 0 150px rgba(168, 85, 247, 0.45));
+  }
+}
+
+/* ═══════════════════════════════════════════════ */
+/* Comparison Table — Neural / Cyber Theme         */
+/* ═══════════════════════════════════════════════ */
+
+.comparison-table-wrapper {
+  background: linear-gradient(145deg, rgba(10, 18, 40, 0.75), rgba(5, 8, 22, 0.9));
+  border: 1px solid rgba(100, 200, 255, 0.15);
+  border-radius: 16px;
+  padding: 2rem 1.5rem;
+  overflow-x: auto;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    0 0 30px rgba(0, 150, 255, 0.06),
+    inset 0 1px 0 rgba(100, 220, 255, 0.08);
+}
+
+.comparison-table {
+  min-width: 580px;
+  border-collapse: separate;
+  border-spacing: 1cm 0;          /* ← 1 cm horizontal gap between columns */
+}
+
+/* ── Header ── */
+.comparison-th {
+  padding: 0.85rem 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(100, 200, 255, 0.7);
+  border-bottom: 1px solid rgba(100, 200, 255, 0.15);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.comparison-th-first {
+  text-align: left;
+  padding-left: 0.25rem;
+}
+
+/* ── Body rows ── */
+.comparison-row td {
+  border-bottom: 1px solid rgba(100, 200, 255, 0.07);
+  transition: background 0.3s ease;
+}
+
+.comparison-row:last-child td {
+  border-bottom: none;
+}
+
+.comparison-row:hover td {
+  background: rgba(100, 200, 255, 0.04);
+}
+
+/* ── Cells ── */
+.comparison-td {
+  padding: 1.2rem 0.5rem;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.comparison-td-name {
+  text-align: left;
+  padding-left: 0.25rem;
+}
+
+/* ── Chain name labels (Solana/Sui, Monero/Zcash) ── */
+.comparison-chain-label {
+  font-weight: 700;
+  font-size: 1rem;
+  color: rgba(200, 215, 230, 0.85);
+  letter-spacing: 0.02em;
+}
+
+/* ── NERV chain label — special terminal font ── */
+.comparison-chain-nerv {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Courier New', monospace;
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #00ffff, #9070ff, #00ffaa);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-shift 3s ease infinite;
+  filter: drop-shadow(0 0 6px rgba(0, 255, 255, 0.35));
+}
+
+/* ── NERV row glow ── */
+.comparison-row-nerv td {
+  background: rgba(0, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(0, 255, 255, 0.12);
+}
+
+.comparison-row-nerv:hover td {
+  background: rgba(0, 255, 255, 0.07);
+}
+
+/* ── Badges (✓ / ✗) ── */
+.comparison-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  font-weight: 800;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.comparison-badge-yes {
+  background: rgba(0, 230, 118, 0.15);
+  border: 1.5px solid rgba(0, 230, 118, 0.5);
+  color: #00e676;
+  box-shadow: 0 0 10px rgba(0, 230, 118, 0.2);
+}
+
+.comparison-badge-no {
+  background: rgba(255, 61, 61, 0.12);
+  border: 1.5px solid rgba(255, 61, 61, 0.4);
+  color: #ff3d3d;
+  box-shadow: 0 0 8px rgba(255, 61, 61, 0.12);
+}
+
+/* ── Cell text: BOLD GREEN for Yes values ── */
+.comparison-cell-yes {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #00e676;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* ── Cell text: BOLD RED for No / Transparent / Low values ── */
+.comparison-cell-no {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #ff3d3d;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* ── Responsive adjustments ── */
+@media (max-width: 600px) {
+  .comparison-table-wrapper {
+    padding: 1.25rem 1rem;
+  }
+
+  .comparison-table {
+    border-spacing: 0.5cm 0;
+  }
+
+  .comparison-th,
+  .comparison-td {
+    padding: 0.65rem 0.35rem;
+    font-size: 0.78rem;
+  }
+
+  .comparison-badge {
+    width: 1.35rem;
+    height: 1.35rem;
+    font-size: 0.68rem;
+    margin-right: 0.3rem;
+  }
+
+  .comparison-cell-yes,
+  .comparison-cell-no {
+    font-size: 0.78rem;
+  }
+
+  .comparison-chain-label {
+    font-size: 0.88rem;
+  }
+
+  .comparison-chain-nerv {
+    font-size: 1rem;
+  }
+}
+
+/* ═══════════════════════════════════════════════ */
+/* V1→V2 Evolution Callout                         */
+/* ═══════════════════════════════════════════════ */
+
+.evolution-callout {
+  background: linear-gradient(145deg, rgba(15, 25, 50, 0.6), rgba(5, 10, 25, 0.8));
+  border: 1px solid rgba(100, 200, 255, 0.12);
+  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle top accent line — matches the hero gradient divider */
+.evolution-callout::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.3), rgba(168, 85, 247, 0.3), transparent);
+}
+
+/* Faint bottom echo */
+.evolution-callout::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 15%;
+  right: 15%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.15), transparent);
+}

@@ -1,0 +1,23 @@
+[Unit]
+Description=NERV Mixnet Relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nerv
+Group=nerv
+ExecStart=/usr/local/bin/nerv-relay \
+    --listen 0.0.0.0:7010 \
+    --log-level info
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,29 @@
+[package]
+name = "nerv-witness"
+description = "NERV inclusion witnesses and light anchors (WP §11): the ~600 B client-held witness, the light-client anchor, archival regeneration"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+
+[lib]
+name = "nerv_witness"
+path = "src/lib.rs"
+
+
+[dependencies]
+nerv-core = { path = "../nerv-core" }
+nerv-crypto = { path = "../nerv-crypto" }
+nerv-consensus = { path = "../nerv-consensus" }
+nerv-state = { path = "../nerv-state" }
+thiserror = { workspace = true }
+
+
+[dev-dependencies]
+nerv-custody = { path = "../nerv-custody" }
+
+
+[lints]
+workspace = true

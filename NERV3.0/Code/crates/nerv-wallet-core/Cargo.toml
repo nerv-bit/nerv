@@ -1,0 +1,28 @@
+[package]
+name = "nerv-wallet-core"
+description = "Platform-agnostic wallet state machine: the single source of truth all four UIs (terminal, desktop, web, mobile) bind to"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "nerv_wallet_core"
+path = "src/lib.rs"
+
+[dependencies]
+nerv-core = { path = "../nerv-core" }
+nerv-crypto = { path = "../nerv-crypto" }
+nerv-custody = { path = "../nerv-custody" }
+nerv-economy = { path = "../nerv-economy" }
+nerv-wallet = { path = "../nerv-wallet" }
+thiserror = { workspace = true }
+getrandom = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+
+[lints]
+workspace = true
+

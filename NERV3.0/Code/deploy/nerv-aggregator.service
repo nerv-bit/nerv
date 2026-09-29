@@ -1,0 +1,26 @@
+[Unit]
+Description=NERV Aggregator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nerv
+Group=nerv
+ExecStart=/usr/local/bin/nerv-aggregator \
+    --listen 0.0.0.0:7020 \
+    --bundle-size 512 \
+    --interval 1 \
+    --log-level info
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+LimitNOFILE=65536
+MemoryMax=16G
+
+[Install]
+WantedBy=multi-user.target
+

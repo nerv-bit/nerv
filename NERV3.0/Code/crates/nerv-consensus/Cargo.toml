@@ -1,0 +1,31 @@
+[package]
+name = "nerv-consensus"
+description = "NERV beacon, committees, and finality (WP §§4.6–4.7, 8.3, 11.2): epoch sortition, committee-context QCs, interval attestations, finality, topology hysteresis, slash evidence"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "nerv_consensus"
+path = "src/lib.rs"
+
+[dependencies]
+nerv-core = { path = "../nerv-core" }
+nerv-crypto = { path = "../nerv-crypto" }
+nerv-custody = { path = "../nerv-custody" }
+nerv-state = { path = "../nerv-state" }
+nerv-registry = { path = "../nerv-registry" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+nerv-proofs = { path = "../nerv-proofs" }
+nerv-codec = { path = "../nerv-codec" }
+nerv-seal = { path = "../nerv-seal" }
+blake3 = { workspace = true }
+proptest = { workspace = true }
+
+[lints]
+workspace = true
+

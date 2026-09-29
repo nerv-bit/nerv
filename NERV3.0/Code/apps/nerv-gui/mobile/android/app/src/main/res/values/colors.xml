@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- NERV design tokens (erratum 205).
+     The palette mirrors the desktop GUI's eframe theme so the WebView
+     canvas and the native chrome feel like one app. The accent gold
+     comes from the supplied NERV logo. -->
+<resources>
+    <!-- Backgrounds. -->
+    <color name="nerv_bg">#0D1117</color>
+    <color name="nerv_bg_elev">#161B22</color>
+    <color name="nerv_surface">#1C2128</color>
+    <color name="nerv_surface_variant">#21262D</color>
+
+    <!-- Text. -->
+    <color name="nerv_text">#E6EDF3</color>
+    <color name="nerv_text_muted">#8B949E</color>
+
+    <!-- Accent. -->
+    <color name="nerv_accent">#58A6FF</color>
+    <color name="nerv_accent_pressed">#388BFD</color>
+
+    <!-- Logo gold (from supplied NERV logo). -->
+    <color name="nerv_gold">#D4AF37</color>
+    <color name="nerv_gold_dim">#8C7220</color>
+
+    <!-- Semantic. -->
+    <color name="nerv_success">#3FB950</color>
+    <color name="nerv_warning">#D29922</color>
+    <color name="nerv_error">#F85149</color>
+
+    <!-- Borders. -->
+    <color name="nerv_border">#30363D</color>
+    <color name="nerv_border_subtle">#21262D</color>
+
+    <!-- Splash (Android 12+ splashscreen API). -->
+    <color name="nerv_splash_bg">#0D1117</color>
+    <color name="nerv_splash_icon_bg">#0D1117</color>
+</resources>

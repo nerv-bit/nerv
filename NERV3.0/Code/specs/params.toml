@@ -1,0 +1,392 @@
+# ============================================================================
+# NERV v3.0-corrigenda — Machine-Readable Protocol Parameters
+# ============================================================================
+# THE single source of truth (WP App B, as amended by §12.2 and Appendix D /
+# D.6). Parsed, validated, and hashed by tests/nerv-conformance; codegen'd
+# into nerv-core::params by chunk 2's build.rs.
+#
+# Discipline (P3, P5, P9, D.2, D.5):
+#   * Every value carries provenance: a WP section, or "genesis-config" for
+#     values the whitepaper deliberately leaves to genesis configuration.
+#   * Integers, booleans, strings only. Floats are forbidden (P5) and
+#     rejected by the loader — including anywhere inside this file.
+#   * Cross-field invariants are enforced by nerv-conformance::spec.
+#   * The BLAKE3 spec-hash of the validated tree is pinned by the frozen
+#     conformance manifest; any parameter change is a visible re-freeze.
+#   * Where the whitepaper is internally inconsistent, [errata] records the
+#     issue and the resolution; the resolved value is what ships here.
+#
+# Units: economy amounts are WHOLE NERV (TOML integers are i64; nano-NERV
+# bucket totals exceed i64 range — code scales by nano_per_nerv in u128).
+# Small fee values are nano-NERV. Durations use the 30-day month / 360-day
+# year convention (determinism; standard vesting practice).
+# ============================================================================
+
+[meta]
+spec_name = "NERV"
+spec_version = "3.0-corrigenda"          # WP v3.0 + Appendix D; folds into v3.1
+hash_algorithm = "blake3"                # validated: the loader hashes with blake3
+spec_hash_domain = "nerv.spechash.v1"
+source_documents = ["whitepaper-v3.0", "appendix-d-corrigenda"]
+freeze_milestone = "M1"                  # vectors freeze at M1 (WP §14.1)
+
+[protocol]
+supply_nerv = 10000000000                # fixed; zero at genesis, post-launch emission (§12.1, E-008)
+nano_per_nerv = 1000000000
+shard_count_genesis = 64                 # App B; 6-bit IDs, prefix trie (§8.2)
+shard_id_bits_genesis = 6                # validated: 2^6 == shard_count_genesis
+shard_count_max = 1024                   # §8 design target
+
+[timing]
+beacon_interval_secs = 1                 # App B
+shard_block_target_secs = 1              # "1–2 s within the interval" (App B)
+shard_block_max_secs = 2
+epoch_secs = 86400                       # 24 h; committee rotation & re-key
+governance_epoch_days = 7                # genesis-config (WP cadence unpinned; see errata note)
+
+[consensus]
+signature_scheme = "ml-dsa-65"           # FIPS 204 / Dilithium3 class (§9.2, App B)
+emergency_signature_scheme = "slh-dsa"   # FIPS 205 fallback (§9.4)
+sortition = "beacon-seeded-hash-ranking" # E-007 (DSR-5): no lattice VRF exists in production
+shard_committee_size = 21                # App B; Byzantine tolerance is DERIVED: 6 (E-009)
+shard_quorum = 15                        # 2f+1-style QC; ML-DSA-65 signatures
+beacon_committee_size = 31               # derived tolerance 10 (consistent with WP §8.3)
+beacon_quorum = 21
+registry_committee_size = 21             # derived tolerance 6 (E-009)
+registry_quorum = 15
+attestation_signers = 21                 # E-001: per-interval signer subset of beacon committee
+attestation_quorum = 15                  # E-001: "15-of-21" per §11.2; ~50 KB ML-DSA bulk
+staggered_thirds = true                  # beacon rotation (§8.3)
+
+[custody]
+nct_depth = 32                           # ≈4.3e9 notes/shard (§3.3)
+nct_node_hash = "poseidon2"              # E-002: in-circuit economy (§5.3; design doc nct.rs)
+nullifier_tree_depth = 256               # §3.4
+nullifier_tree_hash = "blake3"           # E-002: sparse Merkle over 256-bit keys
+transit_log_hash = "blake3"              # sorted-map settled-leg index (§3.4)
+anchor_window_headers = 64               # §4.3 rule 2 (freshness window)
+value_min_nano = 1                       # 0 < v (§3.2)
+value_max_nano = 1152921504606846976     # 2^60 nano-NERV (§3.2)
+note_nonce_bits = 256                    # ρ
+blinding_bits = 256                      # r
+memo_max_bytes = 80                      # §3.2
+note_kem = "ml-kem-768"                  # §3.2 hybrid note encryption
+note_aead = "chacha20poly1305"
+commitment_hash = "blake3"               # cm = BLAKE3("nerv.cm" ‖ v ‖ ρ ‖ d ‖ r)
+nullifier_hash = "blake3"                # nf derivation
+
+# D.3 expiry windows: an issuing leg must declare expiry ∈ [T_min, T_max] blocks
+# after the including block; a Pending transit entry is revert-deterministic at
+# expiry + L_grace. (Concrete values chosen to match the 24 h epoch / 6 s block.)
+d3_expiry_min_blocks_t_min = 100         # ≈10 min: short enough to bound griefing
+d3_expiry_max_blocks_t_max = 14400       # ≈24 h: one epoch
+d3_expiry_grace_blocks_l_grace = 200     # ≈20 min: post-expiry grace before revert
+# Per-tx structural caps (mirrors leg-input / leg-output caps below for sanity).
+max_inputs_per_leg = 64
+max_outputs_per_leg = 64
+max_legs_per_tx = 16
+max_burns_per_leg = 8
+ct_max_bytes = 2048                      # KEM ciphertext (1088 B) + AEAD overhead headroom
+
+[proofs]
+system = "air-stark"                     # §5.3
+field = "goldilocks"                     # 64-bit Goldilocks-class prover field
+field_modulus = "18446744069414584321"   # 2^64 − 2^32 + 1 (validated; quoted as string because the value exceeds i64::MAX and the toml crate's default deserializer uses i64)
+fri_security_bits = 100                  # D.2 FRI floor; QROM stated
+fiat_shamir_hash = "blake3"
+fiat_shamir_model = "qrom"               # the protocol's single named non-standard assumption
+lookup_blake3_window_bits = 16           # D.2 lookup mandate
+range_window_bits = 60                   # windowed 60-bit range checks
+digit_decomposition_bits = 8            # seal digit decomposition
+fs_binding_challenge = "nf-txid-shell"   # H(all nullifiers ‖ txid ‖ shell digest) (§5.1 st. 11)
+[proofs.fri]                             # chunk 12.5: the native engine's frozen FRI config (D.2)
+log_blowup = 4                           # rate 2^-4; conjectured FRI term b·q/2 = 112 bits
+num_queries = 56                         # 112 sits above the envelope's tightest field term (~111)
+log_final_poly_len = 1                   # final layer of 2 points; coefficient cap floors at 1
+commit_pow_bits = 0                      # grinding in reserve (D.2; the engine implements it)
+query_pow_bits = 0                       # Envelope check at these values (the gate runs per proof at the actual log_n): α = 128 − ceil_log₂(families) ≥ 108 (seal-chip scale 2^20); DEEP-ALI = 128 − ceil_log₂(max_heavy·N) ≥ 100 for max_heavy ≤ 5, N ≤ 2^25; batch ≥ 115 at W ≤ 2^16; FRI = 112. Floor 100 met with ≥ 7 bits margin across the whole D.2 envelope; traces beyond 2^25 re-gate (the gate errors loudly, never silently proves weak).
+
+poseidon2_t = 16                    # §5.3: state width over the prover field
+poseidon2_full_rounds = 8           # external rounds (M_E), split 4 + 4
+poseidon2_partial_rounds = 56       # internal rounds (M_I); frozen at ≥ plonky3-class margin
+poseidon2_sbox_degree = 7           # x^7; bijective on Goldilocks: gcd(7, p−1) = 1 (CI-verified)
+
+
+[overlay]
+w_rows = 64                              # δ ∈ (Z/2^64)^64 (§7.2)
+w_cols = 256                             # feature count (slots + rails)
+w_bits = 16                              # 1.15 signed fixed-point
+w_frac_bits = 15
+embedding_dims = 64                      # 512 B per shard
+embedding_bits_per_dim = 64
+slot_count = 224                         # account slots, indices 0–223 (§7.2)
+max_active_slots = 6                     # admissibility bound (§7.4)
+spark_bound = 13                         # any 13 of 224 slot columns independent (§7.4)
+volume_rail_index = 224
+fee_rail_index = 225
+count_rail_index = 226
+log_rail_index = 227
+type_time_rail_start = 228               # through 255
+forecaster_ar_window = 1024              # §10.2
+challenger_window_blocks = 2016          # ~2 weeks (§10.4)
+challenger_min_coverage_permille = 900   # ≥ 90% commit coverage (§10.4)
+
+[seal]
+ring_degree = 256                        # R_q = Z_q[x]/(x^256+1) (§6.3.1)
+q = 4293918721                           # 0xFFF00001 = 4095·2^20 + 1; Proth prime, 512 | q−1 (E-57)
+q_bits = 32
+module_rank = 8                          # A ∈ R_q^{8×8}; s ∈ R_q^8 (§6.3.1)
+plaintext_rings = 2                      # T ∈ R_q^{2×8}; m ∈ R_q^2
+digit_slots = 512                        # 2 × 256
+digits_used = 512                        # erratum 40: 8 positions × 8 bits = 64 exactly
+digit_bits = 8                           # erratum 40 (supersedes §6.3.8's 10-bit)
+digits_per_coordinate = 8                # position 7 is a full digit — no guard plane
+scale_log2 = 15                          # erratum 40: honest margin 9.49σ at B_min = 128
+noise_eta = 2                            # encryptor-side CBD (§6.3.8)
+noise_in_circuit_bound = 3               # statement-10 3σ bound (§6.3.7)
+noise_budget_bits = 16                   # informative; the exact budget is nerv-seal::noise (E-31)
+dkg_noise_eta = 1                        # erratum 41: ternary committee key material
+committee_n = 10                         # E-003
+threshold_t = 7                          # §6.3.3, App B
+chunk_min = 128                          # B_min privacy floor (§6.4)
+chunk_max = 128                          # erratum 40: the closable point at 32-bit q (larger splits)
+sigma_challenge_weight = 32              # FS-with-aborts engine (§6.3.3/§6.3.5; erratum 45)
+sigma_uniform_log2 = 22
+sigma_attempt_cap = 1024
+security_classical_bits = 128            # advisory tier (§6.3.8); M1 estimator freeze
+security_quantum_bits = 96
+pss = true                               # D.1 (erratum 50: fresh-DKG semantics)
+pss_handoff_intervals = 2                # D.1/D.6
+committee_padding = true                 # §6.3.6 (erratum 52)
+
+
+
+
+
+[mixnet]
+path_relays = 5                          # §6.2
+packet_bytes = 20000                     # 20 KB uniform
+jitter_distribution = "truncated-exponential"  # E-004
+jitter_mean_ms = 100
+jitter_cap_ms = 500
+fragmentation_max_packets = 16           # D.2/D.6: K ≤ 16
+fragmentation_classes = [1, 2, 4, 8, 16] # D.2/D.6: coarse packet-count profiles
+submission_fanout = 3                    # censorship insurance: N aggregators (§5.5)
+onion_kem = "ml-kem-768"                 # per-hop encapsulation headers
+onion_aead = "chacha20poly1305"          # per-hop MAC/wrap
+relay_selection = "wallet-random-diversified"  # E-007 note; wallet-local entropy
+
+[registry]
+bundle_min = 512                         # §5.5 tier 1
+bundle_max = 4096
+dedup_rule = "txid-first-wins"           # canonical dedup (design doc fold/dedup.rs)
+challenge_window_secs = 30               # §5.5 degraded-mode backstop
+folding_grace_secs = 5                   # genesis-config ("a short grace period", §5.5)
+degraded_mode = "committee-attestation"  # §5.5
+
+[sharding]
+engineered_ceiling_legs_per_sec = 10000  # §8.8 genesis ceiling per shard
+split_threshold_legs_per_sec = 4000      # §8.5; E-005 ("half" is a mislabel)
+split_window_days = 7                    # trailing average window
+merge_threshold_legs_per_sec = 400
+merge_window_days = 30
+adoption_notice_days = 7
+emergency_overload_multiple = 2          # sustained 2× ceiling → accelerated split (§8.5)
+block_leg_cap = 10000                    # §11.2; leg tree depth ≤ 14 validated
+
+[fees]
+split_producer_permille = 400            # §12.5 four-way split
+split_prover_permille = 300
+split_da_permille = 200
+split_relay_permille = 100
+prover_floor_nano = 100000               # ~10^-4 NERV/tx genesis floor (App B)
+mempool_ordering = "fee-then-txid"       # §4.3/D.4 canonical inclusion ordering
+
+[fees.dynamic_floor]                     # D.4: anomaly-responsive bounded admission floor
+enabled = true
+m_max = 8                                # D.6
+decay_num = 1                            # λ = 1/2 per interval (D.6); integer rational
+decay_den = 2
+base_floor_nano = 1000                   # genesis-config; governance-set minimum admission fee
+trigger_source = "finalized-revealed-aggregates"  # D.4: authority-native rail data only
+hysteresis = true
+
+[economy]
+supply_identity = "emitted-minus-burned-minus-abandoned"  # §12.3 (theorem M1)
+
+[[economy.buckets]]
+name = "early-contributors"
+kind = "linear-vesting"                  # §12.2: 6-month cliff, 42-month linear, 48-month term
+total_nerv = 2000000000
+share_permille = 200
+account = "signed"                       # public ML-DSA identity, public schedule (§12.3)
+cliff_days = 180
+linear_days = 1260
+term_days = 1440
+
+[[economy.buckets]]
+name = "founder"
+kind = "linear-vesting"                  # §12.2: 12-month cliff, 48-month linear, 60-month term
+total_nerv = 600000000
+share_permille = 60
+account = "signed"
+cliff_days = 360
+linear_days = 1440
+term_days = 1800
+
+[[economy.buckets]]
+name = "validator-subsidy"
+kind = "subsidy-decline"                 # §12.2: year-one constant (~545M), decline to zero at month 120
+total_nerv = 3000000000
+share_permille = 300
+account = "producer-payout"              # §4.6 transparent payout accounts
+term_days = 3600                         # 120 months
+year_one_days = 360
+
+[[economy.buckets]]
+name = "community"
+kind = "claim-window"                    # §12.2: shielded claim windows, 24 months
+total_nerv = 2200000000
+share_permille = 220
+account = "commitment-note"              # hiding commitment + one-time claim nullifier (§12.3)
+term_days = 720
+window_days = 720
+burn_unclaimed = true
+
+[[economy.buckets]]
+name = "ecosystem"
+kind = "milestone-window"                # §12.2: milestone-gated grants over 5 years
+total_nerv = 1000000000
+share_permille = 100
+account = "signed-grant"
+term_days = 1800
+window_days = 1800
+
+[[economy.buckets]]
+name = "foundation"
+kind = "quarterly-geometric"             # §12.2 "quarterly, declining over 5 years"; ratio is
+total_nerv = 900000000                   #   a genesis-config choice within that description
+share_permille = 90
+account = "signed"
+term_days = 1800
+quarters = 20
+quarter_days = 90
+ratio_num = 9
+ratio_den = 10
+
+[[economy.buckets]]
+name = "useful-work"
+kind = "linear-vesting"                  # §12.2: era-locked linear over 10 years
+total_nerv = 300000000
+share_permille = 30
+account = "challenger-market"            # payouts only through §10.4 out-of-sample gates
+cliff_days = 0
+linear_days = 3600
+term_days = 3600
+
+[da]
+erasure_scheme = "2d-reed-solomon"       # §8.7
+b7_withhold_permille = 200               # B7: ≥ 20% withholding detected
+b7_detection_permille = 999              # with probability ≥ 0.999
+b7_window_secs = 30
+
+[witness]
+leg_tree_depth_max = 14                  # §11.2: depth ≤ 14 at the 10,000-leg cap
+light_anchor_max_bytes = 102400          # B6: contemporary anchor under 100 KB
+
+[budgets.ci]                             # D.2: normative, CI-enforced constraint budgets
+whole_air_ceiling = 4194304              # 2^22 hard ceiling
+whole_air_target = 2097152               # 2^21 target
+custody_module_ceiling = 1048576         # 2^20 (independent maxima; whole-AIR binds their sum)
+delta_module_ceiling = 524288            # 2^19
+seal_chip_ceiling = 2097152              # 2^21
+blake3_chip_ceiling = 1048576            # 2^20
+wallet_proof_hard_bytes = 196608         # 192 KiB hard ceiling (D.2/D.6)
+wallet_proof_target_bytes = 131072       # 128 KiB target
+
+[budgets.reference]                      # §5.4/§8.8/§11 design targets — hashed identity, not CI gates
+tx_proof_min_bytes = 122880              # 120 KB
+tx_proof_max_bytes = 184320              # 180 KB
+amortized_proof_min_bytes = 250          # bundle tier
+amortized_proof_max_bytes = 500
+shell_bytes = 700
+encrypted_notes_bytes = 1300
+seal_genesis_bytes = 10000               # §6.3.8 genesis wire format (WP self-flags vs §3.6)
+seal_compressed_target_bytes = 5000      # §14 roadmap R2
+transient_per_tx_bytes = 13000           # §8.8
+permanent_per_tx_bytes = 200
+witness_standard_bytes = 600
+witness_cold_bytes = 850
+attestation_daily_bytes = 50000
+attestation_yearly_bytes = 18000000      # ~18 MB/yr epoch-attestation chain (§11.2)
+
+[conformance]
+determinism_arches = ["x86_64", "aarch64", "riscv64"]   # DSR-11 matrix
+vector_families = [
+    "adam_replay",        # WP §10.2 golden vectors — generator lands with chunk 17
+    "dkg_transcripts",    # WP §6.3.5 — chunk 9
+    "seal_decode",        # WP §6.3.1-6.3.2 — chunk 8
+    "witness_verify",     # WP §11 — chunk 18
+    "emission_audit",     # WP §12.3 ledger replay — chunk 17
+    "fs_transcripts",     # WP §5 Fiat–Shamir — chunks 10-12
+    "container_encoding", # this registry: container-format pinning (generated now)
+    "emission_schedule",  # this registry: genesis schedule reference (generated now)
+]
+fv_statements = ["conservation", "feature-admissibility"]  # D.5
+fv_gate = "M5"                           # D.5/D.6: machine-checked proofs are an M5 blocker
+delete_test = true                       # Axiom 3; harness lands with nerv-knowledge (chunk 17)
+
+[[errata]]
+id = "E-001"
+refs = "§11.2 vs §8.3"
+issue = "Interval attestation '15-of-21 ML-DSA-65' vs beacon committee of 31 with tolerance 10."
+resolution = "Attestation signer set is a per-interval 21-member subset of the beacon committee, quorum 15 (BFT-safe as a nested committee, f=6; ~50 KB = 15 ML-DSA-65 signatures). The f=10 promise applies to beacon consensus, not the attestation signature policy; flagged for M0 third-party spec review."
+
+[[errata]]
+id = "E-002"
+refs = "§5.3 vs §3.3/§3.4/App B"
+issue = "§5.3 states Poseidon2 for all tree-internal node hashing; §3.3/§3.4 and App B state BLAKE3 for the NCT and the nullifier tree."
+resolution = "NCT internal nodes: Poseidon2 (in-circuit economy, Merkle chip is Poseidon2). Nullifier tree: BLAKE3 sparse Merkle depth 256. Transit log: BLAKE3 sorted map. Per the implementation design document (nct.rs, nullifier.rs, transit.rs)."
+
+[[errata]]
+id = "E-003"
+refs = "§6.3.3/App B vs §8.3"
+issue = "Decryption committee 't=7 of n=10' vs §8.3's 21-member shard committee 'also serving' as the decryption committee with threshold t=7."
+resolution = "Decryption committee is a 10-member per-epoch subset of the 21-member shard committee; threshold t=7. Both texts agree on t=7."
+
+[[errata]]
+id = "E-004"
+refs = "§6.2/App B"
+issue = "Exponential jitter stated with μ=100 ms and σ=200 ms; an exponential distribution has σ=μ."
+resolution = "Truncated exponential with mean 100 ms and hard cap 500 ms (realized σ slightly below 100 ms). The σ=200 figure is carried over from v2.1 and is not realizable."
+
+[[errata]]
+id = "E-005"
+refs = "§8.5 vs §8.8"
+issue = "S_hi described as 'half of the shard's engineered sustained ceiling' with S_hi=4,000/s, but the ceiling is 10,000 legs/s."
+resolution = "S_hi = 4,000/s and engineered ceiling = 10,000/s are both pinned; 'half' is a mislabel (40%)."
+
+[[errata]]
+id = "E-006"
+refs = "App B vs §12.2"
+issue = "App B allocation row '20/30/25/12/10/3' predates the founder reallocation (§12.2: 20/6/30/22/10/9/3)."
+resolution = "§12.2 governs (its own consistency-amendment list says so): seven buckets summing to 100%."
+
+[[errata]]
+id = "E-007"
+refs = "§8.3 vs DSR-5"
+issue = "'VRF-sampled sortition' — no production lattice-VRF exists; protocol requirements are unpredictability-before-finality, public verifiability, determinism."
+resolution = "Beacon-seeded hash sortition: membership = canonical ranking of H(epoch randomness ‖ pubkey ‖ epoch) over the finalized attestation hash chain. Recorded as a specification erratum so document and code never diverge."
+
+[[errata]]
+id = "E-008"
+refs = "§3.8 vs §12.1/§12.2"
+issue = "§3.8 creates the entire supply as genesis notes; §12.1 commits zero spendable supply at block 0 (no pre-mine)."
+resolution = "§12 supersedes §3.8 (per §12.2's own amendment register): genesis commits empty trees and an empty emission ledger; the claim rail of §12.3 replaces the governance-gated mint window; burns unchanged."
+
+[[errata]]
+id = "E-009"
+refs = "§8.3/App B"
+issue = "Shard/registry committees stated as '21 members, tolerance 7, quorum 15' — n=21 with q=15 cannot sustain f=7 (liveness requires n−f ≥ q ⇒ 14 ≥ 15, false)."
+resolution = "Operative parameters are size 21 and quorum 15 (both texts agree on these). Derived Byzantine tolerance is min(2q−n−1, n−q) = 6, not 7. The beacon committee (31/21) is internally consistent with tolerance 10. Derived tolerances are computed and reported by the spec validator; never hand-copied."
+

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NERV</string>
+    <string name="app_description">Post-Quantum Privacy Wallet</string>
+    <string name="app_tagline">Post-Quantum Privacy Wallet</string>
+
+    <!-- Biometric prompt. -->
+    <string name="biometric_title">Unlock NERV</string>
+    <string name="biometric_subtitle">Authenticate to access your wallet</string>
+    <string name="biometric_description">Your NERV wallet is protected by your device\'s biometric authentication.</string>
+    <string name="biometric_negative">Cancel</string>
+
+    <!-- Snackbar / a11y. -->
+    <string name="cd_nerv_logo">NERV logo</string>
+    <string name="cd_lock_button">Lock wallet</string>
+    <string name="cd_nav_dashboard">Dashboard</string>
+    <string name="cd_nav_send">Send</string>
+    <string name="cd_nav_receive">Receive</string>
+    <string name="cd_nav_claim">Claim</string>
+    <string name="cd_nav_producer">Producer</string>
+    <string name="cd_nav_history">History</string>
+    <string name="cd_nav_settings">Settings</string>
+    <string name="cd_nav_help">Help</string>
+
+    <!-- Status. -->
+    <string name="status_synced">Synced</string>
+    <string name="status_syncing">Syncing</string>
+    <string name="status_offline">Offline</string>
+    <string name="status_locked">Locked</string>
+
+    <!-- Lock screen. -->
+    <string name="lock_unlock_button">Unlock</string>
+    <string name="lock_help">Tap to authenticate. NERV never sees your seed or biometric data.</string>
+    <string name="lock_failed">Authentication failed. Try again.</string>
+    <string name="lock_biometric_unavailable">Biometric authentication is not available on this device.</string>
+
+    <!-- Splash. -->
+    <string name="splash_loading">Loading NERV…</string>
+
+    <!-- Bottom nav titles. -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_send">Send</string>
+    <string name="nav_receive">Receive</string>
+    <string name="nav_claim">Claim</string>
+    <string name="nav_producer">Producer</string>
+    <string name="nav_history">History</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_help">Help</string>
+</resources>

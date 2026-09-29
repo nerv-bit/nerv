@@ -1,0 +1,29 @@
+[package]
+name = "nerv-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "NERV shared vocabulary: domain-separated hashing, canonical codec, core types, fixed-point arithmetic, generated parameters"
+
+[lints]
+workspace = true
+
+[lib]
+name = "nerv_core"
+path = "src/lib.rs"
+
+[dependencies]
+# The runtime consensus path of this crate is exactly two crates (DSR-2):
+# no serde, no toml, nothing else. The firewall job verifies this.
+blake3 = { workspace = true }
+thiserror = { workspace = true }
+
+[build-dependencies]
+# BUILD-TIME ONLY — params codegen. The `toml` crate pulls serde internally;
+# build-dependencies never enter the runtime dependency graph, so serde never
+# touches the consensus path. Semantics of the parsed tree are validated by
+# nerv-conformance in CI; build.rs enforces structure and P5 typing only.
+toml = { workspace = true }
+blake3 = { workspace = true }

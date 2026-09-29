@@ -1,0 +1,36 @@
+[package]
+name = "nerv-net"
+description = "NERV transport (WP §6.2): the PQ wire protocol, the TCP mesh host, gossip with the DSR-8 ordering rule, and submission fan-out"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+
+[lib]
+name = "nerv_net"
+path = "src/lib.rs"
+
+
+[dependencies]
+nerv-core = { path = "../nerv-core" }
+nerv-crypto = { path = "../nerv-crypto" }
+nerv-da = { path = "../nerv-da" }
+nerv-seal = { path = "../nerv-seal" }
+nerv-state = { path = "../nerv-state" }
+nerv-registry = { path = "../nerv-registry" }
+tokio = { workspace = true }
+getrandom = { workspace = true }
+thiserror = { workspace = true }
+
+
+[dev-dependencies]
+blake3 = { workspace = true }
+nerv-custody = { path = "../nerv-custody" }
+nerv-codec = { path = "../nerv-codec" }
+nerv-proofs = { path = "../nerv-proofs" }
+
+
+[lints]
+workspace = true

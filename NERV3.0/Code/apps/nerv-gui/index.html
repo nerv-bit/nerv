@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0D1117">
+    <meta name="description" content="NERV — Post-Quantum Privacy Wallet">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230D1117'/><text x='8' y='22' fill='%2358A6FF' font-size='18' font-family='monospace' font-weight='bold'>N</text></svg>">
+    <title>NERV Wallet</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: #0D1117;
+            color: #E6EDF3;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            overflow: hidden;
+        }
+        #canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #58A6FF;
+            font-size: 24px;
+            letter-spacing: 4px;
+        }
+        #error {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #F85149;
+            font-size: 14px;
+            display: none;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="loading">NERV</div>
+    <div id="error"></div>
+    <script type="module">
+        import init from './pkg/nerv_gui.js';
+
+        async function start() {
+            try {
+                await init().then((wasm) => {
+                    const canvas = document.getElementById('canvas');
+                    wasm.run(canvas).then(() => {
+                        document.getElementById('loading').remove();
+                    }).catch((e) => {
+                        show_error('Failed to start: ' + e);
+                    });
+                });
+            } catch (e) {
+                show_error('Failed to load WASM: ' + e);
+            }
+        }
+
+        function show_error(msg) {
+            const loading = document.getElementById('loading');
+            if (loading) loading.remove();
+            const err = document.getElementById('error');
+            err.textContent = msg;
+            err.style.display = 'block';
+        }
+
+        // Register the service worker for PWA.
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        }
+
+        start();
+    </script>
+</body>
+</html>
+
+File: apps/nerv-gui/manifest.json 
+
+{
+    "name": "NERV Wallet",
+    "short_name": "NERV",
+    "description": "Post-quantum privacy wallet",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0D1117",
+    "theme_color": "#0D1117",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='96' fill='%230D1117'/><text x='128' y='352' fill='%2358A6FF' font-size='288' font-family='monospace' font-weight='bold'>N</text></svg>",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ]
+}

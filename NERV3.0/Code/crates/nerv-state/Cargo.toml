@@ -1,0 +1,35 @@
+[package]
+name = "nerv-state"
+description = "NERV deterministic execution and the composite state commitment C_t (WP §4)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "nerv_state"
+path = "src/lib.rs"
+
+[features]
+# DSR-10's single seam is the NodeStore trait. The RocksDB backend is
+# opt-in so toolchain-less and riscv64 determinism-matrix builds stay
+# pure Rust (erratum 117); both backends are real implementations.
+rocksdb = ["dep:rocksdb"]
+
+[dependencies]
+nerv-core = { path = "../nerv-core" }
+nerv-crypto = { path = "../nerv-crypto" }
+nerv-custody = { path = "../nerv-custody" }
+nerv-economy = { path = "../nerv-economy" }
+nerv-seal = { path = "../nerv-seal" }
+rocksdb = { workspace = true, optional = true }
+thiserror = { workspace = true }
+
+
+[dev-dependencies]
+blake3 = { workspace = true }
+proptest = { workspace = true }
+
+[lints]
+workspace = true

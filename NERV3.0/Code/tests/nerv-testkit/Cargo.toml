@@ -1,0 +1,32 @@
+[package]
+name = "nerv-testkit"
+description = "NERV in-process multinode harness: deterministic clock, loopback transports, adversarial scheduler executing the TLA+ schedule corpus (T5–T7)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+
+[lib]
+name = "nerv_testkit"
+path = "src/lib.rs"
+
+
+[dependencies]
+nerv-core = { path = "../../crates/nerv-core" }
+nerv-crypto = { path = "../../crates/nerv-crypto" }
+nerv-custody = { path = "../../crates/nerv-custody" }
+nerv-codec = { path = "../../crates/nerv-codec" }
+nerv-seal = { path = "../../crates/nerv-seal" }
+nerv-proofs = { path = "../../crates/nerv-proofs" }
+nerv-state = { path = "../../crates/nerv-state" }
+nerv-registry = { path = "../../crates/nerv-registry" }
+nerv-consensus = { path = "../../crates/nerv-consensus" }
+nerv-da = { path = "../../crates/nerv-da" }
+nerv-net = { path = "../../crates/nerv-net" }
+thiserror = { workspace = true }
+
+
+[lints]
+workspace = true

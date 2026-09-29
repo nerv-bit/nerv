@@ -1,0 +1,44 @@
+{
+  "name": "NERV Wallet",
+  "short_name": "NERV",
+  "description": "Post-quantum privacy wallet — web counterpart to the Android + iOS shells.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0D1117",
+  "theme_color": "#0D1117",
+  "lang": "en",
+  "categories": ["finance", "utilities"],
+  "icons": [
+    {
+      "src": "assets/nerv_logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/nerv_logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Send",
+      "short_name": "Send",
+      "description": "Compose a NERV transaction",
+      "url": "./?screen=Send",
+      "icons": [{ "src": "assets/nerv_logo.png", "sizes": "512x512" }]
+    },
+    {
+      "name": "Receive",
+      "short_name": "Receive",
+      "description": "Show your receive address",
+      "url": "./?screen=Receive",
+      "icons": [{ "src": "assets/nerv_logo.png", "sizes": "512x512" }]
+    }
+  ]
+}

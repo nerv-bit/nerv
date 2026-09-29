@@ -1,0 +1,33 @@
+[package]
+name = "nerv-cli"
+description = "NERV CLI: wallet ops, witness regen, epoch-cert verify, supply audit, vector generation"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "nerv-cli"
+path = "src/main.rs"
+
+[dependencies]
+nerv-core = { path = "../../crates/nerv-core" }
+nerv-crypto = { path = "../../crates/nerv-crypto" }
+nerv-custody = { path = "../../crates/nerv-custody" }
+nerv-codec = { path = "../../crates/nerv-codec" }
+nerv-seal = { path = "../../crates/nerv-seal" }
+nerv-economy = { path = "../../crates/nerv-economy" }
+nerv-wallet = { path = "../../crates/nerv-wallet" }
+nerv-state = { path = "../../crates/nerv-state" }
+nerv-consensus = { path = "../../crates/nerv-consensus" }
+nerv-witness = { path = "../../crates/nerv-witness" }
+nerv-proofs = { path = "../../crates/nerv-proofs" }
+clap = { workspace = true }
+anyhow = { workspace = true }
+blake3 = { workspace = true }
+getrandom = { workspace = true }
+
+[lints]
+workspace = true
+
