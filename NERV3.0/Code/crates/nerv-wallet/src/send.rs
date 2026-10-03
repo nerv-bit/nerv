@@ -1,6 +1,7 @@
 //! Mixnet submission (WP §2.3, §5.5, D.2; erratum 188): the proved
 //! transaction through the 5-relay path to 3 aggregators.
 
+use nerv_core::codec::Encode;
 use nerv_core::types::TxId;
 use nerv_net::host::{Host, PeerInfo};
 use nerv_net::relay_registry::{RelayRegistry, select_path};
@@ -204,7 +205,7 @@ pub enum PipelineError {
 /// that into `WalletAction::SendFailed(reason)`.
 pub fn run_send_pipeline<'a, F: FnMut(PipelineStage)>(
     pipeline: &SendPipeline,
-    mut entropy: crate::construct::WalletEntropy<'a>,
+    entropy: &mut crate::construct::WalletEntropy<'a>,
     mut on_stage: F,
 ) -> Result<SendReport, PipelineError> {
     on_stage(PipelineStage::Constructing);
@@ -217,7 +218,7 @@ pub fn run_send_pipeline<'a, F: FnMut(PipelineStage)>(
         &pipeline.codec,
         &pipeline.epoch_pk,
         pipeline.current_height,
-        &mut entropy,
+        entropy,
     )
     .map_err(|e| PipelineError::Construct(format!("{e:?}")))?;
 
@@ -240,7 +241,7 @@ pub fn run_send_pipeline<'a, F: FnMut(PipelineStage)>(
         &proved,
         &pipeline.send_config,
         &pipeline.wallet_seed,
-        &mut entropy,
+        entropy,
     )?;
 
     on_stage(PipelineStage::Submitted);

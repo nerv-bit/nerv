@@ -296,7 +296,7 @@ pub fn spawn_relay(
 // Cover traffic (§6.2, §10.5; erratum 155)
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum CoverError {
     #[error(transparent)]

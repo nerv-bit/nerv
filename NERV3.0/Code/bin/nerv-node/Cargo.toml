@@ -30,6 +30,7 @@ nerv-knowledge = { path = "../../crates/nerv-knowledge" }
 nerv-wallet = { path = "../../crates/nerv-wallet" }
 clap = { workspace = true }
 anyhow = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

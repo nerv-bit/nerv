@@ -105,7 +105,11 @@ impl Curve {
                 let den = rdp(qn)?.checked_sub(rnp(qn)?)
                     .ok_or(ScheduleError::Arithmetic { op: "geometric denominator" })?;
                 let num = total_nano.checked_mul(rdp(qn - q as u32)?)
-                    .and_then(|v| v.checked_mul(rdp(q as u32)?.checked_sub(rnp(q as u32)?)?))
+                    .and_then(|v| v.checked_mul({
+                        let rdp_q = rdp(q as u32).ok()?;
+                        let rnp_q = rnp(q as u32).ok()?;
+                        rdp_q.checked_sub(rnp_q)?
+                    }))
                     .ok_or(ScheduleError::Arithmetic { op: "geometric numerator" })?;
                 let num = i128::try_from(num).map_err(|_| I128)?;
                 let qv = round_half_even(num, den)

@@ -54,7 +54,7 @@ pub fn propose_block(
     view: &dyn BeaconView,
     chain: &dyn ChainSource,
 ) -> Result<Proposal, PipelineError> {
-    let (computed, new_state) = propose(state, &body, &inputs, view, chain)?;
+    let (computed, new_state) = propose(state.clone(), &body, &inputs, view, chain)?;
     // Re-run apply_block to obtain the Applied record (the propose path
     // already verified; this extracts the public outcome).
     let dummy_qc = QuorumCertificate {

@@ -7,6 +7,10 @@
 //! Generated here: container_encoding, emission_schedule. The six whitepaper
 //! families are schema-pinned as deferred and fill with their owning chunks,
 //! freezing at M1 (WP §14.1).
+//!
+//! Cross-crate integration tests for the chunks 13–19 surface
+//! (erratum 199). These are the tests the CI conformance job runs
+//! on every PR.
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
@@ -22,11 +26,6 @@ pub mod vectors;
 
 pub const SPEC_FILE: &str = "specs/params.toml";
 pub const VECTORS_DIR: &str = "specs/vectors";
-
-//! Cross-crate integration tests for the chunks 13–19 surface
-//! (erratum 199). These are the tests the CI conformance job runs
-//! on every PR.
-
 
 pub mod integration;
 

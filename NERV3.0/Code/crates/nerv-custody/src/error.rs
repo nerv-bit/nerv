@@ -68,6 +68,8 @@ pub enum CustodyError {
     CtTooLarge { len: usize, max: usize },
     #[error("{found} burn commitments exceed the leg maximum {max}")]
     TooManyBurns { found: usize, max: usize },
+    #[error("crypto: {0}")]
+    Crypto(#[from] nerv_crypto::CryptoError),
 }
 
 /// Sealing / trial-decryption failures (WP §3.2 note encryption).

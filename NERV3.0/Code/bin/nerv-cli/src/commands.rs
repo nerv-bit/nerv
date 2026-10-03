@@ -2,6 +2,10 @@
 
 use anyhow::{bail, Context, Result};
 
+use nerv_consensus::attestation::EpochAttestation;
+use nerv_core::codec::{Decode, Encode};
+use nerv_state::block::ShardBlock;
+
 use crate::{CertAction, KeysAction, SupplyAction, TxAction, VectorsAction, WitnessAction};
 
 fn parse_seed(hex: &str) -> Result<[u8; 32]> {

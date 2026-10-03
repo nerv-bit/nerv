@@ -255,7 +255,7 @@ impl<'a> Reader<'a> {
     }
     fn read_value(&mut self, depth: u32) -> Result<Canonical, EncError> {
         if depth > MAX_DEPTH {
-            return Err(EncError::DepthLimit);
+            return Err(EncError::DepthLimit(depth));
         }
         let tag = self.take(1)?[0];
         match tag {

@@ -5,11 +5,12 @@ use std::collections::BTreeSet;
 
 use nerv_codec::codec_w::CodecW;
 use nerv_codec::features::{build_leg_features, LegKind, LegMovement};
+use nerv_core::codec::Encode;
 use nerv_core::hash::Hash256;
-use nerv_core::types::{FeeSats, Height, ShardId, ShardSet, TxId};
+use nerv_core::types::{FeeSats, Height, ShardId, ShardSet};
 use nerv_custody::nct::NctDigest;
 use nerv_custody::note::{seal_note, NotePlaintext};
-use nerv_custody::nullifier::derive_nullifier;
+use nerv_custody::NoteError;
 use nerv_custody::tx::{InputSet, LegShell, Output, TransactionShell};
 use nerv_custody::{Address, NoteOpening, WalletKeys};
 use nerv_proofs::custody_air::{CustodyWitness, InputWitness, OutputWitness, RevertWitness};
@@ -36,7 +37,7 @@ pub struct PaymentSpec {
 #[derive(Clone, Debug)]
 pub struct ConstructedTx {
     pub shell: TransactionShell,
-    pub txid: TxId,
+    pub txid: nerv_core::types::TxId,
     pub custody_witness: CustodyWitness,
     pub noise_seeds: Vec<NoiseSeed>,
 }
@@ -55,16 +56,28 @@ pub enum ConstructError {
     #[error("delta is zero for leg {leg}")]
     ZeroDelta { leg: usize },
     #[error("inadmissible features for leg {leg}: {source:?}")]
-    Inadmissible { leg: usize, source: nerv_codec::features::AdmissibilityViolation },
+    Inadmissible {
+        leg: usize,
+        source: nerv_codec::features::AdmissibilityViolation,
+    },
+    #[error("feature construction failed for leg {leg}: {source:?}")]
+    FeatureBuild {
+        leg: usize,
+        source: nerv_codec::features::FeatureError,
+    },
 
     #[error("custody: {0}")]
     Custody(#[from] nerv_custody::CustodyError),
+    #[error("note: {0}")]
+    Note(#[from] NoteError),
     #[error("seal: {0}")]
     Seal(#[from] nerv_seal::SealError),
     #[error("proofs: {0}")]
     Proofs(#[from] nerv_proofs::WitnessGenError),
     #[error("prover: {0}")]
     Prover(#[from] nerv_proofs::TxError),
+    #[error("type: {0}")]
+    Type(#[from] nerv_core::TypeError),
 }
 
 /// OS entropy for production use.
@@ -142,15 +155,6 @@ fn make_revert(
     Ok((cm, opening))
 }
 
-fn map_admissibility(
-    e: nerv_codec::features::AdmissibilityViolation,
-) -> nerv_codec::features::FeatureError {
-    nerv_codec::features::FeatureError::ValueOutOfRange { value: 0 }
-}
-
-
-
-
 /// Compute the leg's delta and seal it, returning the ct bytes.
 fn seal_leg_delta(
     codec: &CodecW,
@@ -159,10 +163,10 @@ fn seal_leg_delta(
     entropy: &mut WalletEntropy<'_>,
 ) -> Result<(Vec<u8>, NoiseSeed), ConstructError> {
     let features = build_leg_features(movement)
-        .map_err(|e| ConstructError::Inadmissible { leg: 0, source: e })?;
-       features
+        .map_err(|e| ConstructError::FeatureBuild { leg: 0, source: e })?;
+    features
         .check_admissible()
-        .map_err(|e| ConstructError::Inadmissible { leg: 0, source: map_admissibility(e) })?;
+        .map_err(|e| ConstructError::Inadmissible { leg: 0, source: e })?;
 
     let delta = codec.apply(&features);
     if delta.is_zero() {
@@ -206,8 +210,7 @@ pub fn construct_payment(
     }
     let input_shard = *input_shards.iter().next().ok_or(ConstructError::NoNotes)?;
     let recipient_shard = active
-        .home_kappa(&nerv_core::types::kappa(spec.recipient.delivery().as_bytes()))
-        .map_err(|e| ConstructError::Custody(e))?;
+        .home_kappa(&nerv_core::types::kappa(spec.recipient.delivery().as_bytes()))?;
 
     // The change address: the wallet's first address on the input shard.
     let change_addr = addresses
@@ -250,30 +253,36 @@ pub fn construct_payment(
     // Build the shell.
     let shell = TransactionShell { legs };
 
-    // Canonicalize and compute the txid.
+    // Canonicalize and compute the txid (the custody layer's canonical
+    // `txid()` is the single source of truth — its domain tag is the public
+    // `nerv_core::constants::TXID` constant).
     let canon = shell.canonicalize()?;
-    let txid = TxId::from_hash(Hash256::concat(
-        &nerv_core::constants::Domain::new("nerv.txid"),
-        &{
-            let mut buf = Vec::new();
-            for l in &canon.legs {
-                l.encode_into(&mut buf);
-            }
-            buf
-        },
-    ));
+    let txid = canon.txid()?;
 
     // Build the custody witness.
     let mut inputs = Vec::new();
     for (_, note) in &selected {
         let pos = wallet
-            .position(note.opening.commitment().ok()?.as_bytes())
+            .position(note.opening.commitment()?.as_bytes())
             .ok_or(ConstructError::NoNotes)?;
+        // NotePosition stores the sibling path flattened (Vec<Goldilocks>);
+        // chunk it back into the circuit-facing Vec<[Goldilocks; 4]>.
+        let siblings: Vec<[nerv_core::field::Goldilocks; 4]> = pos
+            .siblings
+            .chunks(4)
+            .map(|c| {
+                let mut out = [nerv_core::field::Goldilocks::ZERO; 4];
+                for (i, e) in c.iter().enumerate() {
+                    out[i] = *e;
+                }
+                out
+            })
+            .collect();
         inputs.push(InputWitness {
             opening: note.opening.clone(),
             nullifier_key: note.nullifier_key,
             leaf_index: pos.leaf_index,
-            siblings: pos.siblings.clone(),
+            siblings,
             anchor: pos.anchor,
         });
     }
@@ -318,6 +327,9 @@ fn build_single_shard(
     // The recipient output.
     let (recipient_output, recipient_opening) =
         make_output(spec.amount_nano, &spec.recipient, entropy)?;
+    // Snapshot the recipient delivery for the leg's movement vector — we
+    // must keep `recipient_opening` owned for `output_openings` below.
+    let recipient_delivery = recipient_opening.delivery;
 
     // The change output (if any).
     let mut outputs = vec![recipient_output];
@@ -339,7 +351,7 @@ fn build_single_shard(
             .collect(),
         outputs: outputs
             .iter()
-            .map(|o| (recipient_opening.delivery.to_vec(), o.value))
+            .map(|o| (recipient_delivery.to_vec(), o.value))
             .collect(),
         fee_nano: spec.fee_nano,
         kind: LegKind::SingleShard,

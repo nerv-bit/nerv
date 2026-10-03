@@ -877,6 +877,73 @@ impl Vec2 {
     }
 }
 
+// -- nerv-codec Encode/Decode impls for the wire-domain ring types -----------
+//
+// We piggy-back on the existing `to_bytes`/`from_bytes` canonical layout
+// (u32 LE per coefficient — already the public API). Adding trait impls
+// here lets the higher-level `TransactionWitness` round-trip through
+// `nerv_core::codec` without duplicating the byte-level definition.
+
+impl nerv_core::codec::Encode for Poly {
+    fn encode_into(&self, out: &mut Vec<u8>) {
+        let bytes = self.to_bytes();
+        out.extend_from_slice(&bytes);
+    }
+    fn encoded_len(&self) -> usize {
+        Poly::WIRE_SIZE
+    }
+}
+
+impl nerv_core::codec::Decode for Poly {
+    fn decode_from(r: &mut nerv_core::codec::Reader<'_>) -> Result<Self, nerv_core::error::CodecError> {
+        let mut bytes = [0u8; Poly::WIRE_SIZE];
+        bytes.copy_from_slice(r.take(Poly::WIRE_SIZE)?);
+        Poly::from_bytes(&bytes).map_err(|_| nerv_core::error::CodecError::InvariantViolated("poly length"))
+    }
+}
+
+impl nerv_core::codec::Encode for Vec8 {
+    fn encode_into(&self, out: &mut Vec<u8>) {
+        for p in &self.0 {
+            p.encode_into(out);
+        }
+    }
+    fn encoded_len(&self) -> usize {
+        Vec8::WIRE_SIZE
+    }
+}
+
+impl nerv_core::codec::Decode for Vec8 {
+    fn decode_from(r: &mut nerv_core::codec::Reader<'_>) -> Result<Self, nerv_core::error::CodecError> {
+        let mut polys = [Poly::default(); 8];
+        for slot in polys.iter_mut() {
+            *slot = Poly::decode_from(r)?;
+        }
+        Ok(Vec8(polys))
+    }
+}
+
+impl nerv_core::codec::Encode for Vec2 {
+    fn encode_into(&self, out: &mut Vec<u8>) {
+        for p in &self.0 {
+            p.encode_into(out);
+        }
+    }
+    fn encoded_len(&self) -> usize {
+        Vec2::WIRE_SIZE
+    }
+}
+
+impl nerv_core::codec::Decode for Vec2 {
+    fn decode_from(r: &mut nerv_core::codec::Reader<'_>) -> Result<Self, nerv_core::error::CodecError> {
+        let mut polys = [Poly::default(); 2];
+        for slot in polys.iter_mut() {
+            *slot = Poly::decode_from(r)?;
+        }
+        Ok(Vec2(polys))
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct Vec2Ntt([PolyNtt; 2]);
 

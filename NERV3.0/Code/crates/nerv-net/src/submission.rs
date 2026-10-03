@@ -11,7 +11,8 @@
 use nerv_core::codec::{Decode, Encode, Reader};
 use nerv_core::error::CodecError;
 use nerv_core::types::TxId;
-use nerv_registry::mempool::{Mempool, MempoolError, PoolEntry, VerifyContext};
+use nerv_registry::mempool::{Mempool, PoolEntry, VerifyContext};
+use nerv_registry::MempoolError;
 
 use crate::host::{Host, PeerId, PeerInfo};
 

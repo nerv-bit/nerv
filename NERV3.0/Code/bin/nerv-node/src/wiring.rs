@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 
 use nerv_codec::codec_w::{CodecW, Delta, WeightVersion};
 use nerv_codec::weight_gen::{self, BeaconRandomness};
+use nerv_core::codec::{Decode, Encode};
 use nerv_core::hash::Hash256;
 use nerv_core::types::{Epoch, Height, Interval, ShardId, INTERVALS_PER_EPOCH};
 use nerv_knowledge::{BlockEvent, KnowledgeState};
@@ -12,9 +13,9 @@ use nerv_net::gossip::{GossipEngine, GossipMessage, Inbound};
 use nerv_net::host::{Host, HostConfig, HostEvent, HostFrame};
 use nerv_proofs::FriShape;
 use nerv_registry::mempool::VerifyContext;
-use nerv_seal::dkg::{establish_epoch, MemberSecret, COMMITTEE_SIZE, THRESHOLD};
+use nerv_seal::dkg::{MemberSecret, COMMITTEE_SIZE, THRESHOLD};
 use nerv_seal::encrypt::PublicKey;
-use nerv_seal::epoch::{EpochIndex, EpochKeyHandle};
+use nerv_seal::epoch::{establish_epoch, EpochIndex, EpochKeyHandle};
 use nerv_seal::sampling::ASeed;
 use nerv_state::block::ShardBlock;
 use nerv_state::{apply_block, BeaconView, ShardState};
@@ -72,6 +73,12 @@ impl NodeBeaconView {
     }
     pub fn record_transit_root(&mut self, shard: ShardId, height: u64, root: Hash256) {
         self.transit_roots.insert((shard, height), root);
+    }
+
+    /// The number of T_τ roots this view has recorded. Used by the
+    /// attestation trigger and the metrics surface.
+    pub fn tau_roots_len(&self) -> usize {
+        self.tau_roots.len()
     }
 
     /// The highest finalized beacon interval recorded by the node. The
@@ -181,6 +188,17 @@ pub struct Node {
     producer: Option<ProducerRole>,
 }
 
+
+/// Top-level entry point invoked from `main`. Constructs the `Node` for
+/// the given role and drives its event loop until shutdown. All
+/// installation / configuration / runtime wiring lives here so
+/// `main.rs` stays a thin parser.
+pub async fn run_node(config: NodeConfig, role: Role) -> anyhow::Result<()> {
+    let mut node = Node::new(config, role).await?;
+    node.run().await
+}
+
+
 impl Node {
     pub async fn new(config: NodeConfig, role: Role) -> Result<Node, anyhow::Error> {
         let mut sign_seed = [0u8; 32];
@@ -201,11 +219,9 @@ impl Node {
             if let Ok(sock) = peer_str.parse() {
                 let mut b = [0u8; 32];
                 let _ = getrandom::getrandom(&mut b);
-                let (ek, _) = nerv_crypto::mlkem::keypair_from_seed({
-                    let mut s = [0u8; 64];
-                    s[..32].copy_from_slice(&b);
-                    s
-                })?;
+                let mut s = [0u8; 64];
+                s[..32].copy_from_slice(&b);
+                let (ek, _) = nerv_crypto::mlkem::keypair_from_seed(&s)?;
                 let _ = host.dial(nerv_net::host::PeerInfo {
                     vk: *nerv_crypto::mldsa::SigningKey::from_seed(&b)?
                         .verifying_key(),
@@ -471,7 +487,7 @@ impl Node {
         let proof_seed_root = seed_for_epoch(new_epoch_index.0, 0x20);
         let members: Vec<(MemberSecret, [u8; 32])> = (1..=COMMITTEE_SIZE as u8)
             .map(|i| {
-                let member_seed = seed_for_epoch(new_epoch_index.0, 0xA0 + u64::from(i));
+                let member_seed = seed_for_epoch(new_epoch_index.0, 0xA0u8.wrapping_add(i));
                 let proof_seed = derive_proof_seed(proof_seed_root, i);
                 (
                     MemberSecret::generate(i, &member_seed, COMMITTEE_SIZE, THRESHOLD)
@@ -696,6 +712,15 @@ impl Node {
             GossipMessage::BlockData { shard, height, data } => {
                 self.handle_block_data(*shard, height.as_u64(), data);
             }
+            // DA topics (gap 4) — the engine advertises / serves cells here.
+            // The node does not perform DA sampling itself (that's the light
+            // client's job, erratum 207), so we just log the arrival.
+            GossipMessage::DABlob { shard, height, .. } => {
+                tracing::trace!(?shard, height = height.as_u64(), "DA blob advertisement");
+            }
+            GossipMessage::DACell { shard, height, .. } => {
+                tracing::trace!(?shard, height = height.as_u64(), "DA cell response");
+            }
         }
     }
 
@@ -841,7 +866,7 @@ impl Node {
         applied: &nerv_state::executor::Applied,
     ) {
         let height = block.header.height.as_u64();
-        let fee_sum = applied.fee_total.as_u64();
+        let fee_sum = block.header.fee_total.as_u64();
         let bucket: u16 = (height % 16) as u16;
         let event = match block.header.prev_reveal {
             Some(bytes) => {
@@ -881,13 +906,15 @@ impl Node {
         }
 
         // Advisory fault check: the block's header-committed D_t must
-        // match the knowledge layer's freshly-derived root.
+        // match the knowledge layer's freshly-derived root. The header
+        // stores D_t as raw 32 bytes (DSR-4); the knowledge layer surfaces
+        // it as a Hash256 — compare by bytes.
         let derived = self.knowledge.derived_root();
-        if derived != block.header.derived {
+        if derived.as_bytes() != &block.header.derived {
             self.knowledge_faults += 1;
             tracing::error!(
                 height,
-                header_derived = %block.header.derived,
+                header_derived = ?block.header.derived,
                 knowledge_derived = %derived,
                 "advisory D_t mismatch: header.derived disagrees with knowledge.derived_root"
             );
@@ -1400,7 +1427,7 @@ mod gossip_engine_tests {
         // the learned map is first-wins.
       
         let mut forked = header_msg(5);
-        let GossipMessage::Header { header, .. } = &mut forked {
+        if let GossipMessage::Header { header, .. } = &mut forked {
             header.fee_total = nerv_core::types::FeeSats::from_u64(999);
         }
         let PublishOutcome::Broadcast { .. } = e.publish(forked.clone()) else { panic!() };

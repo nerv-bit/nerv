@@ -180,6 +180,31 @@ impl Default for FeatureVector {
     }
 }
 
+impl nerv_core::codec::Encode for FeatureVector {
+    fn encode_into(&self, out: &mut Vec<u8>) {
+        for v in self.values() {
+            // i64 → two's-complement little-endian 8 bytes. Matches the
+            // wire contract for signed-integer fields in
+            // `nerv_core::codec` (LE fixed-width).
+            out.extend_from_slice(&v.to_le_bytes());
+        }
+    }
+    fn encoded_len(&self) -> usize {
+        FEATURE_COUNT * 8
+    }
+}
+
+impl nerv_core::codec::Decode for FeatureVector {
+    fn decode_from(r: &mut nerv_core::codec::Reader<'_>) -> Result<Self, nerv_core::error::CodecError> {
+        let mut arr = [0i64; FEATURE_COUNT];
+        for slot in arr.iter_mut() {
+            let bytes: [u8; 8] = r.take_array::<8>()?;
+            *slot = i64::from_le_bytes(bytes);
+        }
+        Ok(FeatureVector { values: arr })
+    }
+}
+
 impl fmt::Debug for FeatureVector {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Sparse form: a full 256-coordinate dump is noise in diagnostics.

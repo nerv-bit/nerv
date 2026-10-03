@@ -7,6 +7,7 @@
 use std::collections::BTreeMap;
 
 
+use nerv_core::codec::Encode;
 use nerv_core::hash::Hash256;
 use nerv_core::types::{Epoch, Interval};
 use nerv_consensus::attestation::{
@@ -413,7 +414,7 @@ mod tests {
 
 
         // Wrong committee.
-        let (_, other_vks) = keys(0xWRONG, 21);
+        let (_, other_vks) = keys(0xBAD, 21);
         let wrong_cf = committee_fn(&other_vks, quorum);
         let e1 = epoch_att(1, &[zero], zero, &sks, &vks, quorum);
         assert!(anchor.extend_epoch(e1, &wrong_cf).is_err());

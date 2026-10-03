@@ -112,17 +112,17 @@ fn hash32(b: &[u8]) -> Result<[u8; 32], RegError> {
 fn manifest_from_bytes(bytes: &[u8]) -> Result<Manifest, RegError> {
     let c = decode(bytes)?;
     let m = c.as_map()?;
-    let format_version = m.get("format_version")?.as_u64()?;
-    let spec_hash = hash32(m.get("spec_hash")?.as_bytes()?)?;
-    let fams = m.get("families")?.as_seq()?;
+    let format_version = m.get("format_version").ok_or(RegError::MissingManifestKey { key: "format_version".into() })?.as_u64()?;
+    let spec_hash = hash32(m.get("spec_hash").ok_or(RegError::MissingManifestKey { key: "spec_hash".into() })?.as_bytes()?)?;
+    let fams = m.get("families").ok_or(RegError::MissingManifestKey { key: "families".into() })?.as_seq()?;
     let mut families = Vec::with_capacity(fams.len());
     for f in fams {
         let fm = f.as_map()?;
         families.push(FamilyManifest {
-            name: fm.get("name")?.as_str()?.to_string(),
-            schema_hash: hash32(fm.get("schema_hash")?.as_bytes()?)?,
-            data_hash: hash32(fm.get("data_hash")?.as_bytes()?)?,
-            record_count: fm.get("record_count")?.as_u64()?,
+            name: fm.get("name").ok_or(RegError::MissingManifestKey { key: "name".into() })?.as_str()?.to_string(),
+            schema_hash: hash32(fm.get("schema_hash").ok_or(RegError::MissingManifestKey { key: "schema_hash".into() })?.as_bytes()?)?,
+            data_hash: hash32(fm.get("data_hash").ok_or(RegError::MissingManifestKey { key: "data_hash".into() })?.as_bytes()?)?,
+            record_count: fm.get("record_count").ok_or(RegError::MissingManifestKey { key: "record_count".into() })?.as_u64()?,
         });
     }
     Ok(Manifest { format_version, spec_hash, families })

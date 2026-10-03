@@ -21,6 +21,8 @@ pub enum ProveError {
     Prover(#[from] nerv_proofs::TxError),
     #[error("fs: {0}")]
     Fs(#[from] nerv_proofs::FsError),
+    #[error("custody: {0}")]
+    Custody(#[from] nerv_custody::CustodyError),
 }
 
 /// The proved transaction: the shell + proof + txid, ready for submission.

@@ -29,7 +29,7 @@ pub const BEACON_COHORTS: [usize; 3] = [11, 10, 10];
 /// the bootstrap window (erratum 125d).
 pub const STAGGER_START: u64 = 3;
 
-const _: () = assert!(BEACON_COHORTS.iter().sum::<usize>() == BEACON_COMMITTEE_SIZE);
+const _: () = assert!(BEACON_COHORTS[0] + BEACON_COHORTS[1] + BEACON_COHORTS[2] == BEACON_COMMITTEE_SIZE);
 const _: () = assert!(SHARD_COMMITTEE_SIZE <= BEACON_COMMITTEE_SIZE);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]

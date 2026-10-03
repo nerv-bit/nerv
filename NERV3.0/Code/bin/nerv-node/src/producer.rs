@@ -38,12 +38,16 @@ pub enum ProducerError {
     Subsidy(#[from] SubsidyError),
     #[error("stake ledger: {0}")]
     Stake(#[from] StakeError),
+    #[error("crypto: {0}")]
+    Crypto(#[from] nerv_crypto::CryptoError),
     #[error("shard {0:?} is not in the active shard set")]
     InactiveShard(ShardId),
     #[error("the wallet has no address for shard {0:?}")]
     NoAddressForShard(ShardId),
     #[error("the wallet produced no addresses at all")]
     NoAddresses,
+    #[error("invalid ML-DSA seed (keypair derivation failed)")]
+    InvalidSeed,
 }
 
 // ---- ProducerIdentity ------------------------------------------------------
@@ -165,11 +169,7 @@ impl ProducerIdentity {
     /// Sign a header hash with the producer's ML-DSA-65 key. Returns
     /// the raw signature for inclusion in the quorum certificate.
     pub fn sign(&self, message: &[u8]) -> Result<Signature, ProducerError> {
-        self.signing_key
-            .sign(message)
-            .map_err(|_| ProducerError::Stake(StakeError::NotStaked {
-                offender: self.verifying_key,
-            }))
+        Ok(self.signing_key.sign(message)?)
     }
 }
 

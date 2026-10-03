@@ -2,7 +2,7 @@
 
 use std::sync::mpsc;
 
-use nerv_wallet_core::action::{ClaimBucket, ClaimStage};
+use nerv_wallet_core::{ClaimBucket, ClaimStage};
 use nerv_wallet_core::state::Screen;
 use nerv_wallet_core::{
     update, WalletAction, WalletEvent, WalletState,
@@ -266,7 +266,7 @@ impl App {
             let schedule = nerv_economy::schedule::EmissionSchedule::genesis();
             let _ = tx.send(ClaimMsg::Stage(ClaimStage::Submitting));
             match nerv_wallet_core::submit_claim_leg(
-                seed.as_bytes(),
+                &seed,
                 bucket,
                 amount_nano,
                 &schedule,

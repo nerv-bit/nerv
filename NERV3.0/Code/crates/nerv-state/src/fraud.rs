@@ -17,7 +17,11 @@ use nerv_core::hash::Hash256;
 use nerv_core::types::{Height, Interval, LegIndex, ShardId};
 
 use crate::block::{ct_sum, ResolvedLeg, ShardBlock};
-use crate::error::{ExecutorError, FraudError};
+use crate::error::ExecutorError;
+// Re-export so callers can write `nerv_state::fraud::FraudError` (used by
+// `nerv-consensus`'s slash module when wrapping `FraudError` into
+// `SlashError`). The underlying enum lives in `nerv_state::error`.
+pub use crate::error::FraudError;
 use crate::executor::{
     apply_block, shell_law_error, transit_evidence_ok, BeaconView, ChainSource, ShardState,
 };

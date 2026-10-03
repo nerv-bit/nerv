@@ -90,6 +90,8 @@ pub enum RegError {
     MissingFamily { family: String },
     #[error("vectors directory has no manifest — run `make bootstrap` (or `cargo xtask conformance-freeze`) and commit specs/vectors/")]
     NoManifest,
+    #[error("manifest is missing required key `{key}`")]
+    MissingManifestKey { key: String },
     #[error("frozen manifest already exists — re-freezing is deliberate; pass --force (make freeze-vectors) and review the diff")]
     AlreadyFrozen,
 }

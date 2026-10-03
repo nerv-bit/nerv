@@ -739,6 +739,8 @@ impl Spec {
             Err(SpecError::Validation { count: v.len(), report: v.join("\n  - ") })
         }
     }
+}
+
 
 impl Spec {
     /// (label, size, quorum, derived tolerance) for every committee.

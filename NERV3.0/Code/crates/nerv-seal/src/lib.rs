@@ -30,6 +30,7 @@ pub mod dkg;
 pub mod decrypt;
 pub mod digitize;
 pub mod encrypt;
+pub mod epoch;
 pub mod error;
 pub mod noise;
 pub mod ring;

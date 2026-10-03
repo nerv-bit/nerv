@@ -547,3 +547,217 @@ mod tests {
         ));
     }
 }
+
+// -- nerv-codec Encode/Decode impls -----------------------------------------
+//
+// The transaction witness is the prover's private input (§5.1). These
+// impls let it round-trip through `nerv_core::codec` for testing, witness
+// caching, and indexer replay. The FRI proof itself remains the wire
+// format the prover emits (a separate artifact); this is the structured
+// witness that feeds the prover.
+
+impl nerv_core::codec::Encode for DeltaLegWitness {
+    fn encode_into(&self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&(self.leg_index as u64).to_le_bytes());
+        // LegMovement has no Encode impl yet — encode its fields by hand.
+        out.extend_from_slice(&(self.movement.inputs.len() as u32).to_le_bytes());
+        for (delivery, value) in &self.movement.inputs {
+            out.extend_from_slice(&(delivery.len() as u32).to_le_bytes());
+            out.extend_from_slice(delivery);
+            out.extend_from_slice(&value.to_le_bytes());
+        }
+        out.extend_from_slice(&(self.movement.outputs.len() as u32).to_le_bytes());
+        for (delivery, value) in &self.movement.outputs {
+            out.extend_from_slice(&(delivery.len() as u32).to_le_bytes());
+            out.extend_from_slice(delivery);
+            out.extend_from_slice(&value.to_le_bytes());
+        }
+        out.extend_from_slice(&self.movement.fee_nano.to_le_bytes());
+        // LegKind discriminant: u8.
+        let kind_byte: u8 = match self.movement.kind {
+            nerv_codec::features::LegKind::SingleShard => 0,
+            nerv_codec::features::LegKind::CrossShardSpend => 1,
+            nerv_codec::features::LegKind::CrossShardIssue => 2,
+            nerv_codec::features::LegKind::Claim => 3,
+            nerv_codec::features::LegKind::Burn => 4,
+        };
+        out.push(kind_byte);
+        out.extend_from_slice(&self.movement.expiry_height.to_le_bytes());
+        out.extend_from_slice(&self.movement.epoch_length_blocks.to_le_bytes());
+        // FeatureVector and Delta both have Encode impls above.
+        self.features.encode_into(out);
+        self.delta.encode_into(out);
+    }
+    fn encoded_len(&self) -> usize {
+        // Conservative over-estimate; we expose it for callers that want
+        // pre-allocation. Move to exact values if `LegMovement` gets an
+        // Encode impl of its own.
+        8
+            + 4 + self.movement.inputs.iter().map(|(d, _)| 4 + d.len() + 8).sum::<usize>()
+            + 4 + self.movement.outputs.iter().map(|(d, _)| 4 + d.len() + 8).sum::<usize>()
+            + 8 + 1 + 8 + 8
+            + self.features.encoded_len()
+            + self.delta.encoded_len()
+    }
+}
+
+impl nerv_core::codec::Decode for DeltaLegWitness {
+    fn decode_from(r: &mut nerv_core::codec::Reader<'_>) -> Result<Self, nerv_core::error::CodecError> {
+        let leg_index = r.read_u64()? as usize;
+        let n_in = r.read_u32()? as usize;
+        let mut inputs = Vec::with_capacity(n_in);
+        for _ in 0..n_in {
+            let dl = r.read_u32()? as usize;
+            let mut d = vec![0u8; dl];
+            d.copy_from_slice(r.take(dl)?);
+            let v = r.read_u64()?;
+            inputs.push((d, v));
+        }
+        let n_out = r.read_u32()? as usize;
+        let mut outputs = Vec::with_capacity(n_out);
+        for _ in 0..n_out {
+            let dl = r.read_u32()? as usize;
+            let mut d = vec![0u8; dl];
+            d.copy_from_slice(r.take(dl)?);
+            let v = r.read_u64()?;
+            outputs.push((d, v));
+        }
+        let fee_nano = r.read_u64()?;
+        let kind = match r.read_u8()? {
+            0 => nerv_codec::features::LegKind::SingleShard,
+            1 => nerv_codec::features::LegKind::CrossShardSpend,
+            2 => nerv_codec::features::LegKind::CrossShardIssue,
+            3 => nerv_codec::features::LegKind::Claim,
+            4 => nerv_codec::features::LegKind::Burn,
+            n => return Err(nerv_core::error::CodecError::InvalidOptionTag { tag: n }),
+        };
+        let expiry_height = r.read_u64()?;
+        let epoch_length_blocks = r.read_u64()?;
+        let features = nerv_codec::features::FeatureVector::decode_from(r)?;
+        let delta = nerv_codec::codec_w::Delta::decode_from(r)?;
+        Ok(DeltaLegWitness {
+            leg_index,
+            movement: nerv_codec::features::LegMovement {
+                inputs,
+                outputs,
+                fee_nano,
+                kind,
+                expiry_height,
+                epoch_length_blocks,
+            },
+            features,
+            delta,
+        })
+    }
+}
+
+impl nerv_core::codec::Encode for DeltaWitness {
+    fn encode_into(&self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.weight_version.to_le_bytes());
+        let n = self.legs.len() as u32;
+        out.extend_from_slice(&n.to_le_bytes());
+        for leg in &self.legs {
+            leg.encode_into(out);
+        }
+    }
+    fn encoded_len(&self) -> usize {
+        8 + 4 + self.legs.iter().map(|l| l.encoded_len()).sum::<usize>()
+    }
+}
+
+impl nerv_core::codec::Decode for DeltaWitness {
+    fn decode_from(r: &mut nerv_core::codec::Reader<'_>) -> Result<Self, nerv_core::error::CodecError> {
+        let weight_version = r.read_u64()?;
+        let n = r.read_u32()? as usize;
+        let mut legs = Vec::with_capacity(n);
+        for _ in 0..n {
+            legs.push(DeltaLegWitness::decode_from(r)?);
+        }
+        Ok(DeltaWitness { weight_version, legs })
+    }
+}
+
+impl nerv_core::codec::Encode for SealLegWitness {
+    fn encode_into(&self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&(self.leg_index as u64).to_le_bytes());
+        self.noise_seed.encode_into(out);
+        self.r.encode_into(out);
+        self.e1.encode_into(out);
+        self.e2.encode_into(out);
+        self.plaintext.encode_into(out);
+        self.u.encode_into(out);
+        self.v.encode_into(out);
+    }
+    fn encoded_len(&self) -> usize {
+        8
+            + self.noise_seed.encoded_len()
+            + self.r.encoded_len()
+            + self.e1.encoded_len()
+            + self.e2.encoded_len()
+            + self.plaintext.encoded_len()
+            + self.u.encoded_len()
+            + self.v.encoded_len()
+    }
+}
+
+impl nerv_core::codec::Decode for SealLegWitness {
+    fn decode_from(r: &mut nerv_core::codec::Reader<'_>) -> Result<Self, nerv_core::error::CodecError> {
+        let leg_index = r.read_u64()? as usize;
+        let noise_seed = nerv_seal::sampling::NoiseSeed::decode_from(r)?;
+        let r_field = nerv_seal::ring::Vec8::decode_from(r)?;
+        let e1 = nerv_seal::ring::Vec8::decode_from(r)?;
+        let e2 = nerv_seal::ring::Vec2::decode_from(r)?;
+        let plaintext = nerv_seal::digitize::Plaintext::decode_from(r)?;
+        let u = nerv_seal::ring::Vec8::decode_from(r)?;
+        let v = nerv_seal::ring::Vec2::decode_from(r)?;
+        Ok(SealLegWitness {
+            leg_index,
+            noise_seed,
+            r: r_field,
+            e1,
+            e2,
+            plaintext,
+            u,
+            v,
+        })
+    }
+}
+
+impl nerv_core::codec::Encode for TransactionWitness {
+    fn encode_into(&self, out: &mut Vec<u8>) {
+        self.custody.encode_into(out);
+        self.delta.encode_into(out);
+        let n = self.seal.len() as u32;
+        out.extend_from_slice(&n.to_le_bytes());
+        for leg in &self.seal {
+            leg.encode_into(out);
+        }
+        out.extend_from_slice(self.epoch_key_id.as_bytes());
+    }
+    fn encoded_len(&self) -> usize {
+        self.custody.encoded_len()
+            + self.delta.encoded_len()
+            + 4
+            + self.seal.iter().map(|l| l.encoded_len()).sum::<usize>()
+            + 32
+    }
+}
+
+impl nerv_core::codec::Decode for TransactionWitness {
+    fn decode_from(r: &mut nerv_core::codec::Reader<'_>) -> Result<Self, nerv_core::error::CodecError> {
+        let custody = crate::air::custody_air::CustodyWitness::decode_from(r)?;
+        let delta = DeltaWitness::decode_from(r)?;
+        let n = r.read_u32()? as usize;
+        let mut seal = Vec::with_capacity(n);
+        for _ in 0..n {
+            seal.push(SealLegWitness::decode_from(r)?);
+        }
+        let bytes = r.take_array::<32>()?;
+        Ok(TransactionWitness {
+            custody,
+            delta,
+            seal,
+            epoch_key_id: Hash256::from_bytes(bytes),
+        })
+    }
+}

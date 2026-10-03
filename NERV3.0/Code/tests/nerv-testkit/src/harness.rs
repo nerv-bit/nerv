@@ -111,11 +111,11 @@ impl Harness {
     }
 
 
-    pub fn node_mut(&mut self, name: &str) -> Result<&mut (dyn TestNode + Send), HarnessError> {
-        self.nodes
-            .get_mut(name)
-            .map(|n| n.as_mut())
-            .ok_or(HarnessError::NodeNotFound { node: name.to_string() })
+    pub fn node_mut<'a>(&'a mut self, name: &str) -> Result<&'a mut (dyn TestNode + Send), HarnessError> {
+        match self.nodes.get_mut(name) {
+            Some(n) => Ok(n.as_mut()),
+            None => Err(HarnessError::NodeNotFound { node: name.to_string() }),
+        }
     }
 
 

@@ -257,6 +257,10 @@ pub const BALLOT_PROOF: Domain = Domain::new("nerv.ballot.proof");
 /// The referendum ID derivation (§C.2; erratum 183).
 pub const REFERENDUM: Domain = Domain::new("nerv.referendum");
 
+/// Password-derived seed-storage KDF (erratum 204). Used by the
+/// `nerv-wallet-core::storage` password-AEAD scheme.
+pub const STORAGE: Domain = Domain::new("nerv.storage");
+
 
 
 
@@ -353,6 +357,7 @@ pub const ALL: &[Domain] = &[
    BALLOT_NULL,
    BALLOT_PROOF,
    REFERENDUM,
+   STORAGE,
 
 
 ];
@@ -466,6 +471,7 @@ mod tests {
             BALLOT_NULL,
             BALLOT_PROOF,
             REFERENDUM,
+            STORAGE,
         ] {
             assert!(ALL.contains(&d), "domain `{}` missing from ALL", d.as_str());
         }

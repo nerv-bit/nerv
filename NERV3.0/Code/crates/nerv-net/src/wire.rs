@@ -53,7 +53,9 @@ pub enum WireError {
 
 async fn read_exact_or_closed<S: AsyncRead + Unpin>(s: &mut S, buf: &mut [u8]) -> Result<(), WireError> {
     match s.read_exact(buf).await {
-        Ok(()) => Ok(()),
+        // tokio 1.53+ `AsyncReadExt::read_exact` returns `io::Result<usize>`
+        // (the bytes read, always `buf.len()` on success); discard the count.
+        Ok(_n) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => Err(WireError::Closed),
         Err(e) => Err(WireError::Io(e)),
     }
@@ -111,7 +113,7 @@ fn decode_hello(b: &[u8]) -> Result<(u8, VerifyingKey, EncapsulationKey, CipherT
     let vk = VerifyingKey::from_slice(&b[1..1 + PK_LEN])?;
     let ek = EncapsulationKey::from_slice(&b[1 + PK_LEN..1 + PK_LEN + EK_LEN])?;
     let ct: &[u8; CT_LEN] = b[1 + PK_LEN + EK_LEN..].try_into().map_err(|_| WireError::Malformed)?;
-    Ok((ver, vk, ek, CipherText::from_bytes(ct)))
+    Ok((ver, vk, ek, CipherText::from_bytes(*ct)))
 }
 
 
@@ -132,7 +134,7 @@ fn decode_accept(b: &[u8]) -> Result<(VerifyingKey, CipherText, Signature), Wire
     let ct: &[u8; CT_LEN] =
         b[PK_LEN..PK_LEN + CT_LEN].try_into().map_err(|_| WireError::Malformed)?;
     let sig: &[u8; SIG_LEN] = b[PK_LEN + CT_LEN..].try_into().map_err(|_| WireError::Malformed)?;
-    Ok((vk, CipherText::from_bytes(ct), Signature::from_bytes(sig)))
+    Ok((vk, CipherText::from_bytes(*ct), Signature::from_bytes(*sig)))
 }
 
 
@@ -321,7 +323,7 @@ pub async fn accept_handshake<S: AsyncRead + AsyncWrite + Unpin>(
     let finish = read_msg(s, FINISH_LEN).await?;
     let sig_a: &[u8; SIG_LEN] =
         finish.as_slice().try_into().map_err(|_| WireError::Malformed)?;
-    let sig_a = Signature::from_bytes(sig_a);
+    let sig_a = Signature::from_bytes(*sig_a);
     if !a_vk.verify(&signed_by(true, &t), &sig_a) {
         return Err(WireError::BadSignature);
     }

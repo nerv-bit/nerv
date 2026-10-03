@@ -8,9 +8,10 @@ use std::collections::BTreeMap;
 
 
 use nerv_net::host::{Host, HostConfig, HostEvent};
-use nerv_net::submission::SubmissionMessage;
-use nerv_registry::mempool::{IngestOutcome, Mempool, PoolEntry};
+use nerv_net::submission::{IngestOutcome, SubmissionMessage};
+use nerv_registry::mempool::{Mempool, PoolEntry};
 use nerv_registry::bundle::Bundle;
+use nerv_core::codec::{Decode, Encode};
 
 
 #[derive(Parser)]
@@ -112,10 +113,11 @@ async fn main() -> Result<()> {
                             total_received += 1;
                             let txid_bytes = *entry.txid.as_bytes();
                             if !seen.contains_key(&txid_bytes) {
+                                let txid = entry.txid;
                                 seen.insert(txid_bytes, entry.clone());
                                 pool.push(entry);
                                 tracing::debug!(
-                                    txid = ?entry.txid,
+                                    txid = ?txid,
                                     pool_size = pool.len(),
                                     "transaction admitted"
                                 );

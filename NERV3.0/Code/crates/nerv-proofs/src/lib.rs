@@ -42,6 +42,11 @@ pub use air::{
     Blake3Compression, compress_native, hash_native, SealChip, gen_seal_trace, SealLegInput,
     SealTrace,
 };
+// Re-export the custody_air module path so callers can write
+// `nerv_proofs::custody_air::*` (used by `nerv-wallet`'s construction
+// path; previously only the deep types were re-exported, not the module
+// path).
+pub use air::custody_air;
 
 pub use air::delta_air::{gen_delta_trace, DeltaAir, DeltaTrace, LegShape};
 

@@ -28,7 +28,13 @@
 
 [workspace]
 resolver = "2"
-exclude = ["fuzz"]
+# TODO: yoke-derive + icu 2.x rust-1.85 incompatibility — unpin once eframe
+# updates its dep tree. eframe 0.29 → url → idna → idna_adapter → icu 2.3.x
+# requires `let` chains (stabilized in Rust 1.88). rustc on this machine is
+# 1.85, so apps/nerv-gui is the only consumer of that chain and is excluded
+# here. The `yoke-derive` vendor patch below is harmless on rustc 1.88+ — the
+# qualified `std::str::from_utf8(...)` path also compiles there.
+exclude = ["fuzz", "apps/nerv-gui"]
 members = [
     "crates/nerv-core",
     "crates/nerv-crypto",
@@ -48,7 +54,6 @@ members = [
     "crates/nerv-wallet",
     "crates/nerv-wallet-core",
     "apps/nerv-tui",
-    "apps/nerv-gui",
     "bin/nerv-cli",
     "bin/nerv-node",
     "bin/nerv-relay",
@@ -142,6 +147,21 @@ criterion              = "0.5"
 #   k256, p256, p384, p521, secp256k1, curve25519-dalek, ed25519-dalek,
 #   bls12_381, blst, pairing, ark-{ec,ff,bls12-381,bn254}, halo2-*, bellman,
 #   dusk-plonk, snow, ring, aws-lc-rs, ... (P1; WP §9.4 as a dependency policy)
+
+# ---------------------------------------------------------------------------
+# Transitive-dep pin — DO NOT REMOVE without auditing eframe 0.29's dep tree.
+# ---------------------------------------------------------------------------
+# eframe 0.29 pulls in `url` → `idna` → `idna_adapter` → `icu_provider` →
+# `yoke`/`yoke-derive`. The 0.8.3 release of `yoke-derive` calls
+# `str::from_utf8(&Vec<u8>)` in `lib.rs:202`, which Rust 1.85 rejects as a
+# non-existent associated item on the primitive `str`. No newer 0.8.x exists,
+# and we cannot downgrade to 0.7.x because `yoke 0.8.3` pins `^0.8.2`.
+# Workaround: vendor a local copy under `vendor/yoke-derive/` with the
+# qualified `std::str::from_utf8(...)` form, which compiles cleanly on
+# rustc 1.85. Remove this patch once eframe updates its dep tree to a yoke
+# version that no longer carries the buggy call.
+[patch.crates-io]
+yoke-derive = { path = "vendor/yoke-derive" }
 
 [profile.release]
 lto = "thin"

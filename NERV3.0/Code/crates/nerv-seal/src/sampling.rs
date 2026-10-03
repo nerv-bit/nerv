@@ -61,6 +61,21 @@ impl NoiseSeed {
     }
 }
 
+impl nerv_core::codec::Encode for NoiseSeed {
+    fn encode_into(&self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.0);
+    }
+    fn encoded_len(&self) -> usize {
+        32
+    }
+}
+
+impl nerv_core::codec::Decode for NoiseSeed {
+    fn decode_from(r: &mut nerv_core::codec::Reader<'_>) -> Result<Self, nerv_core::error::CodecError> {
+        Ok(NoiseSeed(r.take_array::<32>()?))
+    }
+}
+
 fn cbd2_block(bytes: &[u8; CBD_BYTES_PER_POLY]) -> [i64; N] {
     let mut vals = [0i64; N];
     for (j, v) in vals.iter_mut().enumerate() {

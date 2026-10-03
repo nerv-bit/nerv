@@ -46,7 +46,7 @@ pub use qc::{body_hash, detect_double_sign, signer_intersection, DoubleSignError
 pub use slash::{Offender, SlashClass, SlashContext, SlashError, SlashEvidence, VerifiedSlash};
 pub use beacon::{BeaconError, BeaconState, GenesisMap};
 pub use shard_chain::{
-   assemble_with_qc, body_hash as shard_body_hash, propose_block, validate_and_sign,
+   assemble_with_qc, propose_block, validate_and_sign,
    PipelineError, Proposal, SHARD_QUORUM,
 };
 pub use topology::{

@@ -52,6 +52,21 @@ pub const fn slot(j: usize, k: usize) -> usize {
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct Plaintext(Vec2);
 
+impl nerv_core::codec::Encode for Plaintext {
+    fn encode_into(&self, out: &mut Vec<u8>) {
+        self.0.encode_into(out);
+    }
+    fn encoded_len(&self) -> usize {
+        self.0.encoded_len()
+    }
+}
+
+impl nerv_core::codec::Decode for Plaintext {
+    fn decode_from(r: &mut nerv_core::codec::Reader<'_>) -> Result<Self, nerv_core::error::CodecError> {
+        Ok(Plaintext(Vec2::decode_from(r)?))
+    }
+}
+
 impl Plaintext {
     pub fn zero() -> Plaintext {
         Plaintext(Vec2::new([Poly::zero(), Poly::zero()]))

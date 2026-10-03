@@ -138,36 +138,36 @@ pub fn update(state: &mut WalletState, action: WalletAction) -> Vec<WalletEvent>
             events.push(WalletEvent::Redraw);
         }
         WalletAction::SetRecipient(hex) => {
+            let balance = state.balance_nano();
+            let synced = matches!(state.sync, SyncStatus::Synced { .. });
             if let Some(draft) = &mut state.draft {
                 draft.recipient_hex = hex;
-                let balance = state.balance_nano();
-                let synced = matches!(state.sync, SyncStatus::Synced { .. });
                 draft.validate(balance, synced);
             }
             events.push(WalletEvent::Redraw);
         }
         WalletAction::SetAmount(amount) => {
+            let balance = state.balance_nano();
+            let synced = matches!(state.sync, SyncStatus::Synced { .. });
             if let Some(draft) = &mut state.draft {
                 draft.amount_nano = amount;
-                let balance = state.balance_nano();
-                let synced = matches!(state.sync, SyncStatus::Synced { .. });
                 draft.validate(balance, synced);
             }
             events.push(WalletEvent::Redraw);
         }
         WalletAction::SetFee(fee) => {
+            let balance = state.balance_nano();
+            let synced = matches!(state.sync, SyncStatus::Synced { .. });
             if let Some(draft) = &mut state.draft {
                 draft.fee_nano = fee;
-                let balance = state.balance_nano();
-                let synced = matches!(state.sync, SyncStatus::Synced { .. });
                 draft.validate(balance, synced);
             }
             events.push(WalletEvent::Redraw);
         }
         WalletAction::ConfirmSend => {
+            let balance = state.balance_nano();
+            let synced = matches!(state.sync, SyncStatus::Synced { .. });
             if let Some(draft) = &mut state.draft {
-                let balance = state.balance_nano();
-                let synced = matches!(state.sync, SyncStatus::Synced { .. });
                 draft.validate(balance, synced);
                 if draft.is_ready() {
                     state.notify(NotificationLevel::Info, "Ready to sign".into());
@@ -318,17 +318,17 @@ pub fn update(state: &mut WalletState, action: WalletAction) -> Vec<WalletEvent>
             if let Some(draft) = state.producer_draft.take() {
                 if !draft.is_ready() {
                     // Validation failed — bounce the draft back to the
-                    // UI so the user sees the error.
+                    // UI so the user sees the error. Snapshot the error
+                    // message first so we don't borrow `draft` after it's
+                    // moved back into `state.producer_draft`.
+                    let msg = draft
+                        .validation
+                        .error
+                        .as_ref()
+                        .map(ProducerError::message)
+                        .unwrap_or_else(|| "Producer draft is not ready".into());
                     state.producer_draft = Some(draft);
-                    state.notify(
-                        NotificationLevel::Warning,
-                        draft
-                            .validation
-                            .error
-                            .as_ref()
-                            .map(ProducerError::message)
-                            .unwrap_or_else(|| "Producer draft is not ready".into()),
-                    );
+                    state.notify(NotificationLevel::Warning, msg);
                     events.push(WalletEvent::Redraw);
                     return events;
                 }
@@ -463,9 +463,9 @@ pub fn update(state: &mut WalletState, action: WalletAction) -> Vec<WalletEvent>
                     state.sync = SyncStatus::Synced { height: new_height };
                 }
                 // Re-validate the draft (the balance may have changed).
+                let balance = state.balance_nano();
+                let synced = matches!(state.sync, SyncStatus::Synced { .. });
                 if let Some(draft) = &mut state.draft {
-                    let balance = state.balance_nano();
-                    let synced = matches!(state.sync, SyncStatus::Synced { .. });
                     draft.validate(balance, synced);
                 }
                 events.push(WalletEvent::Redraw);
@@ -484,10 +484,18 @@ pub fn update(state: &mut WalletState, action: WalletAction) -> Vec<WalletEvent>
         WalletAction::NoteReceived(note) => {
             let value = note.opening.value;
             let height = state.chain_height;
+            // Snapshot the nullifier bytes before we move `note` into the
+            // note set — the TxId derivation below needs them.
+            let nf_bytes: [u8; 32] = note
+                .nullifier
+                .as_bytes()
+                .to_owned()
+                .try_into()
+                .unwrap_or([0u8; 32]);
             state.notes.insert(note);
             state.history.push_front(HistoryEntry {
                 txid: nerv_core::types::TxId::from_hash(
-                    nerv_core::hash::Hash256::from_bytes(note.nullifier.as_bytes().to_owned().try_into().unwrap_or([0u8; 32])),
+                    nerv_core::hash::Hash256::from_bytes(nf_bytes),
                 ),
                 direction: Direction::Incoming,
                 amount_nano: value,

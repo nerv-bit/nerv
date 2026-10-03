@@ -14,9 +14,11 @@ workspace = true
 name = "nerv_conformance"
 path = "src/lib.rs"
 
-[[bin]]
-name = "nerv-conformance"
-path = "src/bin/conformance.rs"
+# The conformance crate ships as a library only; the dedicated
+# `src/bin/conformance.rs` file was an early prototype generator (no
+# main()), fully duplicated under `pub mod vectors;`. Stale binary
+# entrypoint removed; the lib's `vectors` module is the canonical
+# generator surface.
 
 [dependencies]
 blake3 = { workspace = true }

@@ -14,7 +14,10 @@ use nerv_core::error::CodecError;
 use nerv_core::hash::Hash256;
 use nerv_core::types::Epoch;
 
-use crate::error::QcError;
+// Re-export so callers can write `nerv_crypto::sigaggr::QcError` (used by
+// `nerv-consensus` and any crate that surfaces QC errors across module
+// boundaries). The underlying enum lives in `nerv_crypto::error`.
+pub use crate::error::QcError;
 use crate::mldsa::{Signature, VerifyingKey, SIG_LEN};
 
 pub const MAX_BITMAP_COMMITTEE: usize = 32;

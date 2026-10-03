@@ -1,7 +1,7 @@
 //! Role definitions and dispatch (design doc; erratum 195).
 
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use nerv_core::types::ShardId;
 
 

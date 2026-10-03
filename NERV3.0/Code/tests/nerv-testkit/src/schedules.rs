@@ -18,69 +18,77 @@ pub struct CorpusEntry {
 
 
 /// The full corpus: every (strategy, assertion) pair the model checker
-/// covers, as executable scenarios.
-pub const CORPUS: &[CorpusEntry] = &[
-    // T5 — Cross-shard atomicity (§4.5): no reachable state creates
-    // value without destroying equal value.
-    CorpusEntry {
-        name: "t5-honest-delivery",
-        strategy: ScheduleStrategy::InOrder,
-        description: "In-order delivery: the baseline where cross-shard completes cleanly.",
-        theorem: "T5",
-    },
-    CorpusEntry {
-        name: "t5-delayed-issue-past-expiry",
-        strategy: ScheduleStrategy::DelaySource {
-            source: "shard-40".to_string(),
-            delay_ns: 24 * 3600 * 1_000_000_000, // 24 hours in logical ns.
+/// covers, as executable scenarios. Built lazily (via [`corpus`]) because
+/// the `String` constructor is not const-stable on rustc 1.85.
+pub static CORPUS: std::sync::OnceLock<Vec<CorpusEntry>> = std::sync::OnceLock::new();
+
+
+/// Build the corpus. The first call initializes the static; subsequent
+/// calls return a borrowed slice to the cached vector.
+pub fn corpus() -> &'static [CorpusEntry] {
+    CORPUS.get_or_init(|| vec![
+        // T5 — Cross-shard atomicity (§4.5): no reachable state creates
+        // value without destroying equal value.
+        CorpusEntry {
+            name: "t5-honest-delivery",
+            strategy: ScheduleStrategy::InOrder,
+            description: "In-order delivery: the baseline where cross-shard completes cleanly.",
+            theorem: "T5",
         },
-        description: "The issue leg is delayed past the expiry: reversion must mint the revert outputs.",
-        theorem: "T5",
-    },
-    CorpusEntry {
-        name: "t5-reorder-spend-issue",
-        strategy: ScheduleStrategy::Reverse,
-        description: "Issue leg arrives before the spend leg: the ordering rule must gate.",
-        theorem: "T5",
-    },
-    // T6 — Deadlock-freedom (§4.5): the dependency graph is acyclic.
-    CorpusEntry {
-        name: "t6-adversarial-reorder",
-        strategy: ScheduleStrategy::Reverse,
-        description: "Systematic message reversal: no cyclic dependency can form.",
-        theorem: "T6",
-    },
-    CorpusEntry {
-        name: "t6-delay-all",
-        strategy: ScheduleStrategy::DelaySource {
-            source: "*".to_string(),
-            delay_ns: 60 * 1_000_000_000, // 60 seconds.
+        CorpusEntry {
+            name: "t5-delayed-issue-past-expiry",
+            strategy: ScheduleStrategy::DelaySource {
+                source: "shard-40",
+                delay_ns: 24 * 3600 * 1_000_000_000, // 24 hours in logical ns.
+            },
+            description: "The issue leg is delayed past the expiry: reversion must mint the revert outputs.",
+            theorem: "T5",
         },
-        description: "All messages delayed 60s: completion still occurs within bounds.",
-        theorem: "T6",
-    },
-    // T7 — Liveness (§4.5, §5.5): issue legs are completable by anyone.
-    CorpusEntry {
-        name: "t7-producer-censored",
-        strategy: ScheduleStrategy::DropSource {
-            source: "producer-shard-7".to_string(),
+        CorpusEntry {
+            name: "t5-reorder-spend-issue",
+            strategy: ScheduleStrategy::Reverse,
+            description: "Issue leg arrives before the spend leg: the ordering rule must gate.",
+            theorem: "T5",
         },
-        description: "The producer is censored: issue legs remain completable by any other party.",
-        theorem: "T7",
-    },
-    CorpusEntry {
-        name: "t7-round-robin-fairness",
-        strategy: ScheduleStrategy::RoundRobin,
-        description: "Round-robin delivery: every party gets turns; no starvation.",
-        theorem: "T7",
-    },
-    CorpusEntry {
-        name: "t7-partial-drop",
-        strategy: ScheduleStrategy::DropPermille { permille: 300, seed: 42 },
-        description: "30% of messages dropped: the surviving paths still deliver.",
-        theorem: "T7",
-    },
-];
+        // T6 — Deadlock-freedom (§4.5): the dependency graph is acyclic.
+        CorpusEntry {
+            name: "t6-adversarial-reorder",
+            strategy: ScheduleStrategy::Reverse,
+            description: "Systematic message reversal: no cyclic dependency can form.",
+            theorem: "T6",
+        },
+        CorpusEntry {
+            name: "t6-delay-all",
+            strategy: ScheduleStrategy::DelaySource {
+                source: "*",
+                delay_ns: 60 * 1_000_000_000, // 60 seconds.
+            },
+            description: "All messages delayed 60s: completion still occurs within bounds.",
+            theorem: "T6",
+        },
+        // T7 — Liveness (§4.5, §5.5): issue legs are completable by anyone.
+        CorpusEntry {
+            name: "t7-producer-censored",
+            strategy: ScheduleStrategy::DropSource {
+                source: "producer-shard-7",
+            },
+            description: "The producer is censored: issue legs remain completable by any other party.",
+            theorem: "T7",
+        },
+        CorpusEntry {
+            name: "t7-round-robin-fairness",
+            strategy: ScheduleStrategy::RoundRobin,
+            description: "Round-robin delivery: every party gets turns; no starvation.",
+            theorem: "T7",
+        },
+        CorpusEntry {
+            name: "t7-partial-drop",
+            strategy: ScheduleStrategy::DropPermille { permille: 300, seed: 42 },
+            description: "30% of messages dropped: the surviving paths still deliver.",
+            theorem: "T7",
+        },
+    ])
+}
 
 
 /// The result of one corpus run.
@@ -100,7 +108,7 @@ pub fn run_corpus(
     node_factory: &dyn Fn(&str) -> Box<dyn TestNode + Send>,
     node_names: &[&str],
 ) -> Vec<CorpusResult> {
-    CORPUS
+    corpus()
         .iter()
         .map(|entry| {
             let mut harness = Harness::new(entry.strategy.clone());
@@ -167,17 +175,18 @@ mod tests {
 
     #[test]
     fn corpus_is_well_formed() {
-        assert!(CORPUS.len() >= 7);
+        let corpus = corpus();
+        assert!(corpus.len() >= 7);
         let theorems: std::collections::BTreeSet<&str> =
-            CORPUS.iter().map(|e| e.theorem).collect();
+            corpus.iter().map(|e| e.theorem).collect();
         assert!(theorems.contains("T5"));
         assert!(theorems.contains("T6"));
         assert!(theorems.contains("T7"));
         // No duplicate names.
-        let names: std::collections::BTreeSet<&str> = CORPUS.iter().map(|e| e.name).collect();
-        assert_eq!(names.len(), CORPUS.len());
+        let names: std::collections::BTreeSet<&str> = corpus.iter().map(|e| e.name).collect();
+        assert_eq!(names.len(), corpus.len());
         // Every entry has a description.
-        for e in CORPUS {
+        for e in corpus {
             assert!(!e.description.is_empty(), "{}", e.name);
         }
     }
@@ -188,8 +197,9 @@ mod tests {
         let factory = |name: &str| -> Box<dyn TestNode + Send> {
             Box::new(SimpleNode::new(name))
         };
+        let corpus = corpus();
         let results = run_corpus(&factory, &["a", "b", "c"]);
-        assert_eq!(results.len(), CORPUS.len());
+        assert_eq!(results.len(), corpus.len());
         for r in &results {
             assert!(r.passed, "{} failed: {}", r.name, r.details);
         }

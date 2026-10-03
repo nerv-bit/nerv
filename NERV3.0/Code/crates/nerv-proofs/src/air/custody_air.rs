@@ -457,6 +457,183 @@ pub struct BurnWitness {
 
 
 // ---------------------------------------------------------------------------
+// nerv-codec Encode/Decode impls
+// ---------------------------------------------------------------------------
+//
+// The witness contract is the private input to the custody AIR (§5.1
+// statements 1–5 + reversion/burn binding). These impls let it round-trip
+// through `nerv_core::codec` for testing, indexing, and persistence. The
+// wire format is:
+//   * u32 LE count, then items in declaration order
+//   * For `InputWitness`: opening (NoteEncoding) ‖ nk (32 bytes) ‖
+//     leaf_index (u64 LE) ‖ u32 LE sibling count ‖ siblings (each
+//     [Goldilocks; 4] is 4×u64 LE) ‖ anchor (NctDigest's existing
+//     Encode/Decode).
+//   * For `BurnWitness`: u8 (leg) ‖ u64 LE (value) ‖ Hash256 (32 bytes).
+
+impl nerv_core::codec::Encode for InputWitness {
+    fn encode_into(&self, out: &mut Vec<u8>) {
+        self.opening.encode_into(out);
+        out.extend_from_slice(&self.nullifier_key);
+        out.extend_from_slice(&self.leaf_index.to_le_bytes());
+        let n = self.siblings.len() as u32;
+        out.extend_from_slice(&n.to_le_bytes());
+        for sib in &self.siblings {
+            for g in sib {
+                out.extend_from_slice(&g.as_u64().to_le_bytes());
+            }
+        }
+        self.anchor.encode_into(out);
+    }
+    fn encoded_len(&self) -> usize {
+        // NoteOpening::encoded_len + 32 + 8 + 4 + 32*siblings + anchor_len.
+        // We don't know the opening length statically; callers that need
+        // pre-allocation should compute it from the note's own encoded_len.
+        // For smoke / persistence, callers typically use `encode()` and let
+        // the Vec grow; we expose a best-effort constant that matches the
+        // common case (32-byte opening: value 8B + rho 12B + delivery 48B +
+        // blinding 8B + pk_n 32B = 108B; see `NoteOpening` constants).
+        108 + 32 + 8 + 4 + (32 * self.siblings.len()) + 32
+    }
+}
+
+impl nerv_core::codec::Decode for InputWitness {
+    fn decode_from(r: &mut nerv_core::codec::Reader<'_>) -> Result<Self, nerv_core::error::CodecError> {
+        let opening = nerv_custody::NoteOpening::decode_from(r)?;
+        let nk_bytes = r.take_array::<32>()?;
+        let mut nullifier_key = [0u8; 32];
+        nullifier_key.copy_from_slice(&nk_bytes);
+        let leaf_index = r.read_u64()?;
+        let n = r.read_u32()? as usize;
+        let mut siblings = Vec::with_capacity(n);
+        for _ in 0..n {
+            let mut sib = [nerv_core::field::Goldilocks::ZERO; 4];
+            for slot in sib.iter_mut() {
+                let bytes = r.take_array::<8>()?;
+                *slot = nerv_core::field::Goldilocks::from_u64_reduce(u64::from_le_bytes(bytes));
+            }
+            siblings.push(sib);
+        }
+        let anchor = nerv_custody::nct::NctDigest::decode_from(r)?;
+        Ok(InputWitness { opening, nullifier_key, leaf_index, siblings, anchor })
+    }
+}
+
+impl nerv_core::codec::Encode for OutputWitness {
+    fn encode_into(&self, out: &mut Vec<u8>) {
+        self.opening.encode_into(out);
+    }
+    fn encoded_len(&self) -> usize {
+        self.opening.encoded_len()
+    }
+}
+
+impl nerv_core::codec::Decode for OutputWitness {
+    fn decode_from(r: &mut nerv_core::codec::Reader<'_>) -> Result<Self, nerv_core::error::CodecError> {
+        Ok(OutputWitness { opening: nerv_custody::NoteOpening::decode_from(r)? })
+    }
+}
+
+impl nerv_core::codec::Encode for RevertWitness {
+    fn encode_into(&self, out: &mut Vec<u8>) {
+        self.opening.encode_into(out);
+    }
+    fn encoded_len(&self) -> usize {
+        self.opening.encoded_len()
+    }
+}
+
+impl nerv_core::codec::Decode for RevertWitness {
+    fn decode_from(r: &mut nerv_core::codec::Reader<'_>) -> Result<Self, nerv_core::error::CodecError> {
+        Ok(RevertWitness { opening: nerv_custody::NoteOpening::decode_from(r)? })
+    }
+}
+
+impl nerv_core::codec::Encode for BurnWitness {
+    fn encode_into(&self, out: &mut Vec<u8>) {
+        out.push(self.leg);
+        out.extend_from_slice(&self.value.to_le_bytes());
+        out.extend_from_slice(self.commitment.as_bytes());
+    }
+    fn encoded_len(&self) -> usize {
+        1 + 8 + 32
+    }
+}
+
+impl nerv_core::codec::Decode for BurnWitness {
+    fn decode_from(r: &mut nerv_core::codec::Reader<'_>) -> Result<Self, nerv_core::error::CodecError> {
+        let leg = r.read_u8()?;
+        let value = r.read_u64()?;
+        let bytes = r.take_array::<32>()?;
+        let commitment = Hash256::from_bytes(bytes);
+        Ok(BurnWitness { leg, value, commitment })
+    }
+}
+
+impl nerv_core::codec::Encode for CustodyWitness {
+    fn encode_into(&self, out: &mut Vec<u8>) {
+        encode_vec(out, &self.inputs);
+        encode_vec(out, &self.outputs);
+        encode_vec_u64(out, &self.fees);
+        encode_vec(out, &self.reverts);
+        encode_vec(out, &self.burns);
+    }
+    fn encoded_len(&self) -> usize {
+        vec_len(&self.inputs) + vec_len(&self.outputs) + (4 + 8 * self.fees.len())
+            + vec_len(&self.reverts) + vec_len(&self.burns)
+    }
+}
+
+impl nerv_core::codec::Decode for CustodyWitness {
+    fn decode_from(r: &mut nerv_core::codec::Reader<'_>) -> Result<Self, nerv_core::error::CodecError> {
+        let inputs = decode_vec::<InputWitness>(r)?;
+        let outputs = decode_vec::<OutputWitness>(r)?;
+        let fees = decode_vec_u64(r)?;
+        let reverts = decode_vec::<RevertWitness>(r)?;
+        let burns = decode_vec::<BurnWitness>(r)?;
+        Ok(CustodyWitness { inputs, outputs, fees, reverts, burns })
+    }
+}
+
+fn encode_vec<T: nerv_core::codec::Encode>(out: &mut Vec<u8>, v: &[T]) {
+    let n = v.len() as u32;
+    out.extend_from_slice(&n.to_le_bytes());
+    for item in v {
+        item.encode_into(out);
+    }
+}
+
+fn encode_vec_u64(out: &mut Vec<u8>, v: &[u64]) {
+    let n = v.len() as u32;
+    out.extend_from_slice(&n.to_le_bytes());
+    for item in v {
+        out.extend_from_slice(&item.to_le_bytes());
+    }
+}
+
+fn vec_len<T: nerv_core::codec::Encode>(v: &[T]) -> usize {
+    4 + v.iter().map(|i| i.encoded_len()).sum::<usize>()
+}
+
+fn decode_vec<T: nerv_core::codec::Decode>(r: &mut nerv_core::codec::Reader<'_>) -> Result<Vec<T>, nerv_core::error::CodecError> {
+    let n = r.read_u32()? as usize;
+    let mut out = Vec::with_capacity(n);
+    for _ in 0..n {
+        out.push(T::decode_from(r)?);
+    }
+    Ok(out)
+}
+
+fn decode_vec_u64(r: &mut nerv_core::codec::Reader<'_>) -> Result<Vec<u64>, nerv_core::error::CodecError> {
+    let n = r.read_u32()? as usize;
+    let mut out = Vec::with_capacity(n);
+    for _ in 0..n {
+        out.push(r.read_u64()?);
+    }
+    Ok(out)
+}
+
+// ---------------------------------------------------------------------------
 // Generation
 // ---------------------------------------------------------------------------
 

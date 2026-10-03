@@ -24,5 +24,5 @@ pub mod schedules;
 pub use clock::DetClock;
 pub use harness::{Harness, HarnessError, NodeId, TestNode};
 pub use loopback::{Loopback, Message, Queue};
-pub use scheduler::{Schedule, ScheduleStrategy, Scheduler};
-pub use schedules::{run_corpus, CorpusResult, CORPUS};
+pub use scheduler::{ScheduleStrategy, Scheduler, StepResult};
+pub use schedules::{corpus, run_corpus, CorpusResult, CorpusEntry, CORPUS};

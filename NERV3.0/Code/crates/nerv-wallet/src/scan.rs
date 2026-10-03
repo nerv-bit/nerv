@@ -5,11 +5,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 
+use nerv_core::codec::Decode;
 use nerv_core::hash::Hash256;
 use nerv_core::types::{Height, LegIndex, ShardId, TxId};
 use nerv_custody::nct::NctDigest;
 use nerv_custody::note::{SealedNote, trial_decrypt};
-use nerv_custody::{NoteOpening, nullifier_pk};
+use nerv_custody::NoteOpening;
 use nerv_custody::nullifier::derive_nullifier;
 
 
@@ -18,7 +19,7 @@ use crate::keys::WalletAddress;
 
 /// A scanned note: everything the wallet learned from one successful
 /// trial-decryption (erratum 185).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ScannedNote {
     pub opening: NoteOpening,
     pub nullifier_key: [u8; 32],
@@ -141,7 +142,7 @@ impl WalletNoteSet {
         self.notes
             .iter()
             .filter(|(_, n)| !self.spent.contains(n.nullifier.as_bytes()))
-            .map(|(cm, n)| (cm.as_slice(), n))
+            .map(|(cm, n)| (cm, n))
             .collect()
     }
 
@@ -152,9 +153,9 @@ impl WalletNoteSet {
             .iter()
             .filter(|(cm, n)| {
                 !self.spent.contains(n.nullifier.as_bytes())
-                    && self.positions.get(cm).is_some_and(|p| &p.shard == shard)
+                    && self.positions.get(*cm).is_some_and(|p| &p.shard == shard)
             })
-            .map(|(cm, n)| (cm.as_slice(), n))
+            .map(|(cm, n)| (cm, n))
             .collect()
     }
 
@@ -198,7 +199,7 @@ pub fn scan_sealed_note(
             dk: addr.dk.clone(),
         };
 
-        let pk_n = nullifier_pk(&addr.nk);
+        let pk_n = addr.address.pk_n();
         if let Ok(note) = trial_decrypt(&sealed, &kp, published_cm, &pk_n) {
             let opening = NoteOpening {
                 value: note.value,

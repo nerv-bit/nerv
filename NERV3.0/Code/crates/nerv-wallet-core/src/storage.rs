@@ -8,8 +8,8 @@ use nerv_core::hash::Hash256;
 use nerv_crypto::aead::{open, seal, AeadKey, Nonce};
 use nerv_crypto::kdf::blake3_kdf;
 
-/// The storage domain for password derivation.
-pub const STORAGE_DOMAIN: Domain = Domain::new("nerv.storage");
+/// The storage domain for password derivation (mirrors `nerv_core::constants::STORAGE`).
+pub const STORAGE_DOMAIN: Domain = nerv_core::constants::STORAGE;
 
 /// The encrypted seed's wire format: [salt 32B][nonce 12B][ct 48B].
 pub const ENVELOPE_LEN: usize = 32 + 12 + 48;
@@ -22,7 +22,13 @@ pub enum StorageError {
     #[error("storage backend: {0}")]
     Backend(String),
     #[error("I/O: {0}")]
-    Io(#[from] std::io::Error),
+    Io(String),
+}
+
+impl From<std::io::Error> for StorageError {
+    fn from(e: std::io::Error) -> Self {
+        StorageError::Io(e.to_string())
+    }
 }
 
 /// The password-encrypted seed envelope.

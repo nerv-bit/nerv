@@ -20,8 +20,12 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 
+pub mod cover_model;
 pub mod gossip;
 pub mod host;
+pub mod relay;
+pub mod relay_registry;
+pub mod sphinx;
 pub mod submission;
 pub mod wire;
 
@@ -36,10 +40,13 @@ pub use gossip::{
 };
 pub use host::{Host, HostConfig, HostError, HostEvent, PeerBook, PeerId, PeerInfo};
 pub use submission::{
-   default_fanout, deliver, fan_out, ingest, ingest_entry, FanOutReport, IngestOutcome,
-   SubmissionError, SubmissionMessage, SUBMISSION_TAG,
+   deliver, fan_out, ingest, ingest_entry, FanOutReport, IngestOutcome,
+   SubmissionError, SubmissionMessage, DEFAULT_FANOUT, SUBMISSION_TAG,
 };
 pub use wire::{accept_handshake, dial_handshake, Session, WireError, MAX_FRAME};
+
+
+use nerv_core::codec::{Decode, Encode};
 
 
 const _: () = assert!(nerv_core::params::MIXNET_SUBMISSION_FANOUT >= 1);

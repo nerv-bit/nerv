@@ -7,7 +7,7 @@ use nerv_state::StateError;
 
 
 /// The proof-verification gate's failures (WP §5.5; erratum 119).
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum VerificationError {
     #[error(transparent)]
@@ -33,7 +33,7 @@ pub enum MempoolError {
 }
 
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum BundleError {
     #[error(transparent)]
@@ -61,7 +61,7 @@ pub enum BundleError {
 }
 
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum IntervalError {
     #[error(transparent)]

@@ -56,6 +56,13 @@ impl SigningKey {
         &self.vk
     }
 
+    /// Alias for [`SigningKey::verifying_key`] returning an owned `VerifyingKey`
+    /// (by copy — `VerifyingKey` is `Copy`). Convenience for callers that
+    /// already hold a `VerifyingKey` field elsewhere.
+    pub fn public_key(&self) -> VerifyingKey {
+        self.vk
+    }
+
     pub fn sign(&self, message: &[u8]) -> Result<Signature, CryptoError> {
         let sig = provider::dsa_sign(&self.kp, message).map_err(CryptoError::Provider)?;
         Ok(Signature(provider::to_fixed::<SIG_LEN>(sig, "ML-DSA-65 signature")?))

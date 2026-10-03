@@ -17,10 +17,10 @@ nerv-crypto = { path = "../nerv-crypto" }
 nerv-custody = { path = "../nerv-custody" }
 nerv-state = { path = "../nerv-state" }
 nerv-registry = { path = "../nerv-registry" }
+nerv-proofs = { path = "../nerv-proofs" }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-nerv-proofs = { path = "../nerv-proofs" }
 nerv-codec = { path = "../nerv-codec" }
 nerv-seal = { path = "../nerv-seal" }
 blake3 = { workspace = true }

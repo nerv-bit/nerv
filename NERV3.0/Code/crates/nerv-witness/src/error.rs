@@ -6,5 +6,5 @@ pub enum WitnessError {
     #[error("block resolution failed: {0}")]
     BlockUnresolvable(String),
     #[error("anchor: {0}")]
-    Anchor(#[from] anchor::AnchorError),
+    Anchor(#[from] crate::anchor::AnchorError),
 }

@@ -5,7 +5,8 @@
 use nerv_core::codec::Encode;
 use nerv_core::constants::SLASH;
 use nerv_core::hash::Hash256;
-use nerv_core::types::{Address, Interval};
+use nerv_core::types::Interval;
+use nerv_custody::Address;
 use nerv_crypto::mldsa::VerifyingKey;
 use nerv_registry::bundle::{verify_bundle, Bundle, BundleError};
 use nerv_registry::challenge::{ChallengeOutcome, InclusionChallenge};
@@ -191,7 +192,7 @@ impl SlashEvidence {
                 let Some((committee, quorum)) = ctx.committee else {
                     return Err(SlashError::CommitteeUnavailable);
                 };
-                let indices = detect_double_sign(a, b, committee, *quorum)?;
+                let indices = detect_double_sign(a, b, committee, quorum)?;
                 Ok(VerifiedSlash {
                     class: SlashClass::DoubleSign,
                     offenders: indices

@@ -9,7 +9,6 @@ use nerv_crypto::mldsa::VerifyingKey;
 use nerv_crypto::sigaggr::{
     validate_qc, QuorumCertificate, MAX_BITMAP_COMMITTEE, QcError,
 };
-use nerv_state::header::ShardHeader;
 
 /// The committee's signing subject (erratum 131): the header hash with
 /// the qc_hash field zeroed — the unsigned header. The header's qc_hash

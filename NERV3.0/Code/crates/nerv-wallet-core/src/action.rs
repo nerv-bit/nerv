@@ -2,6 +2,8 @@
 //! from any platform's UI. The update function is the single handler.
 
 use crate::state::{ClaimBucket, ClaimStage, ProducerDraft, ProducerError, ProducerState, Screen};
+use nerv_core::types::TxId;
+use nerv_wallet::scan::ScannedNote;
 
 /// Every user intent in the wallet. Each platform's UI translates its
 /// native input events into these actions.

@@ -21,6 +21,8 @@ nerv-proofs = { path = "../nerv-proofs" }
 nerv-net = { path = "../nerv-net" }
 nerv-witness = { path = "../nerv-witness" }
 nerv-economy = { path = "../nerv-economy" }
+nerv-state = { path = "../nerv-state" }
+nerv-registry = { path = "../nerv-registry" }
 thiserror = { workspace = true }
 getrandom = { workspace = true }
 

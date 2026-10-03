@@ -13,12 +13,16 @@ use tokio::sync::mpsc;
 use tokio::task::JoinSet;
 
 
+use nerv_core::codec::Decode;
 use nerv_core::constants::NET_PEER;
+use nerv_core::CodecError;
 use nerv_core::hash::Hash256;
 use nerv_crypto::mlkem::{DecapsulationKey, EncapsulationKey};
 use nerv_crypto::mldsa::{SigningKey, VerifyingKey};
 
-
+use crate::gossip::GossipMessage;
+use crate::sphinx::{FragmentFrame, Packet, MIX_FRAGMENT_TAG, MIX_PACKET_TAG};
+use crate::submission::SubmissionMessage;
 use crate::wire::{accept_handshake, dial_handshake, Session, WireError};
 
 
@@ -37,6 +41,12 @@ impl PeerId {
        PeerId(h)
    }
 
+
+   /// Borrow the underlying 32-byte hash.
+   pub fn as_hash(&self) -> Hash256 {
+       self.0
+   }
+}
 
 
 impl std::fmt::Display for PeerId {
@@ -577,5 +587,55 @@ mod tests {
         pre.extend_from_slice(NET_PEER.as_bytes());
         pre.extend_from_slice(sk.verifying_key().as_bytes());
         assert_eq!(id.as_hash().as_bytes(), blake3::hash(&pre).as_bytes());
+    }
+}
+
+/// The application-level payload framing inside an encrypted session
+/// (erratum 207). The wire format is a single discriminator tag byte
+/// followed by the body of the inner message; this enum is the node's
+/// in-process view of "what arrived", independent of which transport
+/// surface carried it.
+///
+/// Tags share a single 0..=8 namespace with the inner message types so
+/// the wire bytes are unambiguous: 0,1,2,6,7,8 → `GossipMessage`;
+/// 3 → `SubmissionMessage`; 4 → `Packet`; 5 → `FragmentFrame`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum HostFrame {
+    Gossip(GossipMessage),
+    Submission(SubmissionMessage),
+    MixPacket(Packet),
+    MixFragment(FragmentFrame),
+}
+
+impl HostFrame {
+    /// Decode a session payload into the variant the tag selects.
+    /// The caller is responsible for handing us the AEAD-opened bytes
+    /// (the wire layer peels encryption before we see them).
+    pub fn decode(payload: &[u8]) -> Result<HostFrame, CodecError> {
+        let Some(&tag) = payload.first() else {
+            return Err(CodecError::Truncated);
+        };
+        match tag {
+            MIX_PACKET_TAG => {
+                let pkt = Packet::decode(&payload[1..])?;
+                Ok(HostFrame::MixPacket(pkt))
+            }
+            MIX_FRAGMENT_TAG => {
+                let frag = FragmentFrame::decode(&payload[1..])?;
+                Ok(HostFrame::MixFragment(frag))
+            }
+            // 3 is the SubmissionMessage tag (SUBMISSION_TAG).
+            // All other tags in 0..=8 belong to GossipMessage.
+            // Both inner decoders read the tag themselves, so we hand
+            // them the full buffer.
+            3 => {
+                let s = SubmissionMessage::decode(payload)?;
+                Ok(HostFrame::Submission(s))
+            }
+            _ => {
+                let g = GossipMessage::decode(payload)?;
+                Ok(HostFrame::Gossip(g))
+            }
+        }
     }
 }

@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 
 use nerv_core::types::{Epoch, Interval, ShardId, ShardSet};
 use nerv_crypto::mldsa::{SigningKey, VerifyingKey};
-use nerv_registry::IntervalLedger;
+use nerv_proofs::{IntervalLedger, IntervalSet};
 
 
 use crate::attestation::{
@@ -41,6 +41,8 @@ pub enum BeaconError {
     IntervalNotInEpoch { interval: u64, epoch: u64 },
     #[error("no interval attestations in epoch {epoch}")]
     EmptyEpoch { epoch: u64 },
+    #[error(transparent)]
+    Dedup(#[from] nerv_proofs::DedupError),
 }
 
 
@@ -233,7 +235,7 @@ impl BeaconState {
 
         // Commit the (empty) registry set for this interval — the ledger
         // chain advances even with no bundles (erratum 121).
-        let set = nerv_registry::IntervalSet {
+        let set = IntervalSet {
             interval,
             txids: Default::default(),
         };

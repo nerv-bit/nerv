@@ -12,7 +12,11 @@ use nerv_crypto::mldsa::{Signature, SigningKey, VerifyingKey};
 use nerv_state::ttau::TauTree;
 
 
-use crate::error::{BundleError, VerificationError};
+use crate::error::VerificationError;
+// Re-export so callers can write `nerv_registry::bundle::BundleError` (used
+// by `nerv-consensus`'s slash module when bundling `BundleError` into
+// `SlashError`). The underlying enum lives in `nerv_registry::error`.
+pub use crate::error::BundleError;
 use crate::mempool::PoolEntry;
 
 

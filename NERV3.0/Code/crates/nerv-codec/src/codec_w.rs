@@ -196,6 +196,27 @@ impl Default for Delta {
     }
 }
 
+impl nerv_core::codec::Encode for Delta {
+    fn encode_into(&self, out: &mut Vec<u8>) {
+        for v in &self.0 {
+            out.extend_from_slice(&v.to_le_bytes());
+        }
+    }
+    fn encoded_len(&self) -> usize {
+        EMBEDDING_DIM * 8
+    }
+}
+
+impl nerv_core::codec::Decode for Delta {
+    fn decode_from(r: &mut nerv_core::codec::Reader<'_>) -> Result<Self, nerv_core::error::CodecError> {
+        let mut arr = [0u64; EMBEDDING_DIM];
+        for slot in arr.iter_mut() {
+            *slot = r.read_u64()?;
+        }
+        Ok(Delta(arr))
+    }
+}
+
 impl Delta {
     /// WP §5.1 statement 8: `δ_leg ≠ 0` — every provable transaction moves
     /// the public index. A sanity check, explicitly not collision

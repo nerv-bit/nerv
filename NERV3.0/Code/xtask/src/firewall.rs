@@ -120,7 +120,7 @@ fn internal_deps(meta: &Metadata, id: &PackageId) -> BTreeSet<String> {
         if is_dev {
             continue;
         }
-        if let Some(p) = meta.packages.iter().find(|p| p.id == dep.package) {
+        if let Some(p) = meta.packages.iter().find(|p| p.id == dep.pkg) {
             if meta.workspace_members.contains(&p.id) {
                 out.insert(p.name.clone());
             }

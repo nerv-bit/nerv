@@ -38,6 +38,6 @@ pub use theme::Theme;
 pub use storage::{
     EncryptedSeed, FileStorage, MemoryStorage, StorageError, WalletStorage,
 };
-pub use update::update;
+pub use update::{update, WalletEvent};
 
 

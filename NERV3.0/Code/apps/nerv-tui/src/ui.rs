@@ -2,7 +2,7 @@
 
 use ratatui::prelude::*;
 use ratatui::widgets::*;
-use nerv_wallet_core::state::{Direction, Screen, SyncStatus};
+use nerv_wallet_core::state::{Direction as TxDirection, Screen, SyncStatus};
 use nerv_wallet_core::Theme;
 
 use crate::app::App;
@@ -116,8 +116,8 @@ fn draw_dashboard(f: &mut Frame, app: &App, area: Rect, t: &Theme) {
     } else {
         app.state.history.iter().take(10).map(|e| {
             let (dir_str, color) = match e.direction {
-                Direction::Incoming => ("↓", Color::Rgb(t.success[0], t.success[1], t.success[2])),
-                Direction::Outgoing => ("↑", Color::Rgb(t.error[0], t.error[1], t.error[2])),
+                TxDirection::Incoming => ("↓", Color::Rgb(t.success[0], t.success[1], t.success[2])),
+                TxDirection::Outgoing => ("↑", Color::Rgb(t.error[0], t.error[1], t.error[2])),
             };
             let amount = e.amount_nano as f64 / 1_000_000_000.0;
             ListItem::new(Line::from(vec![
@@ -245,7 +245,7 @@ fn draw_receive(f: &mut Frame, app: &App, area: Rect, t: &Theme) {
 }
 
 fn draw_claim(f: &mut Frame, app: &App, area: Rect, t: &Theme) {
-    use nerv_wallet_core::action::ClaimBucket;
+    use nerv_wallet_core::ClaimBucket;
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -457,8 +457,8 @@ fn draw_history(f: &mut Frame, app: &App, area: Rect, t: &Theme) {
     } else {
         app.state.history.iter().map(|e| {
             let (arrow, color) = match e.direction {
-                Direction::Incoming => ("↓", Color::Rgb(t.success[0], t.success[1], t.success[2])),
-                Direction::Outgoing => ("↑", Color::Rgb(t.error[0], t.error[1], t.error[2])),
+                TxDirection::Incoming => ("↓", Color::Rgb(t.success[0], t.success[1], t.success[2])),
+                TxDirection::Outgoing => ("↑", Color::Rgb(t.error[0], t.error[1], t.error[2])),
             };
             let amount = e.amount_nano as f64 / 1_000_000_000.0;
             let conf = if e.confirmations > 0 {
@@ -555,7 +555,7 @@ fn draw_notifications(f: &mut Frame, app: &App, t: &Theme) {
     }
 }
 
-fn surrounding_block(title: &str, t: &Theme) -> Block<'_> {
+fn surrounding_block<'a>(title: &'a str, t: &Theme) -> Block<'a> {
     Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Rgb(t.border[0], t.border[1], t.border[2])))

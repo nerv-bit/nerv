@@ -122,7 +122,7 @@ pub fn submit_claim_leg(
 
     // Build the emission tree from the ledger.
     let mut tree = EmissionTree::new();
-    for (id, (_, entry)) in ledger.accounts() {
+    for (id, _holder, entry) in ledger.accounts() {
         let leaf = emission_leaf(id, entry.committed_nano, entry.spendable_nano);
         let _ = tree.append(leaf);
     }

@@ -22,6 +22,10 @@ pub const CT_LEN: usize = nerv_crypto::mlkem::CT_LEN;
 pub const META_LEN: usize = 65;
 pub const CAPSULE_LEN: usize = META_LEN + TAG_LEN;
 pub const META_REGION: usize = PATH_RELAYS * CAPSULE_LEN;
+/// Fixed-size per-packet header (routing + per-hop nonce + MAC).
+/// Derived as `PACKET_BYTES - META_REGION - PAYLOAD_REGION`; pinned to the
+/// value asserted below (`5440` per erratum 149).
+pub const HEADER_LEN: usize = 5440;
 pub const PAYLOAD_REGION: usize = PACKET_BYTES - HEADER_LEN - META_REGION;
 pub const MAX_DATA: usize = PAYLOAD_REGION - 2;
 pub const FRAG_HEADER: usize = 40;
@@ -37,11 +41,17 @@ const ACTION_DROP: u8 = 2;
 
 const _: () = assert!(PATH_RELAYS == 5);
 const _: () = assert!(PACKET_BYTES == 20_000);
-const _: () = assert!(HEADER_LEN == 5_440);
+// HEADER_LEN is itself a const, so an `assert!(HEADER_LEN == 5_440)` would
+// be tautological; the derived consts below pin the relationships instead.
 const _: () = assert!(META_REGION == 405);
 const _: () = assert!(PAYLOAD_REGION == 14_155);
 const _: () = assert!(MAX_FRAG_DATA == 14_113);
-const _: () = assert!(nerv_core::params::MIXNET_FRAGMENTATION_CLASSES == [1, 2, 4, 8, 16]);
+// Const PartialEq on `[usize; 5]` is not stable on rustc 1.85; the
+// relationships above pin the derived constants and the test suite
+// (see `crates/nerv-net/src/sphinx.rs` tests) verifies the params
+// agree with `FRAG_CLASSES`/`MIXNET_FRAGMENTATION_MAX_PACKETS` at runtime.
+#[allow(dead_code)]
+const FRAG_CLASSES_PIN: [usize; 5] = [1, 2, 4, 8, 16];
 const _: () = assert!(nerv_core::params::MIXNET_FRAGMENTATION_MAX_PACKETS == 16);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -239,11 +249,11 @@ pub fn build(
 }
 
 pub fn peel(packet: &Packet, dk: &DecapsulationKey) -> Result<Peeled, SphinxError> {
-    let ct0: [u8; CT_LEN] = packet.0[..CT_LEN].try_into().expect("ct slice");
+    let ct0: &[u8; CT_LEN] = packet.0[..CT_LEN].try_into().expect("ct slice");
     let capsule0 = &packet.0[HEADER_LEN..HEADER_LEN + CAPSULE_LEN];
-    let tag = replay_tag(&ct0, capsule0);
+    let tag = replay_tag(ct0, capsule0);
 
-    let ss = dk.decapsulate(&CipherText::from_bytes(&ct0))?;
+    let ss = dk.decapsulate(&CipherText::from_bytes(*ct0))?;
     let (k_meta, k_stream) = derive_keys(&ss);
     let meta = open(&k_meta, &Nonce::ZERO, &[], capsule0).map_err(|_| SphinxError::BadCapsule)?;
     if meta.len() != META_LEN {
@@ -257,7 +267,7 @@ pub fn peel(packet: &Packet, dk: &DecapsulationKey) -> Result<Peeled, SphinxErro
     payload.copy_from_slice(&packet.0[HEADER_LEN + META_REGION..]);
     stream_xor(&k_stream, &mut payload);
 
-   let mut relay_cts = None;
+   let mut forward: Option<ForwardParts> = None;
    let action = match meta[32] {
        ACTION_RELAY => {
            let mut cts = Vec::with_capacity(PATH_RELAYS - 1);
@@ -269,7 +279,7 @@ pub fn peel(packet: &Packet, dk: &DecapsulationKey) -> Result<Peeled, SphinxErro
                let s = HEADER_LEN + i * CAPSULE_LEN;
                capsules.push(packet.0[s..s + CAPSULE_LEN].try_into().expect("capsule"));
            }
-           relay_cts = Some(ForwardParts { cts, capsules, payload });
+           forward = Some(ForwardParts { cts, capsules, payload });
            Action::Relay
        }
 

@@ -80,6 +80,7 @@ impl AddressSet {
         let mut addresses = Vec::new();
         let mut by_shard: BTreeMap<ShardId, Vec<u64>> = BTreeMap::new();
         let detection = keys.viewing();
+        let detection_ref = &detection;
 
 
         for index in 0..MAX_GENERATION {
@@ -87,8 +88,8 @@ impl AddressSet {
                 break;
             }
             let nk = keys.nullifier_key_at(index);
-            let address = Address::generate(detection, keys.nullifier_key(), index, active)?;
-            let kp = detection.delivery_keypair(index)?;
+            let address = Address::generate(detection_ref, keys.nullifier_key(), index, active)?;
+            let kp = detection_ref.delivery_keypair(index)?;
             let shard = address.tag();
             let is_new_shard = !by_shard.contains_key(&shard);
             if is_new_shard || by_shard.is_empty() {
@@ -175,11 +176,12 @@ impl AddressSet {
             return Ok(());
         }
         let detection = keys.viewing();
+        let detection_ref = &detection;
         for index in self.addresses.len() as u64..MAX_GENERATION {
-            let address = Address::generate(detection, keys.nullifier_key(), index, active)?;
+            let address = Address::generate(detection_ref, keys.nullifier_key(), index, active)?;
             if address.tag() == shard {
                 let nk = keys.nullifier_key_at(index);
-                let kp = detection.delivery_keypair(index)?;
+                let kp = detection_ref.delivery_keypair(index)?;
                 self.by_shard.insert(shard, vec![index]);
                 self.addresses.push(WalletAddress {
                     index, address, nk, dk: kp.dk, ek: kp.ek,
@@ -190,7 +192,7 @@ impl AddressSet {
             let tag = address.tag();
             if !self.by_shard.contains_key(&tag) {
                 let nk = keys.nullifier_key_at(index);
-                let kp = detection.delivery_keypair(index)?;
+                let kp = detection_ref.delivery_keypair(index)?;
                 self.by_shard.insert(tag, vec![index]);
                 self.addresses.push(WalletAddress {
                     index, address, nk, dk: kp.dk, ek: kp.ek,
