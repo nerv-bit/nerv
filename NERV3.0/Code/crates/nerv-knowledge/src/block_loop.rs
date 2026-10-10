@@ -37,6 +37,7 @@ pub struct Commitment {
 }
 
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BlockEvent {
     Reveal { height: u64, delta: Delta, fee_sum: u64, bucket: u16 },
@@ -142,7 +143,7 @@ impl KnowledgeState {
         }
 
 
-        self.forecaster.push_observation(Observation { delta: delta.clone(), fee_sum, bucket });
+        self.forecaster.push_observation(Observation { delta, fee_sum, bucket });
         self.embedding.apply(height, &delta)?;
 
 
@@ -150,7 +151,7 @@ impl KnowledgeState {
             height,
             missed: false,
             legs: None,
-            prediction: Some(committed.prediction.clone()),
+            prediction: Some(committed.prediction),
             prediction_hash: Some(committed.hash),
             residual: Some(r),
             loss_q32: Some(loss),
@@ -196,6 +197,7 @@ impl Default for KnowledgeState {
 /// The gradient vector in the canonical order (ar ‖ fee ‖ bucket ‖ bias),
 /// over the PRE-push window — the same lagged features the prediction
 /// consumed (erratum 170).
+#[allow(clippy::expect_used)]
 fn assemble_grads(
     f: &crate::forecaster::Forecaster,
     b: &[i128; DIMS],
@@ -206,7 +208,7 @@ fn assemble_grads(
 
     let mut grads = vec![0i128; LEARNABLE];
     let n = f.window().len().min(AR_ORDER);
-    for j in 0..DIMS {
+    for (j, _) in (0..DIMS).enumerate() {
         let bj = b[j];
         grads[3 * PER_CHANNEL + j] = bj.saturating_neg();
         for lag in 1..=n {
@@ -269,7 +271,7 @@ mod tests {
 
         let rec = s.reveal(&c, 1, delta(100), 5_000, 3).unwrap();
         assert_eq!(rec.residual.unwrap(), [100i64; DIMS]);
-        assert_eq!(rec.loss_q32.unwrap() > 0, true);
+        assert!(rec.loss_q32.unwrap() > 0);
         assert_eq!(s.embedding().coord().0[0], 100);
         assert_eq!(s.forecaster().window().len(), 1);
         assert_eq!(s.forecaster().moments().step, 1, "one Adam step");

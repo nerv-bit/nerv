@@ -26,8 +26,18 @@ pub mod store;
 pub mod ttau;
 
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testkit"))]
 mod testutil;
+///
+/// Compiled in two contexts:
+/// 1. `cfg(test)` — internal unit tests in this crate.
+/// 2. feature `testkit` — external callers (the cross-crate smoke test in
+///    `nerv-wallet`, future integration tests) opt in by depending on
+///    `nerv-state` with `features = ["testkit"]`.
+///
+/// See `testkit` module docs for the full API.
+#[cfg(any(test, feature = "testkit"))]
+pub mod testkit;
 
 pub use anchor::AnchorRing;
 pub use commitment::{genesis_commitment, state_commitment};

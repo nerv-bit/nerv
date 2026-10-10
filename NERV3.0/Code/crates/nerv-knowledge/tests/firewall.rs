@@ -143,7 +143,7 @@ fn the_firewall_is_a_build_rule() {
 
     // (b) DSR-1: no authority member's build closure reaches knowledge.
     for name in AUTHORITY_SET {
-        if !graph.contains_key(name) {
+        if !graph.contains_key(*name) {
             continue; // e.g. nerv-witness, chunk 18
         }
         let closure = build_closure(&graph, name);
@@ -204,13 +204,11 @@ fn the_workspace_builds_without_nerv_knowledge() {
 
     // Fresh target dir; the lockfile travels (its stale knowledge entry is
     // pruned locally — offline, no registry access).
-    let status = run_with_deadline(
-        std::process::Command::new("cargo")
-            .args(["check", "--workspace", "--offline"])
-            .env("CARGO_TARGET_DIR", tmp.join("target"))
-            .current_dir(&tmp),
-        1800,
-    );
+    let mut cmd = std::process::Command::new("cargo");
+    cmd.args(["check", "--workspace", "--offline"])
+        .env("CARGO_TARGET_DIR", tmp.join("target"))
+        .current_dir(&tmp);
+    let status = run_with_deadline(cmd, 1800);
     let _ = std::fs::remove_dir_all(&tmp);
     assert!(
         status.success(),
@@ -230,7 +228,7 @@ fn copy_tree(src: &Path, dst: &Path, skip: &dyn Fn(&Path) -> bool) -> std::io::R
         if p.is_dir() {
             copy_tree(&p, &dst.join(entry.file_name()), skip)?;
         } else {
-            std::fs::copy(&p, &dst.join(entry.file_name()))?;
+            std::fs::copy(p, dst.join(entry.file_name()))?;
         }
     }
     Ok(())

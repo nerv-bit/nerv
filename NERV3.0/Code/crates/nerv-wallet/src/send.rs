@@ -46,7 +46,7 @@ pub fn bucket_fee(fee_nano: u64, bucket_count: u64) -> u64 {
     if bucket_count <= 1 || fee_nano == 0 {
         return fee_nano;
     }
-    let step = (fee_nano + bucket_count - 1) / bucket_count;
+    let step = fee_nano.div_ceil(bucket_count);
     ((fee_nano + step / 2) / step) * step
 }
 
@@ -203,9 +203,9 @@ pub enum PipelineError {
 ///
 /// Any stage failure short-circuits with `PipelineError`; the caller maps
 /// that into `WalletAction::SendFailed(reason)`.
-pub fn run_send_pipeline<'a, F: FnMut(PipelineStage)>(
+pub fn run_send_pipeline<F: FnMut(PipelineStage)>(
     pipeline: &SendPipeline,
-    entropy: &mut crate::construct::WalletEntropy<'a>,
+    entropy: &mut crate::construct::WalletEntropy<'_>,
     mut on_stage: F,
 ) -> Result<SendReport, PipelineError> {
     on_stage(PipelineStage::Constructing);

@@ -5,7 +5,6 @@
 
 use std::collections::BTreeMap;
 
-use nerv_codec::codec_w::Delta;
 use nerv_core::constants::DERIVED_PRED;
 use nerv_core::hash::Hash256;
 
@@ -248,6 +247,7 @@ impl ChallengerMarket {
     }
 
     /// Every challenger processes the public event; (id, per-block score).
+    #[allow(clippy::type_complexity)]
     pub fn process(
         &mut self,
         event: BlockEvent,
@@ -294,6 +294,7 @@ impl ChallengerMarket {
 mod tests {
     use super::*;
     use crate::block_loop::KnowledgeState;
+    use nerv_codec::codec_w::Delta;
 
     fn reveal(height: u64, v: u64) -> BlockEvent {
         BlockEvent::Reveal { height, delta: Delta([v; DIMS]), fee_sum: 1_000, bucket: 3 }
@@ -501,7 +502,7 @@ mod tests {
         ));
         m.register([2u8; 32], Weights::zero()).unwrap();
         for h in 1..=3u64 {
-            m.commit([1u8; 32], h).unwrap();
+            m.commit(&[1u8; 32], h).unwrap();
             let results = m.process(reveal(h, 500)).unwrap();
             assert_eq!(results.len(), 2);
             for (id, s) in &results {
@@ -513,11 +514,11 @@ mod tests {
             }
         }
         assert!(matches!(
-            m.commit([9u8; 32], 4),
+            m.commit(&[9u8; 32], 4),
             Err(ChallengerError::NotRegistered { .. })
         ));
         assert!(matches!(
-            m.evaluate_gate([1u8; 32], 1, &incumbent(u128::MAX)).unwrap(),
+            m.evaluate_gate(&[1u8; 32], 1, &incumbent(u128::MAX)).unwrap(),
             GateOutcome::NotEligible(EligibilityFailure::InsufficientCoverage { covered: 3, .. })
         ));
         assert!(m.challenger(&[2u8; 32]).is_some());

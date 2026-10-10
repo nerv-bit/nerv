@@ -305,7 +305,9 @@ mod tests {
             assert_eq!(addr.tag(), genesis.home_kappa(&addr.kappa()).unwrap());
             assert_eq!(addr.pk_n(), &nullifier_pk(&w.nullifier_key_at(i)));
             assert_eq!(
-                Address::new(addr.delivery(), addr.tag(), addr.pk_n).unwrap().pk_n(),
+                Address::new(*addr.delivery(), addr.tag(), addr.pk_n)
+                    .unwrap()
+                    .pk_n(),
                 addr.pk_n()
             );
             tags.insert(addr.tag());
@@ -320,11 +322,11 @@ mod tests {
         let addr = Address::generate(w.detection(), w.nullifier_key(), 0, &genesis).unwrap();
         let wrong = ShardId::new(6, addr.tag().value() ^ 1).unwrap();
         assert!(matches!(
-            Address::new(addr.delivery(), wrong, addr.pk_n()),
+            Address::new(*addr.delivery(), wrong, *addr.pk_n()),
             Err(CustodyError::InvalidShardTag)
         ));
         let parent = addr.tag().parent().unwrap();
-        assert!(Address::new(addr.delivery(), parent, addr.pk_n()).is_ok());
+        assert!(Address::new(*addr.delivery(), parent, *addr.pk_n()).is_ok());
     }
 
     #[test]
@@ -333,8 +335,13 @@ mod tests {
         let genesis = ShardSet::genesis();
         let addr = Address::generate(w.detection(), w.nullifier_key(), 5, &genesis).unwrap();
         let children = genesis.split(&addr.tag()).unwrap();
-        assert!(Address::new(addr.delivery(), addr.tag(), addr.pk_n()).is_ok());
-        assert!(addr.home_under(&children).unwrap().is_prefix_of(&addr.tag()));
+        assert!(Address::new(*addr.delivery(), addr.tag(), *addr.pk_n()).is_ok());
+        // After splitting `tag` into its two children, the address's new
+        // home is one of those children — strictly longer than the parent
+        // — so the parent tag is a prefix of the new home, not vice-versa.
+        let new_home = addr.home_under(&children).unwrap();
+        assert_eq!(new_home.bits(), addr.tag().bits() + 1);
+        assert!(addr.tag().is_prefix_of(&new_home));
     }
 
     #[test]

@@ -117,22 +117,24 @@ mod tests {
 
     #[test]
     fn validate_binds_subject_and_committee() {
-        let (keys, roster) = keys(21);
+        let (sks, roster) = keys(21);
         let shard = ShardSet::genesis().ids()[7];
-         let hdr = header(shard, 1, 0x51);
-       let qc = qc_for(body_hash(&hdr), Epoch::from_u64(2), 0..15, &keys, 15);
-        let hq = HeaderQc { shard, header: hdr.clone(), qc }.clone();
-        drop(hdr);
+        let hdr = header(shard, 1, 0x51);
+        let qc = qc_for(body_hash(&hdr), Epoch::from_u64(2), 0..15, &sks, 15);
+        let hq = HeaderQc { shard, header: hdr, qc };
         hq.validate(&roster, 15).unwrap();
-        assert_eq!(hq.subject(), hq.header.header_hash());
+        // The QC binds to the header's body hash (subject), not the full
+        // header hash (which depends on `qc_hash` and isn't part of the
+        // signed payload). `validate` already enforces `qc.subject ==
+        // hq.subject()`; the explicit check below mirrors that contract.
+        assert_eq!(hq.qc.subject, hq.subject());
 
         let mut bad = hq.clone();
-        bad.qc.subject = bad.qc.subject(); // no-op for the borrow checker
-        let forged = h(&bad.header);
+        let forged = h(&bad);
         bad.qc.subject = forged;
         assert!(matches!(
             bad.validate(&roster, 15),
-            Err(QcError::MalformedCertificate("qc subject is not the header hash"))
+            Err(QcError::MalformedCertificate("qc subject is not the header body hash"))
         ));
 
         let (_, other) = keys(21 + 7);
@@ -146,7 +148,7 @@ mod tests {
         ));
 
         let hdr0 = header(shard, 0, 0x52);
-       let qc0 = qc_for(body_hash(&hdr0), Epoch::from_u64(2), 0..15, &keys, 15);
+        let qc0 = qc_for(body_hash(&hdr0), Epoch::from_u64(2), 0..15, &sks, 15);
         let hq0 = HeaderQc { shard, header: hdr0, qc: qc0 };
         assert!(matches!(
             hq0.validate(&roster, 15),
@@ -156,51 +158,28 @@ mod tests {
 
     #[test]
     fn detects_offenders() {
-        let (keys, roster) = keys(21);
+        let (sks, roster) = keys(21);
         let shard = ShardSet::genesis().ids()[7];
         let ha = header(shard, 5, 0x53);
         let hb = header(shard, 5, 0x54);
         assert_ne!(ha.header_hash(), hb.header_hash());
-        let a = HeaderQc {
-           shard,
-           header: ha,
-           qc: qc_for(body_hash(&ha), Epoch::from_u64(2), 0..15, &keys, 15),
-       };
-       let b = HeaderQc {
-           shard,
-           header: hb,
-           qc: qc_for(body_hash(&hb), Epoch::from_u64(2), 5..20, &keys, 15),
-       };
-       let offenders = detect_double_sign(&a, &b, &roster, 15).unwrap();
-
+        let qc_a = qc_for(body_hash(&ha), Epoch::from_u64(2), 0..15, &sks, 15);
+        let qc_b = qc_for(body_hash(&hb), Epoch::from_u64(2), 5..20, &sks, 15);
+        let a = HeaderQc { shard, header: ha, qc: qc_a };
+        let b = HeaderQc { shard, header: hb.clone(), qc: qc_b };
+        let offenders = detect_double_sign(&a, &b, &roster, 15).unwrap();
         assert_eq!(offenders, (5..15).collect::<Vec<_>>());
 
         // Different height / different header / different epochs.
         let hc = header(shard, 6, 0x55);
-        let c = HeaderQc {
-           shard,
-           header: hc,
-           qc: qc_for(body_hash(&hc), Epoch::from_u64(2), 0..15, &keys, 15),
-       };
-       assert!(matches!(
-           detect_double_sign(&a, &c, &roster, 15),
-           Err(DoubleSignError::DifferentSlots)
-       ));
-       let a2 = HeaderQc {
-           shard,
-           header: a.header.clone(),
-           qc: qc_for(body_hash(&a.header), Epoch::from_u64(3), 0..15, &keys, 15),
-       };
-
+        let qc_c = qc_for(body_hash(&hc), Epoch::from_u64(2), 0..15, &sks, 15);
+        let c = HeaderQc { shard, header: hc, qc: qc_c };
         assert!(matches!(
             detect_double_sign(&a, &c, &roster, 15),
             Err(DoubleSignError::DifferentSlots)
         ));
-        let a2 = HeaderQc {
-            shard,
-            header: a.header.clone(),
-            qc: qc_for(a.header.header_hash(), Epoch::from_u64(3), 0..15, &keys, 15),
-        };
+        let qc_a2 = qc_for(body_hash(&hb), Epoch::from_u64(3), 0..15, &sks, 15);
+        let a2 = HeaderQc { shard, header: hb, qc: qc_a2 };
         assert!(matches!(
             detect_double_sign(&a, &a2, &roster, 15),
             Err(DoubleSignError::DifferentEpochs)
@@ -213,20 +192,14 @@ mod tests {
 
     #[test]
     fn disjoint_signers_are_not_attributable() {
-        let (keys, roster) = keys(30);
+        let (sks, roster) = keys(30);
         let shard = ShardSet::genesis().ids()[7];
         let ha = header(shard, 2, 0x56);
         let hb = header(shard, 2, 0x57);
-        let a = HeaderQc {
-           shard,
-           header: ha,
-           qc: qc_for(body_hash(&ha), Epoch::from_u64(1), 0..15, &keys, 15),
-       };
-       let b = HeaderQc {
-           shard,
-           header: hb,
-           qc: qc_for(body_hash(&hb), Epoch::from_u64(1), 15..30, &keys, 15),
-       };
+        let qc_a = qc_for(body_hash(&ha), Epoch::from_u64(1), 0..15, &sks, 15);
+        let qc_b = qc_for(body_hash(&hb), Epoch::from_u64(1), 15..30, &sks, 15);
+        let a = HeaderQc { shard, header: ha, qc: qc_a };
+        let b = HeaderQc { shard, header: hb, qc: qc_b };
 
         assert!(matches!(
             detect_double_sign(&a, &b, &roster, 15),

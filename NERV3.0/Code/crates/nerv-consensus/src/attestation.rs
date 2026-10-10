@@ -199,6 +199,7 @@ impl IntervalAttestation {
         Hash256::concat(&ATT, &buf)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn build(
         interval: Interval,
         g_root: Hash256,
@@ -517,16 +518,15 @@ mod tests {
         static SET: OnceLock<(Vec<nerv_crypto::mldsa::SigningKey>, Vec<VerifyingKey>)> =
             OnceLock::new();
         SET.get_or_init(|| {
-            let (keys, vks) = keys(21);
-            (keys, vks)
+            keys(21)
         })
     }
 
     fn attestation_fixture(seed: u64, interval: u64, prev: Hash256) -> IntervalAttestation {
         let mut rng = SplitMix64::new(seed);
-        let (keys, vks) = signer_set();
+        let (sks, vks) = signer_set();
         let signers: Vec<(usize, &nerv_crypto::mldsa::SigningKey)> =
-            (0..15).map(|i| (i, &keys[i])).collect();
+            (0..15).map(|i| (i, &sks[i])).collect();
         IntervalAttestation::build(
             Interval::from_u64(interval),
             Hash256::from_bytes(rng.bytes32()),
@@ -599,9 +599,15 @@ mod tests {
         verify_chain(Interval::from_u64(86_399), &zero, &[a.clone(), b.clone(), c.clone()], &|_| Some(set.clone()), 15)
             .unwrap();
 
-        // Broken link.
+        // Broken link: a forked 86_401 attestation (same interval, same
+        // prev, different body) changes the digest that 86_402 chains
+        // to. The suffix is contiguous, so this is ChainBroken at
+        // 86_402 — a missing attestation would be ChainGap instead (the
+        // contiguity check fires first).
+        let b_fork = attestation_fixture(0xA9, 86_401, a.digest());
+        assert_ne!(b_fork.digest(), b.digest());
         assert!(matches!(
-            verify_chain(Interval::from_u64(86_399), &zero, &[a.clone(), c.clone()], &|_| Some(set.clone()), 15),
+            verify_chain(Interval::from_u64(86_399), &zero, &[a.clone(), b_fork.clone(), c.clone()], &|_| Some(set.clone()), 15),
             Err(AttestationError::ChainBroken { interval: 86_402 })
         ));
         // Gap.
@@ -633,9 +639,9 @@ mod tests {
         assert_eq!(root, merkle_root(&ATT, &digests));
         assert_ne!(root, interval_digests_root(&digestests_reversed(&digests)));
 
-        let (keys, vks) = signer_set();
+        let (sks, vks) = signer_set();
         let signers: Vec<(usize, &nerv_crypto::mldsa::SigningKey)> =
-            (0..15).map(|i| (i, &keys[i])).collect();
+            (0..15).map(|i| (i, &sks[i])).collect();
         let e0 = EpochAttestation::build(Epoch::from_u64(0), root, zero, &signers, vks, 15).unwrap();
         e0.validate(vks, 15).unwrap();
         assert_eq!(e0.digest(), e0.digest());
@@ -648,7 +654,7 @@ mod tests {
         bad.qc.subject = Hash256::from_bytes([7u8; 32]);
         assert!(matches!(bad.validate(vks, 15), Err(AttestationError::SubjectMismatch)));
         let mut bad = e0.clone();
-        bad.epoch = Epoch::from_u64(1);
+        bad.qc.epoch = Epoch::from_u64(1);
         assert!(matches!(bad.validate(vks, 15), Err(AttestationError::EpochMismatch { .. })));
         let (_, other) = keys(21 + 9);
         assert!(matches!(e0.validate(&other, 15), Err(AttestationError::Qc(_))));
@@ -677,9 +683,9 @@ mod tests {
         ext.push(0);
         assert!(IntervalAttestation::decode(&ext).is_err());
 
-        let (keys, vks) = signer_set();
+        let (sks, vks) = signer_set();
         let signers: Vec<(usize, &nerv_crypto::mldsa::SigningKey)> =
-            (0..15).map(|i| (i, &keys[i])).collect();
+            (0..15).map(|i| (i, &sks[i])).collect();
         let e = EpochAttestation::build(
             Epoch::from_u64(2),
             interval_digests_root(&[a.digest()]),

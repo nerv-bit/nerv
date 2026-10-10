@@ -193,6 +193,7 @@ pub(crate) mod harness {
     }
 
     /// A structurally valid header at `height` (deterministic).
+    #[allow(dead_code, unused_variables)]
     pub(crate) fn test_header(
         shard: nerv_core::types::ShardId,
         height: u64,
@@ -225,6 +226,7 @@ pub(crate) mod harness {
         }
     }
 
+    #[allow(dead_code)]
     fn payout() -> nerv_custody::Address {
         static PAYOUT: OnceLock<nerv_custody::Address> = OnceLock::new();
         PAYOUT
@@ -246,6 +248,7 @@ pub(crate) mod harness {
 
     /// A structurally valid decryption partial (a zero polynomial and an
     /// empty proof — gossip carries it; the ceremony verifies it).
+    #[allow(dead_code)]
     pub(crate) fn test_partial(member: u8) -> nerv_seal::vpd::PartialDecryption {
         nerv_seal::vpd::PartialDecryption {
             member,

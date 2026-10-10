@@ -103,9 +103,11 @@ impl Hash256 {
         }
         let m = m as u128;
         let mut r: u128 = 0;
-        for limb in self.to_u64_words_le() {
+        // Horner from the MOST significant word down: the value is
+        // Σ wordᵢ·2^(64·i), so low-first would weight the words backwards.
+        for limb in self.to_u64_words_le().iter().rev() {
             // r < m <= 2^64-1, so (r << 64) + limb < 2^128: no overflow.
-            r = ((r << 64) + limb as u128) % m;
+            r = ((r << 64) + *limb as u128) % m;
         }
         r as u64
     }
@@ -259,7 +261,7 @@ mod tests {
         // ["ab", "c"] and ["a", "bc"] concatenate identically — the ambiguity
         // framed mode exists to kill. Plain concatenation collides by
         // construction; the framed encodings must not.
-        assert_eq!([b"ab", b"c"].concat(), [b"a", b"bc"].concat());
+        assert_eq!([&b"ab"[..], &b"c"[..]].concat(), [&b"a"[..], &b"bc"[..]].concat());
         let a = Hash256::framed(&constants::TXID, &[b"ab", b"c"]);
         let b = Hash256::framed(&constants::TXID, &[b"a", b"bc"]);
         assert_ne!(a, b);
@@ -323,13 +325,17 @@ mod tests {
         Xof::new(&constants::STATE_COMMITMENT, b"msg").fill(&mut raw);
         assert_eq!(v, u64::from_le_bytes(raw));
 
-        // position/seek are exact
+        // position/seek are exact: one word costs 8 bytes, and seeking to
+        // offset p reproduces the stream from byte p.
         let mut xs = Xof::new(&constants::STATE_COMMITMENT, b"msg");
         let first = xs.next_u64();
         assert_eq!(xs.position(), 8);
+        let second = xs.next_u64();
         let mut xz = Xof::new(&constants::STATE_COMMITMENT, b"msg");
-        xz.seek(8);
+        xz.seek(0);
         assert_eq!(xz.next_u64(), first);
+        xz.seek(8);
+        assert_eq!(xz.next_u64(), second);
     }
 
     #[test]
@@ -370,7 +376,11 @@ mod tests {
     fn display_is_lowercase_hex() {
         let h = Hash256::from_bytes([0u8; 32]);
         assert_eq!(h.to_string(), "00".repeat(32));
-        let h2 = Hash256::from_bytes([0x0a, 0xff, 0x10]);
+        let mut tail = [0u8; 32];
+        tail[0] = 0x0a;
+        tail[1] = 0xff;
+        tail[2] = 0x10;
+        let h2 = Hash256::from_bytes(tail);
         assert!(h2.to_string().starts_with("0aff10"));
     }
 }

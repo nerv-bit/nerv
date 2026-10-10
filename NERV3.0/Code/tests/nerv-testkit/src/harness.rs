@@ -338,7 +338,7 @@ mod tests {
     #[test]
     fn censorship_prevents_delivery() {
         let mut h = Harness::new(ScheduleStrategy::DropSource {
-            source: "censored".to_string(),
+            source: "censored",
         });
         h.add_node(Box::new(BlackHoleNode::new("target")));
 

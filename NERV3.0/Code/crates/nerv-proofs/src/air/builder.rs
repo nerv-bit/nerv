@@ -369,7 +369,7 @@ mod tests {
 
     #[test]
     fn public_values_and_out_of_bounds() {
-        let mut eval = NativeEval {
+        let eval = NativeEval {
             trace: vec![row(&[0])],
             public_values: vec![Goldilocks::from_u32(9)],
             prep: vec![],
@@ -395,7 +395,7 @@ mod tests {
         eval.position = 1;
         assert_eq!(eval.preprocessed(0), Goldilocks::from_u32(8));
         assert_eq!(eval.preprocessed(5), Goldilocks::ZERO);
-        let mut empty = NativeEval {
+        let empty = NativeEval {
             trace: vec![row(&[0])],
             public_values: vec![],
             prep: vec![],
@@ -409,7 +409,7 @@ mod tests {
     fn check_with_prep_end_to_end() {
         let trace = vec![row(&[7]), row(&[8])];
         let prep = vec![vec![Goldilocks::from_u32(7)], vec![Goldilocks::from_u32(8)]];
-        assert!(NativeEval::check_with_prep(trace, prep, vec![], &PrepAir, 4).is_ok());
+        assert!(NativeEval::check_with_prep(trace, prep.clone(), vec![], &PrepAir, 4).is_ok());
 
         let bad = vec![row(&[7]), row(&[9])];
         let errs = NativeEval::check_with_prep(bad, prep, vec![], &PrepAir, 4).unwrap_err();

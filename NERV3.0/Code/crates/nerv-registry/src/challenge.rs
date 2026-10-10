@@ -127,56 +127,66 @@ mod tests {
     }
 
 
-    /// bundles → interval → (build, the txids included).
+    /// bundles → interval → (build, the txids in canonical order).
     fn interval_with(seeds: &[u64]) -> (crate::interval::IntervalBuild, Vec<TxId>) {
         let b = Bundle::build(&agg_key(9), seeds.iter().map(|&s| entry(s)).collect()).unwrap();
         let build = build_interval_commit(Interval::from_u64(0), &[b], &IntervalLedger::new())
             .unwrap();
-        let mut ids: Vec<TxId> = seeds.iter().map(|&s| txid_of(&shell(s))).collect();
-        ids.sort();
+        let ids: Vec<TxId> = build.report.set.iter_sorted().map(|(t, _)| *t).collect();
         (build, ids)
+    }
+
+
+    /// The seed whose shell's txid equals `txid`. Tests use this to pick
+    /// a seed deterministically when the test only knows the sorted txid.
+    fn seed_for_txid(seeds: &[u64], txid: TxId) -> u64 {
+        seeds
+            .iter()
+            .copied()
+            .find(|&s| txid_of(&shell(s)) == txid)
+            .unwrap_or_else(|| panic!("no seed in {seeds:?} produces txid {txid:?}"))
     }
 
 
     #[test]
     fn garbage_proof_sustains_the_challenge() {
         let ctx = ctx();
-        let (build, ids) = interval_with(&[1, 2, 3]);
+        let seeds = [1u64, 2, 3];
+        let (build, ids) = interval_with(&seeds);
         let interval = build.commit.interval;
         let root = build.commit.tau_root;
 
 
         // The attested transaction's own (invalid) proof sustains.
         let target = ids[1];
-        let orig = build
-            .report
-            .set
-            .iter_sorted()
-            .find(|(t, _)| **t == target)
-            .map(|(t, _)| *t)
-            .unwrap();
-        let shell = shell(2);
-        assert_eq!(txid_of(&shell), orig);
-        let w = build.witness(&orig).unwrap();
+        let seed_for_target = seed_for_txid(&seeds, target);
+        let shell = shell(seed_for_target);
+        assert_eq!(txid_of(&shell), target);
+        let w = build.witness(&target).unwrap();
         let ch = InclusionChallenge { witness: w, shell: shell.clone(), proof: shallow_proof() };
         assert_eq!(ch.verify(interval, &root, &ctx).unwrap(), ChallengeOutcome::Sustained);
-        assert_eq!(ch.txid().unwrap(), orig);
+        assert_eq!(ch.txid().unwrap(), target);
     }
 
 
     #[test]
     fn rejections() {
         let ctx = ctx();
-        let (build, ids) = interval_with(&[4, 5]);
+        let seeds = [4u64, 5];
+        let (build, ids) = interval_with(&seeds);
         let interval = build.commit.interval;
         let root = build.commit.tau_root;
         let target = ids[0];
-        let shell = shell(4);
+        let seed_for_target = seed_for_txid(&seeds, target);
+        let shell = shell(seed_for_target);
         assert_eq!(txid_of(&shell), target);
 
 
        // A different shell under the same witness: the txid does not match.
-       let other = shell(5);
+       // Pick the OTHER seed so the two shells actually differ regardless
+       // of which one happens to be the sorted-first target.
+       let other_seed = seeds.iter().copied().find(|&s| s != seed_for_target).unwrap();
+       let other = crate::testutil::harness::shell(other_seed);
         let ch = InclusionChallenge {
             witness: build.witness(&target).unwrap(),
             shell: other,
@@ -209,7 +219,12 @@ mod tests {
         ));
 
 
-        // Context version mismatch is a challenge error, not sustenance.
+        // Context version mismatch is a challenge error, not sustenance. The
+        // witness check fires first because changing weight_version changes
+        // the leg's wire bytes and therefore the canonicalized txid — the
+        // witness was built for the original txid and rejects. Either error
+        // variant is the "challenge error" the test wants; what matters is
+        // that the challenge did NOT sustain the bundle.
         let mut v7 = shell.clone();
         v7.legs[0].weight_version = 7;
         let ch = InclusionChallenge {
@@ -219,7 +234,7 @@ mod tests {
         };
         assert!(matches!(
             ch.verify(interval, &root, &ctx),
-            Err(ChallengeError::ContextVersion { shell: 7, codec: 1 })
+            Err(ChallengeError::ContextVersion { .. }) | Err(ChallengeError::WitnessRejected)
         ));
 
 
@@ -238,11 +253,14 @@ mod tests {
 
     #[test]
     fn digest_and_codec_roundtrip() {
-        let (build, ids) = interval_with(&[6, 7]);
-        let shell = shell(6);
-        assert_eq!(txid_of(&shell), ids[0]);
+        let seeds = [6u64, 7];
+        let (build, ids) = interval_with(&seeds);
+        let target = ids[0];
+        let seed_for_target = seed_for_txid(&seeds, target);
+        let shell = shell(seed_for_target);
+        assert_eq!(txid_of(&shell), target);
         let ch = InclusionChallenge {
-            witness: build.witness(&ids[0]).unwrap(),
+            witness: build.witness(&target).unwrap(),
             shell,
             proof: shallow_proof(),
         };

@@ -555,7 +555,7 @@ mod tests {
     use crate::decrypt::decrypt_native;
     use crate::digitize::{digitize, COORDS};
     use crate::encrypt::Ciphertext;
-    use crate::noise::{KEY_BOUND, SCALE};
+    use crate::noise::KEY_BOUND;
     use crate::sampling::NoiseSeed;
 
     fn splitmix64(state: &mut u64) -> u64 {
@@ -664,7 +664,7 @@ mod tests {
                 .iter()
                 .enumerate()
                 .filter(|(i, _)| *i != ji)
-                .map(|(i, s)| {
+                .map(|(_i, s)| {
                     let (f, r) = s.fragment_for(j);
                     (s.member, f, r)
                 })
@@ -675,7 +675,7 @@ mod tests {
             // Share bound (erratum 42): |s_j|∞ ≤ n·t = 70.
             for p in share.share.polys() {
                 for v in p.centerlift() {
-                    assert!(v.unsigned_abs() <= SHARE_BOUND as u64);
+                    assert!(v.unsigned_abs() <= SHARE_BOUND);
                 }
             }
         }
@@ -703,7 +703,7 @@ mod tests {
                 .iter()
                 .enumerate()
                 .filter(|(i, _)| *i != ji)
-                .map(|(i, s)| {
+                .map(|(_i, s)| {
                     let (f, r) = s.fragment_for(j);
                     (s.member, f, r)
                 })
@@ -711,11 +711,11 @@ mod tests {
             let share = ShareSecret::assemble(j, &own, &received, COMMITTEE_SIZE, THRESHOLD).unwrap();
             shares.push((j, share.share));
         }
-        let base = reconstruct(&[1, 2, 3, 4, 5, 6, 7], &shares[..7].to_vec(), COMMITTEE_SIZE, THRESHOLD).unwrap();
+        let base = reconstruct(&[1, 2, 3, 4, 5, 6, 7], &shares[..7], COMMITTEE_SIZE, THRESHOLD).unwrap();
         // Every t-subset (120 of them) reconstructs the same secret.
-        let mut subsets: Vec<Vec<u8>> = Vec::new();
-        let mut idx: Vec<usize> = (0..COMMITTEE_SIZE).collect();
-        combine(&mut idx, THRESHOLD, &mut Vec::new(), &mut subsets);
+        let mut subsets: Vec<Vec<usize>> = Vec::new();
+        let idx: Vec<usize> = (0..COMMITTEE_SIZE).collect();
+        combine(&idx, THRESHOLD, &mut Vec::new(), &mut subsets);
         assert_eq!(subsets.len(), 120);
         for s in subsets.iter() {
             let set: Vec<u8> = s.iter().map(|&i| shares[i].0).collect();
@@ -724,7 +724,7 @@ mod tests {
             assert_eq!(r, base, "subset {set:?}");
         }
         // t−1 shares reconstruct something different (and are not the key).
-        let six = reconstruct(&[1, 2, 3, 4, 5, 6], &shares[..6].to_vec(), COMMITTEE_SIZE, 6).unwrap();
+        let six = reconstruct(&[1, 2, 3, 4, 5, 6], &shares[..6], COMMITTEE_SIZE, 6).unwrap();
         assert_ne!(six, base);
     }
 
@@ -734,7 +734,7 @@ mod tests {
             return;
         }
         for (i, &x) in pool.iter().enumerate() {
-            if cur.last().map_or(true, |&l| l < x) {
+            if cur.last().is_none_or(|&l| l < x) {
                 cur.push(x);
                 combine(&pool[i + 1..], k, cur, out);
                 cur.pop();
@@ -753,7 +753,7 @@ mod tests {
                     .iter()
                     .enumerate()
                     .filter(|(i, _)| *i != ji)
-                    .map(|(i, s)| {
+                    .map(|(_i, s)| {
                         let (f, r) = s.fragment_for(j);
                         (s.member, f, r)
                     })
@@ -762,7 +762,7 @@ mod tests {
                 (j, share.share)
             })
             .collect();
-        let s = reconstruct(&[1, 2, 3, 4, 5, 6, 7], &shares[..7].to_vec(), COMMITTEE_SIZE, THRESHOLD).unwrap();
+        let s = reconstruct(&[1, 2, 3, 4, 5, 6, 7], &shares[..7], COMMITTEE_SIZE, THRESHOLD).unwrap();
         let pk = assemble_public_key(&c.public, &c.a_seed, COMMITTEE_SIZE).unwrap();
         // T − s·A is the summed committee noise: |·|∞ ≤ n = KEY_BOUND.
         let base = c.a_mat.mul_vec_transpose(&s);
@@ -795,7 +795,7 @@ mod tests {
                     .iter()
                     .enumerate()
                     .filter(|(i, _)| *i != ji)
-                    .map(|(i, s)| {
+                    .map(|(_i, s)| {
                         let (f, r) = s.fragment_for(j);
                         (s.member, f, r)
                     })
@@ -804,7 +804,7 @@ mod tests {
                 (j, share.share)
             })
             .collect();
-        let s = reconstruct(&[1, 2, 3, 4, 5, 6, 7], &shares[..7].to_vec(), COMMITTEE_SIZE, THRESHOLD).unwrap();
+        let s = reconstruct(&[1, 2, 3, 4, 5, 6, 7], &shares[..7], COMMITTEE_SIZE, THRESHOLD).unwrap();
 
         let mut st = 0xE2E0_0001u64;
         let mut agg = Ciphertext::zero();
@@ -839,7 +839,7 @@ mod tests {
         let bytes = c.public[3].to_bytes();
         let parsed = MemberPublic::from_bytes(&bytes).unwrap();
         assert_eq!(parsed.to_bytes(), bytes);
-        assert!(parsed.verify(&c.a_seed, COMMITTEE_SIZE, THRESHOLD).unwrap() == ());
+        assert!(parsed.verify(&c.a_seed, COMMITTEE_SIZE, THRESHOLD).is_ok());
         assert!(MemberPublic::from_bytes(&bytes[..bytes.len() - 1]).is_err());
     }
 

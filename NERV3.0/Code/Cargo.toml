@@ -75,7 +75,7 @@ publish = false
 unsafe_code = "forbid"
 
 [workspace.lints.clippy]
-all = "deny"
+all = { level = "deny", priority = -1 }
 float_arithmetic = "deny"   # P5: consensus-adjacent code is integer-exact. (The M1 float
                             # oracle in nerv-knowledge tests re-allows locally, DSR-11.)
 unwrap_used = "warn"

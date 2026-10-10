@@ -1,6 +1,5 @@
 //! Self-spend shard migration (WP §8.5; erratum 190).
 
-use std::collections::BTreeSet;
 
 use nerv_codec::codec_w::CodecW;
 use nerv_core::types::{ShardId, ShardSet};
@@ -76,6 +75,7 @@ mod tests {
     use super::*;
     use crate::keys::AddressSet;
     use crate::scan::{scan_sealed_note, NotePosition, WalletNoteSet};
+    use nerv_core::codec::Encode;
     use crate::testutil::SplitMix64;
     use nerv_codec::codec_w::WeightVersion;
     use nerv_codec::weight_gen::{certify, expand, BeaconRandomness, CertConfig};
@@ -124,7 +124,7 @@ mod tests {
             let wit = tree.witness(idx).unwrap();
             ns.set_position(*cm.as_bytes(), NotePosition {
                 leaf_index: idx, anchor,
-                siblings: wit.siblings.iter().map(|d| d.to_elements().unwrap()).collect(),
+                siblings: wit.siblings.iter().flat_map(|d| d.to_elements().unwrap()).collect(),
                 shard: from, received_height: 1,
             });
         }

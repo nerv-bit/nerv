@@ -279,7 +279,7 @@ mod tests {
     #[test]
     fn constraint_violation_caught_by_the_debug_differential() {
         let mut rows = range_rows(0xB2, 4);
-        rows[1][0] = rows[1][0] + Goldilocks::ONE;
+        rows[1][0] += Goldilocks::ONE;
         let chip = RangeChip::new(0, 1, 32);
         let prover = Prover::new(strong_fri());
         let mut t = seeded(0x5EED);

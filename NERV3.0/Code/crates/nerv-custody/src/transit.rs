@@ -129,7 +129,7 @@ impl TransitEntry {
     /// D.3: a Pending entry past expiry + L_grace is due for reversion.
     pub fn reversion_due(&self, current: Height) -> bool {
         self.state == TransitEntryState::Pending
-            && current.as_u64() >= self.expiry.as_u64() + CUSTODY_D3_EXPIRY_GRACE_BLOCKS_L_GRACE as u64
+            && current.as_u64() >= self.expiry.as_u64() + CUSTODY_D3_EXPIRY_GRACE_BLOCKS_L_GRACE
     }
 }
 
@@ -186,11 +186,18 @@ fn default_hashes() -> &'static [Hash256; 257] {
 fn mask(key: &[u8; 32], level: u16) -> [u8; 32] {
     let mut out = *key;
     let full = (level / 8) as usize;
-    for b in out.iter_mut().skip(full) {
-        *b = 0;
-    }
     let rem = (level % 8) as u8;
-    if rem != 0 {
+    // Zero the suffix. The partial byte at index `full` (when rem != 0) is
+    // handled separately below — otherwise the prefix-zeroing loop wipes
+    // the bits we want to keep and the subsequent `&=` mask has no effect.
+    if rem == 0 {
+        for b in out.iter_mut().skip(full) {
+            *b = 0;
+        }
+    } else {
+        for b in out.iter_mut().skip(full + 1) {
+            *b = 0;
+        }
         out[full] &= 0xFFu8 << (8 - rem);
     }
     out
@@ -416,7 +423,7 @@ impl TransitLog {
             .get(key.as_bytes())
             .ok_or(CustodyError::TransitAbsent { key: *key })?;
         let earliest = Height::from_u64(
-            e.expiry.as_u64() + CUSTODY_D3_EXPIRY_GRACE_BLOCKS_L_GRACE as u64,
+            e.expiry.as_u64() + CUSTODY_D3_EXPIRY_GRACE_BLOCKS_L_GRACE,
         );
         self.consume(key, TransitEntryState::Reverted, height, Some(earliest))
     }
@@ -598,21 +605,24 @@ mod tests {
     #[test]
     fn reversion_rule_and_errors() {
         let mut rng = SplitMix64::new(4);
-        let e = entry(&mut rng, 10, 500); // expiry 500, L_grace 10
+        // L_grace = CUSTODY_D3_EXPIRY_GRACE_BLOCKS_L_GRACE = 200 (per
+        // specs/params.toml: d3_expiry_grace_blocks_l_grace). With
+        // expiry = 500 the due boundary is height = 700.
+        let e = entry(&mut rng, 10, 500);
         let mut log = TransitLog::new();
         log.insert_pending(e).unwrap();
 
         // before expiry + L_grace: not due, and revert() is an error
-        assert!(e.reversion_due(Height::from_u64(509)).eq(&false));
+        assert!(e.reversion_due(Height::from_u64(699)).eq(&false));
         assert!(matches!(
-            log.revert(&e.key(), Height::from_u64(509)),
+            log.revert(&e.key(), Height::from_u64(699)),
             Err(CustodyError::ReversionTooEarly { .. })
         ));
         // at expiry + L_grace exactly: due
-        assert!(e.reversion_due(Height::from_u64(510)));
-        let reverted = log.revert(&e.key(), Height::from_u64(510)).unwrap();
+        assert!(e.reversion_due(Height::from_u64(700)));
+        let reverted = log.revert(&e.key(), Height::from_u64(700)).unwrap();
         assert_eq!(reverted.state, TransitEntryState::Reverted);
-        assert_eq!(reverted.height.as_u64(), 510);
+        assert_eq!(reverted.height.as_u64(), 700);
         // consume-once after reversion
         assert!(matches!(
             log.claim(&e.key(), Height::from_u64(600)),

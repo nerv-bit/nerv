@@ -19,6 +19,7 @@ impl SplitMix64 {
     }
 
 
+    #[allow(dead_code)]
     pub(crate) fn bytes32(&mut self) -> [u8; 32] {
         let mut out = [0u8; 32];
         for chunk in out.chunks_exact_mut(8) {

@@ -4,7 +4,6 @@
 //! key before storage.
 
 use nerv_core::constants::Domain;
-use nerv_core::hash::Hash256;
 use nerv_crypto::aead::{open, seal, AeadKey, Nonce};
 use nerv_crypto::kdf::blake3_kdf;
 
@@ -319,6 +318,7 @@ pub fn base64_encode(data: &[u8]) -> String {
     out
 }
 
+#[allow(clippy::result_unit_err)]
 pub fn base64_decode(s: &str) -> Result<Vec<u8>, ()> {
     let s = s.trim_end_matches('=');
     let mut out = Vec::with_capacity(s.len() * 3 / 4);

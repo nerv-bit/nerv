@@ -286,7 +286,7 @@ mod tests {
         assert_eq!(e21, e22);
         for p in r1.polys().iter().chain(e11.polys().iter()).chain(e21.polys().iter()) {
             for v in p.centerlift() {
-                assert!(v >= -2 && v <= 2);
+                assert!((-2..=2).contains(&v));
             }
         }
         assert_ne!(r1, e11);
@@ -356,12 +356,12 @@ mod tests {
             let ns = NoiseSeed::from_bytes(b);
             let (r, e1, e2) = derive_short_triplet(&ns).unwrap();
             let (r2, e12, e22) = derive_short_triplet(&ns).unwrap();
-            prop_assert_eq!(r, r2);
-            prop_assert_eq!(e1, e12);
-            prop_assert_eq!(e2, e22);
+            prop_assert_eq!(r.clone(), r2);
+            prop_assert_eq!(e1.clone(), e12);
+            prop_assert_eq!(e2.clone(), e22);
             for p in r.polys().iter().chain(e1.polys().iter()).chain(e2.polys().iter()) {
                 for v in p.centerlift() {
-                    prop_assert!(v >= -2 && v <= 2);
+                    prop_assert!((-2..=2).contains(&v));
                 }
             }
         }
@@ -395,7 +395,7 @@ mod tests {
         assert_eq!(x2.position(), 64 + 8 * 64);
         for p in v.polys() {
             for c in p.centerlift() {
-                assert!(c >= -1 && c <= 1);
+                assert!((-1..=1).contains(&c));
             }
         }
     }

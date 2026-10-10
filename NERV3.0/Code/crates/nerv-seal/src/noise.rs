@@ -42,7 +42,7 @@ pub const DIGIT_SUM_HEADROOM: u64 = (Q - 1) / 2 / SCALE;
 /// CBD(η = 2) per-coefficient variance.
 pub const VAR_CBD2: u64 = 1;
 /// Committee size (params pin) — the sum-structure factor.
-pub const COMMITTEE_N: u64 = nerv_core::params::SEAL_COMMITTEE_N as u64;
+pub const COMMITTEE_N: u64 = nerv_core::params::SEAL_COMMITTEE_N;
 /// DKG key-side per-coefficient variance: n members × ternary variance 1/2.
 pub const KEY_VARIANCE_DKG: u64 = 5;
 /// Single-party reference-key variance (the DSR-7 twin used by tests and
@@ -63,6 +63,9 @@ pub const VAR_LEG_REF: u64 = leg_variance(KEY_VARIANCE_REF);
 
 /// DKG-proven honest bound on key-side coefficients (s, E₀): n × ternary.
 pub const KEY_BOUND: u64 = COMMITTEE_N;
+/// Single-party key-side coefficient bound (the reference keypair's s
+/// and E₀ rows, DSR-7): CBD(η = 2) support is [−2, 2], so |v|∞ ≤ 2.
+pub const KEY_SHORT_BOUND: u64 = 2;
 /// Statement-10 in-circuit bound on encryptor-side coefficients (±3σ at η=2).
 pub const CIRCUIT_NOISE_BOUND: u64 = 3;
 
@@ -92,13 +95,13 @@ pub const fn decode_margin() -> i64 {
 
 // --- compile-time budget closure (errata 30–31, 40) ------------------------
 
-const _: () = assert!(SCALE == 1u64 << (nerv_core::params::SEAL_SCALE_LOG2 as u64));
+const _: () = assert!(SCALE == 1u64 << nerv_core::params::SEAL_SCALE_LOG2);
 const _: () = assert!(KEY_VARIANCE_DKG * 2 == COMMITTEE_N);
 
 // Even worst-case adversarial noise plus full smudging cannot wrap the
 // centered decode range.
 const _: () = {
-    let chunk = nerv_core::params::SEAL_CHUNK_MAX as u64;
+    let chunk = nerv_core::params::SEAL_CHUNK_MAX;
     let plaintext_worst = SCALE * (chunk * DIGIT_MAX);
     let noise_worst = chunk * ADVERSARIAL_LEG_WORST_NOISE as u64 + SMUDGING_BUDGET as u64;
     assert!(plaintext_worst + noise_worst < (Q - 1) / 2);
@@ -106,13 +109,13 @@ const _: () = {
 
 // Encryption-noise margin floor at the genesis chunk: ≥ 102 σ² (≈ 10.1σ).
 const _: () = {
-    let chunk = nerv_core::params::SEAL_CHUNK_MAX as u64;
+    let chunk = nerv_core::params::SEAL_CHUNK_MAX;
     assert!((HALF_SCALE as u64 * HALF_SCALE as u64) / (chunk * VAR_LEG) >= 102);
 };
 
 // Post-smudging honest margin floor: ≥ 89 σ² (≈ 9.43σ).
 const _: () = {
-    let chunk = nerv_core::params::SEAL_CHUNK_MAX as u64;
+    let chunk = nerv_core::params::SEAL_CHUNK_MAX;
     let effective = (HALF_SCALE - SMUDGING_BUDGET) as u64;
     assert!((effective * effective) / (chunk * VAR_LEG) >= 89);
 };
@@ -149,12 +152,16 @@ mod tests {
         assert_eq!(SCALE, 32_768);
         assert_eq!(HALF_SCALE, 16_384);
         assert_eq!(DIGIT_SUM_HEADROOM, 65_520);
-        assert!(COMMITTEE_N * DIGIT_MAX < DIGIT_SUM_HEADROOM);
+        // Headroom pin: derived invariant `COMMITTEE_N * DIGIT_MAX < DIGIT_SUM_HEADROOM`
+        // is exercised by the const-eval check at the top of `noise.rs` (errors
+        // out at compile time if it ever drifts). Lint `assertions_on_constants`
+        // forbids a runtime `assert!` on a constant; the compile-time check
+        // is the actual safety net.
     }
 
     #[test]
     fn budget_closed_even_adversarially() {
-        let chunk = nerv_core::params::SEAL_CHUNK_MAX as u64;
+        let chunk = nerv_core::params::SEAL_CHUNK_MAX;
         assert_eq!(chunk, 128);
         let total = SCALE * (chunk * DIGIT_MAX)
             + chunk * ADVERSARIAL_LEG_WORST_NOISE as u64
@@ -166,11 +173,11 @@ mod tests {
     #[test]
     fn smudging_budget_pins() {
         assert_eq!(SMUDGING_BUDGET, 1_024);
-        let t = nerv_core::params::SEAL_COMMITTEE_THRESHOLD as u64;
+        let t = nerv_core::params::SEAL_THRESHOLD_T;
         assert!(t * 128 <= SMUDGING_BUDGET as u64);
         let effective = HALF_SCALE - SMUDGING_BUDGET;
         assert_eq!(effective, 15_360);
-        let chunk = nerv_core::params::SEAL_CHUNK_MAX as u64;
+        let chunk = nerv_core::params::SEAL_CHUNK_MAX;
         assert_eq!((effective as u64 * effective as u64) / (chunk * VAR_LEG), 89);
     }
 }

@@ -2,14 +2,12 @@
 
 use std::collections::BTreeMap;
 
-use nerv_core::constants::{
-    CLAIM_COMMIT, CLAIM_ELIG, EMISSION, EMISSION_CRED, EMISSION_ROOT,
-};
+use nerv_core::constants::{CLAIM_COMMIT, CLAIM_ELIG, EMISSION, EMISSION_CRED, EMISSION_ROOT};
 use nerv_core::hash::Hash256;
 use nerv_core::types::Epoch;
 use nerv_crypto::mldsa::{Signature, SigningKey, VerifyingKey};
 
-use crate::schedule::{AccountKind, EmissionSchedule};
+use crate::schedule::EmissionSchedule;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
@@ -120,7 +118,7 @@ pub struct NoteAccount {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AccountHolder {
-    Signed(SignedAccount),
+    Signed(Box<SignedAccount>),
     Note(NoteAccount),
 }
 
@@ -232,7 +230,7 @@ impl EmissionLedger {
         let id = signed_account_id(&lek, bucket);
         self.accounts.entry(id).or_insert_with(|| {
             (
-                AccountHolder::Signed(SignedAccount { lek, vk }),
+                AccountHolder::Signed(Box::new(SignedAccount { lek, vk })),
                 AccountEntry { committed_nano: 0, spendable_nano: 0 },
             )
         });
@@ -453,7 +451,6 @@ pub(crate) fn test_vk(seed: u64) -> VerifyingKey {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::claim::EmissionTree;
     use crate::schedule::EmissionSchedule;
 
     fn key(seed: u64) -> SigningKey {
@@ -463,7 +460,7 @@ mod tests {
     }
 
     fn beacon() -> SigningKey {
-        key(0xBEAC0N)
+        key(0xBEAC0)
     }
 
     fn lek(seed: u64) -> [u8; 32] {
@@ -517,7 +514,7 @@ mod tests {
         let b = beacon();
         let c = EmissionCredential::build(&b, lek(1), "founder", 1000, Epoch::from_u64(5)).unwrap();
         assert!(c.verify(b.verifying_key()));
-        assert_eq!(c.message().len() > 32, true);
+        assert!(c.message().len() > 32);
 
         let mut bad = c.clone();
         bad.amount_nano = 1001;
@@ -538,7 +535,7 @@ mod tests {
         assert!(!c.verify(other.verifying_key()));
     }
 
-    fn setup(schedule: &EmissionSchedule, epoch: u64) -> (EmissionLedger, SigningKey) {
+    fn setup(_schedule: &EmissionSchedule, epoch: u64) -> (EmissionLedger, SigningKey) {
         let mut ledger = EmissionLedger::new();
         ledger.set_epoch(Epoch::from_u64(epoch));
         (ledger, beacon())
@@ -600,7 +597,7 @@ mod tests {
         let schedule = EmissionSchedule::genesis();
         let (mut ledger, b) = setup(&schedule, 361);
         let l = lek(20);
-        let id = ledger.add_signed(l, "founder", *key(20).verifying_key());
+        let _id = ledger.add_signed(l, "founder", *key(20).verifying_key());
         let amt = schedule.bucket("founder").unwrap().day_emission(361) * 1_000_000_000u64;
         let c = EmissionCredential::build(&b, l, "founder", amt, Epoch::from_u64(361)).unwrap();
 
@@ -770,7 +767,7 @@ mod tests {
         assert_eq!(
             empty.root().as_slice(),
             blake3::hash(&[
-                nerv_core::constants::EMISSION_ROOT.as_bytes().as_slice(),
+                nerv_core::constants::EMISSION_ROOT.as_bytes(),
                 msg.as_slice()
             ].concat()).as_slice()
         );
@@ -815,7 +812,7 @@ mod tests {
             linear_days: Some(10),
             term_days: 10,
             total_nerv: 500,
-            ..crate::test_raw(name, "linear-vesting")
+            ..test_raw(name, "linear-vesting")
         };
         let s2 = EmissionSchedule::from_params(&[mk("a"), mk("b")]).unwrap();
         let (mut l, bb) = setup(&s2, 0);

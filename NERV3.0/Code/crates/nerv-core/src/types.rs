@@ -30,7 +30,7 @@ const _: () = assert!(crate::params::PROTOCOL_SHARD_COUNT_MAX <= 1u64 << MAX_SHA
 
 /// A binary shard id: the `bits`-bit binary expansion of `value`.
 /// Canonical order = trie DFS pre-order (padded key, then depth).
-#[derive(Clone, Copy, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct ShardId {
     bits: u8,
     value: u16,
@@ -44,15 +44,13 @@ impl ShardId {
         if bits > MAX_SHARD_BITS {
             return Err(TypeError::ShardIdTooLong { bits, max: MAX_SHARD_BITS });
         }
-        if bits < 16 {
-            if value >= (1u16 << bits) {
-                return Err(TypeError::OutOfRange {
-                    what: "shard id value",
-                    value: value as u64,
-                    min: 0,
-                    max: ((1u16 << bits) as u64) - 1,
-                });
-            }
+        if bits < 16 && value >= (1u16 << bits) {
+            return Err(TypeError::OutOfRange {
+                what: "shard id value",
+                value: value as u64,
+                min: 0,
+                max: ((1u16 << bits) as u64) - 1,
+            });
         }
         Ok(ShardId { bits, value })
     }
@@ -129,12 +127,6 @@ impl ShardId {
     }
 }
 
-impl PartialEq for ShardId {
-    fn eq(&self, other: &Self) -> bool {
-        self.bits == other.bits && self.value == other.value
-    }
-}
-impl Eq for ShardId {}
 impl PartialOrd for ShardId {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))

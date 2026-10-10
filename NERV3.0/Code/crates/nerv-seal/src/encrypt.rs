@@ -194,7 +194,7 @@ pub fn derive_reference_keypair(entropy: &[u8; 32]) -> Result<(PublicKey, Vec8),
 mod tests {
     use super::*;
     use crate::digitize::digitize;
-    use crate::noise::{chunk_noise_variance, HALF_SCALE, HONEST_LEG_WORST_NOISE, KEY_SHORT_BOUND, VAR_LEG_REF};
+    use crate::noise::{chunk_noise_variance, HALF_SCALE, HONEST_LEG_WORST_NOISE, KEY_SHORT_BOUND};
     use crate::ring::Poly;
     use proptest::prelude::*;
 
@@ -233,8 +233,8 @@ mod tests {
     fn noise_of(key_s: &Vec8, ct: &Ciphertext, scaled_m: &Vec2) -> [Poly; 2] {
         let su = key_s.dot(ct.u());
         [
-            ct.v().poly(0).sub(&su).sub(&scaled_m.poly(0)),
-            ct.v().poly(1).sub(&su).sub(&scaled_m.poly(1)),
+            ct.v().poly(0).sub(&su).sub(scaled_m.poly(0)),
+            ct.v().poly(1).sub(&su).sub(scaled_m.poly(1)),
         ]
     }
 

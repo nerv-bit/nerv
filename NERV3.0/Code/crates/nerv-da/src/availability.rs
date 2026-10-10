@@ -3,7 +3,6 @@
 
 use std::collections::BTreeSet;
 
-use nerv_core::codec::Encode;
 use nerv_core::constants::DA_FRAUD;
 use nerv_core::hash::Hash256;
 
@@ -165,7 +164,7 @@ use crate::blobs::CHUNK_LEN;
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::blobs::{tree_path, BlobSet, Square};
+    use crate::blobs::{tree_path, BlobSet};
     use crate::testutil::SplitMix64;
     use nerv_core::types::{Height, ShardSet};
 
@@ -243,7 +242,7 @@ mod tests {
     }
 
     fn evidence_for(
-        set: &BlobSet,
+        _set: &BlobSet,
         bad_root: Hash256,
         blob_leaves: &[Hash256],
         width: usize,

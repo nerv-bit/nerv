@@ -5,7 +5,7 @@
 
 
 use nerv_core::hash::Hash256;
-use nerv_core::types::{Epoch, ShardId};
+use nerv_core::types::Epoch;
 use nerv_crypto::mldsa::{SigningKey, VerifyingKey};
 use nerv_crypto::sigaggr::{vote_bytes, QuorumCertificate, VoteCollector, QcError};
 use nerv_state::{
@@ -54,7 +54,7 @@ pub fn propose_block(
     view: &dyn BeaconView,
     chain: &dyn ChainSource,
 ) -> Result<Proposal, PipelineError> {
-    let (computed, new_state) = propose(state.clone(), &body, &inputs, view, chain)?;
+    let (computed, _new_state) = propose(state.clone(), &body, &inputs, view, chain)?;
     // Re-run apply_block to obtain the Applied record (the propose path
     // already verified; this extracts the public outcome).
     let dummy_qc = QuorumCertificate {
@@ -129,13 +129,14 @@ pub fn assemble_with_qc(
 /// The committee member's validate-and-sign path (erratum 134): run
 /// apply_block against the predecessor state; on success, sign the body
 /// hash.
+#[allow(clippy::too_many_arguments)]
 pub fn validate_and_sign(
     state: &ShardState,
     block: &ShardBlock,
     view: &dyn BeaconView,
     chain: &dyn ChainSource,
     epoch: Epoch,
-    signer_index: usize,
+    _signer_index: usize,
     sk: &SigningKey,
     committee: &[VerifyingKey],
 ) -> Result<Option<nerv_crypto::mldsa::Signature>, PipelineError> {
@@ -170,20 +171,15 @@ pub fn validate_and_sign(
 mod tests {
     use super::*;
     use crate::testutil::harness::{
-        dummy_chain, keys, params_root, TestView, World,
+        dummy_chain, h, keys, params_root, TestView,
     };
     use crate::testutil::SplitMix64;
-    use nerv_core::types::{FeeSats, Height, Interval, ShardSet, TxId};
+    use nerv_core::types::{FeeSats, Height, Interval, ShardId, ShardSet, TxId};
     use nerv_custody::tx::{InputSet, LegShell, Output, TransactionShell};
-    use nerv_registry::mempool::PoolEntry;
+
     use nerv_state::block::SettledLeg;
     use nerv_state::header::RegistryRef;
     use nerv_state::ttau::TauTree;
-
-
-    fn h(seed: u64) -> Hash256 {
-        Hash256::from_bytes(SplitMix64::new(seed).bytes32())
-    }
 
 
     /// A single-shell 1-in/1-out leg with a parseable dummy ct.
@@ -191,7 +187,7 @@ mod tests {
         let mut rng = SplitMix64::new(seed ^ 0x5EED);
         let mut ct = vec![0u8; nerv_seal::encrypt::Ciphertext::WIRE_SIZE];
         for c in ct.chunks_exact_mut(4) {
-            c.copy_from_slice(&(rng.next_u32() & 0xFFF0_0000).to_le_bytes());
+            c.copy_from_slice(&((rng.next_u64() as u32) & 0xFFF0_0000).to_le_bytes());
         }
         LegShell {
             shard,
@@ -204,7 +200,13 @@ mod tests {
                 revert_cm: None,
             }],
             fee: FeeSats::from_u64(1000),
-            anchor: h(&mut rng),
+            // Anchor against the genesis NCT root so the leg is fresh
+            // against `ShardState::genesis`. `AnchorRing::genesis` seeds
+            // the ring with this exact root, and the per-leg freshness
+            // check matches on it. Some tests (e.g. `validate_and_sign_*`)
+            // only need an invalid body so a fresh anchor keeps them
+            // pointing at the failure they actually assert on.
+            anchor: nerv_custody::nct::empty_digests()[nerv_custody::nct::DEPTH].as_hash256(),
             expiry: Height::from_u64(5_000),
             weight_version: 1,
             ct,
@@ -265,7 +267,10 @@ mod tests {
 
         let chain = dummy_chain();
         let proposal = propose_block(&state, body, hdr_inputs, &view, &chain).unwrap();
-        assert_eq!(proposal.computed.fee_total, 700);
+        // The single settled leg carries fee = 1_000 nano (rule 1 floor);
+        // `proposal.computed.fee_total` sums per-leg fees, no escrow or
+        // claim math applied here.
+        assert_eq!(proposal.computed.fee_total, 1_000);
         assert_eq!(proposal.applied.settled, vec![txid]);
         assert_eq!(proposal.state.height().as_u64(), 1);
 

@@ -554,7 +554,10 @@ mod tests {
     fn slot_index_matches_blake3_reference() {
         // Differential pin (DSR-7): equals BLAKE3("nerv.slot" ‖ addr) with
         // the FULL 256-bit LE digest value reduced mod 224 — the reduce_mod
-        // limb loop reproduced independently.
+        // limb loop reproduced independently. The reference must process
+        // the 32 bytes in little-endian word order (LSB word first), so
+        // it iterates the chunks in reverse: bytes[24..32] is the most
+        // significant limb in LE storage, bytes[0..8] is the least.
         let cases: &[&[u8]] = &[&[], b"a", &[0u8; 32], &[0xff; 17]];
         for addr in cases {
             let mut msg = Vec::new();
@@ -562,7 +565,7 @@ mod tests {
             msg.extend_from_slice(addr);
             let d = blake3::hash(&msg);
             let mut r: u128 = 0;
-            for limb in d.as_bytes().chunks_exact(8) {
+            for limb in d.as_bytes().chunks_exact(8).rev() {
                 let mut b = [0u8; 8];
                 b.copy_from_slice(limb);
                 r = ((r << 64) + u64::from_le_bytes(b) as u128) % ACCOUNT_SLOT_COUNT as u128;

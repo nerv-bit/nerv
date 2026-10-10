@@ -341,10 +341,12 @@ mod tests {
             anchor: Hash256::from_bytes(r.bytes32()),
             expiry: Height::from_u64(5_000 + r.next_u64() % 500),
             weight_version: version,
+            ct: Vec::new(),
+            burns: Vec::new(),
         }
     }
 
-    fn shell(r: &mut SplitMix64, legs: Vec<LegShell>) -> TransactionShell {
+    fn shell(_r: &mut SplitMix64, legs: Vec<LegShell>) -> TransactionShell {
         TransactionShell { legs }
     }
 
@@ -405,8 +407,10 @@ mod tests {
             h.update(part);
         }
         fn absorb(state: &mut [u8; 32], op: u64, part: &[u8]) {
+            // `Hash256::framed` length-prefixes EVERY part including the
+            // domain, so the raw-BLAKE3 reference must do the same.
             let mut h = blake3::Hasher::new();
-            h.update(FS.as_bytes());
+            frame(&mut h, FS.as_bytes());
             frame(&mut h, state);
             frame(&mut h, &op.to_le_bytes());
             frame(&mut h, part);
@@ -420,8 +424,9 @@ mod tests {
         absorb(&mut state, 0, nf.as_bytes());
         absorb(&mut state, 1, txid.as_bytes());
         absorb(&mut state, 2, sd.as_bytes());
+        // Same length-prefix-everything convention as the production's `framed`.
         let mut h = blake3::Hasher::new();
-        h.update(FS.as_bytes());
+        frame(&mut h, FS.as_bytes());
         frame(&mut h, &state);
         frame(&mut h, &3u64.to_le_bytes());
         frame(&mut h, BIND_TAG);
@@ -447,8 +452,8 @@ mod tests {
         let sd1 = Hash256::from_bytes(r.bytes32());
         let sd2 = Hash256::from_bytes(r.bytes32());
 
-        let (t1, h1) = bind(&[a, b], &txid, &sd1);
-        let (t2, h2) = bind(&[a, b], &txid, &sd1);
+        let (mut t1, h1) = bind(&[a, b], &txid, &sd1);
+        let (mut t2, h2) = bind(&[a, b], &txid, &sd1);
         assert_eq!(h1, h2);
         assert_eq!(t1.squeeze_hash(b"next"), t2.squeeze_hash(b"next"));
 
@@ -467,13 +472,11 @@ mod tests {
     fn shell_digest_shares_the_txid_preimage() {
         let mut r = SplitMix64::new(0xF6);
         let g = ShardSet::genesis();
-        let sh = shell(
-            &mut r,
-            vec![
-                leg(&mut r, g.ids()[2], 2, 2, 7),
-                leg(&mut r, g.ids()[40], 0, 1, 7),
-            ],
-        );
+        let legs = vec![
+            leg(&mut r, g.ids()[2], 2, 2, 7),
+            leg(&mut r, g.ids()[40], 0, 1, 7),
+        ];
+        let sh = shell(&mut r, legs);
         let txid = sh.txid().unwrap();
         let sd = shell_digest(&sh).unwrap();
         let legs = legs_bytes(&sh.canonicalize().unwrap());
@@ -491,13 +494,11 @@ mod tests {
     fn derive_check_and_every_mismatch() {
         let mut r = SplitMix64::new(0xF7);
         let g = ShardSet::genesis();
-        let sh = shell(
-            &mut r,
-            vec![
-                leg(&mut r, g.ids()[7], 2, 1, 4),
-                leg(&mut r, g.ids()[30], 1, 2, 4), // two input-bearing legs
-            ],
-        );
+        let legs = vec![
+            leg(&mut r, g.ids()[7], 2, 1, 4),
+            leg(&mut r, g.ids()[30], 1, 2, 4), // two input-bearing legs
+        ];
+        let sh = shell(&mut r, legs);
         let key_id = Hash256::from_bytes(r.bytes32());
         let pi = TxPublicInputs::derive(&sh, key_id).unwrap();
         assert_eq!(pi.anchors.len(), 2);
@@ -525,17 +526,16 @@ mod tests {
         assert!(matches!(bad.check_against_shell(&sh), Err(FsError::ShellDigestMismatch)));
 
         // Mixed leg versions rejected at derive.
-        let mixed = shell(
-            &mut r,
-            vec![leg(&mut r, g.ids()[7], 1, 1, 4), leg(&mut r, g.ids()[8], 1, 1, 5)],
-        );
+        let legs = vec![leg(&mut r, g.ids()[7], 1, 1, 4), leg(&mut r, g.ids()[8], 1, 1, 5)];
+        let mixed = shell(&mut r, legs);
         assert!(matches!(
             TxPublicInputs::derive(&mixed, key_id),
             Err(FsError::WeightVersionMismatch { leg: 5, tx: 4 })
         ));
 
         // Issue-only shell: no anchors, still derives and checks.
-        let issue = shell(&mut r, vec![leg(&mut r, g.ids()[9], 0, 2, 4)]);
+        let legs = vec![leg(&mut r, g.ids()[9], 0, 2, 4)];
+        let issue = shell(&mut r, legs);
         let pi2 = TxPublicInputs::derive(&issue, key_id).unwrap();
         assert!(pi2.anchors.is_empty());
         pi2.check_against_shell(&issue).unwrap();
@@ -545,7 +545,8 @@ mod tests {
     fn public_digest_binds_every_field() {
         let mut r = SplitMix64::new(0xF8);
         let g = ShardSet::genesis();
-        let sh = shell(&mut r, vec![leg(&mut r, g.ids()[3], 1, 1, 1)]);
+        let legs = vec![leg(&mut r, g.ids()[3], 1, 1, 1)];
+        let sh = shell(&mut r, legs);
         let key_id = Hash256::from_bytes(r.bytes32());
         let pi = TxPublicInputs::derive(&sh, key_id).unwrap();
         let d0 = pi.digest();
@@ -575,17 +576,18 @@ mod tests {
     fn bind_transaction_composes_in_order() {
         let mut r = SplitMix64::new(0xF9);
         let g = ShardSet::genesis();
-        let sh = shell(&mut r, vec![leg(&mut r, g.ids()[5], 2, 1, 3)]);
+        let legs = vec![leg(&mut r, g.ids()[5], 2, 1, 3)];
+        let sh = shell(&mut r, legs);
         let txid = sh.txid().unwrap();
         let sd = shell_digest(&sh).unwrap();
         let nfs = canonical_nullifiers(&sh).unwrap();
         assert_eq!(nfs.len(), 2);
         let pi = TxPublicInputs::derive(&sh, Hash256::from_bytes(r.bytes32())).unwrap();
 
-        let (t, binding, pubs) = bind_transaction(&nfs, &txid, &sd, &pi);
+        let (mut t, binding, pubs) = bind_transaction(&nfs, &txid, &sd, &pi);
         assert_eq!(pubs, pi.digest());
         // Same binding as the bare bind…
-        let (bare, bare_binding) = bind(&nfs, &txid, &sd);
+        let (mut bare, bare_binding) = bind(&nfs, &txid, &sd);
         assert_eq!(binding, bare_binding);
         // …but the chains diverge afterwards (public inputs absorbed).
         assert_ne!(t.squeeze_hash(b"stmt1"), bare.squeeze_hash(b"stmt1"));

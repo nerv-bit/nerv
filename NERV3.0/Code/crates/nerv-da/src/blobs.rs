@@ -246,13 +246,11 @@ impl Square {
         loop {
             let mut progress = false;
             for r in 0..width {
-                let known: Vec<usize> =
-                    (0..width).filter(|&c| grid[r * width + c].is_some()).collect();
+                let known: Vec<(usize, &[u8])> = (0..width)
+                    .filter_map(|c| grid[r * width + c].as_ref().map(|v| (c, v.as_slice())))
+                    .collect();
                 if known.len() >= k && known.len() < width {
-                    let shards: Vec<(usize, &[u8])> = known[..k]
-                        .iter()
-                        .map(|&c| (c, grid[r * width + c].as_ref().unwrap().as_slice()))
-                        .collect();
+                    let shards: Vec<(usize, &[u8])> = known[..k].to_vec();
                     let line = erasure::full_codeword(&shards, k, width)?;
                     for c in 0..width {
                         if grid[r * width + c].is_none() {
@@ -263,13 +261,11 @@ impl Square {
                 }
             }
             for c in 0..width {
-                let known: Vec<usize> =
-                    (0..width).filter(|&r| grid[r * width + c].is_some()).collect();
+                let known: Vec<(usize, &[u8])> = (0..width)
+                    .filter_map(|r| grid[r * width + c].as_ref().map(|v| (r, v.as_slice())))
+                    .collect();
                 if known.len() >= k && known.len() < width {
-                    let shards: Vec<(usize, &[u8])> = known[..k]
-                        .iter()
-                        .map(|&r| (r, grid[r * width + c].as_ref().unwrap().as_slice()))
-                        .collect();
+                    let shards: Vec<(usize, &[u8])> = known[..k].to_vec();
                     let line = erasure::full_codeword(&shards, k, width)?;
                     for r in 0..width {
                         if grid[r * width + c].is_none() {
@@ -605,7 +601,7 @@ mod tests {
         assert_eq!(k_for(CHUNK_LEN).unwrap(), 1);
         assert_eq!(k_for(CHUNK_LEN + 1).unwrap(), 2);
         assert_eq!(k_for(5 * CHUNK_LEN).unwrap(), 4);
-        assert_eq!(s.data(3 * CHUNK_LEN + 100), d);
+        assert_eq!(s.data((3 * CHUNK_LEN + 100) as u32), d);
         // Data capacity and overflow.
         assert!(Square::build_with_k(&d, 1).is_err());
         assert_eq!(

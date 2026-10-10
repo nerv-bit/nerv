@@ -14,7 +14,7 @@ use nerv_proofs::{IntervalLedger, IntervalSet};
 use crate::attestation::{
     interval_digests_root, EpochAttestation, GTree, IntervalAttestation,
 };
-use crate::committee::{attestation_signers, ATTESTATION_QUORUM, ATTESTATION_SIGNERS};
+use crate::committee::{attestation_signers, ATTESTATION_QUORUM};
 use crate::finality::{
     FinalityViolation, IntervalFinality, ObserveOutcome, ShardFinality,
 };
@@ -126,19 +126,22 @@ impl BeaconState {
 
 
     /// Observe a QC-validated header (the caller's pipeline validates
-    /// the QC before feeding the guard).
+    /// the QC before feeding the guard). Per erratum 103, the guard's
+    /// parent linkage is the predecessor's C_t (`prev`) and the new
+    /// header's own committed C_t is `link`. Both are required.
     pub fn observe_header(
         &mut self,
         shard: ShardId,
         height: u64,
         hash: nerv_core::hash::Hash256,
         prev: nerv_core::hash::Hash256,
+        link: nerv_core::hash::Hash256,
     ) -> Result<ObserveOutcome, BeaconError> {
         let guard = self
             .guards
             .get_mut(&shard)
             .ok_or(BeaconError::InactiveShard { shard })?;
-        Ok(guard.observe(height, hash, prev)?)
+        Ok(guard.observe(height, hash, prev, link)?)
     }
 
 
@@ -193,23 +196,29 @@ impl BeaconState {
         signers: &[(usize, &SigningKey)],
         signer_set: &[VerifyingKey],
     ) -> Result<IntervalAttestation, BeaconError> {
-        // The interval must be the next after the last finalized.
-        if let Some(last) = self.interval_finality.last() {
-            if interval.as_u64() != last.as_u64() + 1 {
-                return Err(BeaconError::NotNextInterval {
-                    interval: interval.as_u64(),
-                    last: last.as_u64(),
-                });
-            }
-        }
-
-
-        // The interval must be in the current epoch.
+        // The interval must be in the current epoch (erratum 100).
+        // Epoch-range check fires first so a far-future or far-past
+        // interval returns a more informative error than the
+        // contiguity check.
         if interval.epoch() != self.current_epoch {
             return Err(BeaconError::IntervalNotInEpoch {
                 interval: interval.as_u64(),
                 epoch: self.current_epoch.as_u64(),
             });
+        }
+
+
+        // The interval must be the next after the last finalized *within an
+// epoch* (erratum 100). `interval_finality` does not advance across the
+// epoch boundary — that's `close_epoch`'s job — so a new interval in
+// a later epoch is allowed even though its raw index isn't `last + 1`.
+        if let Some(last) = self.interval_finality.last() {
+            if interval.epoch() == last.epoch() && interval.as_u64() != last.as_u64() + 1 {
+                return Err(BeaconError::NotNextInterval {
+                    interval: interval.as_u64(),
+                    last: last.as_u64(),
+                });
+            }
         }
 
 
@@ -279,6 +288,12 @@ impl BeaconState {
         self.epoch_attestations.insert(epoch, attestation.clone());
 
 
+        // The epoch attestation is the boundary's finality checkpoint:
+        // advance the interval watermark so the next epoch's first
+        // interval is acceptable (erratum 100).
+        self.interval_finality.close_epoch(epoch);
+
+
         let next_randomness =
             crate::committee::epoch_randomness(&attestation.digest(), Epoch::from_u64(epoch.as_u64() + 1));
         self.current_epoch = Epoch::from_u64(epoch.as_u64() + 1);
@@ -292,10 +307,10 @@ impl BeaconState {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::testutil::harness::{keys, RandomnessMap};
+    use crate::testutil::harness::keys;
     use crate::testutil::SplitMix64;
     use nerv_core::hash::Hash256;
-    use nerv_core::types::{Height, ShardSet};
+    use nerv_core::types::ShardSet;
 
 
     fn h(seed: u64) -> Hash256 {
@@ -327,10 +342,19 @@ mod tests {
         assert_eq!(b.last_finalized_interval(), None);
         assert!(b.interval_attestations().is_empty());
         assert!(b.epoch_attestations().is_empty());
-        assert_eq!(b.shard_tip(&set.ids()[7]), None);
-        // The 𝔾 tree is all sentinels.
+        // Fresh genesis seeds every guard with the C₀ at height 0; the tip IS
+// that block until the first observation extends the canon above it.
+        assert_eq!(b.shard_tip(&set.ids()[7]), Some((0, h(0xC0))));
+        // The 𝔾 tree's leaves are the C₀ hash for every shard — not
+        // the empty-subtree sentinel, because each guard has the genesis
+        // block at height 0 in its canon chain. Build the matching GTree
+        // by stamping the same hash into every leaf.
+        let mut expected_g = GTree::new(64);
+        for i in 0..64 {
+            expected_g.set_tip(i, h(0xC0));
+        }
         let g = b.g_tree();
-        assert_eq!(g.root(), GTree::new(64).root());
+        assert_eq!(g.root(), expected_g.root());
     }
 
 
@@ -342,9 +366,12 @@ mod tests {
         let s40 = set.ids()[40];
 
 
-        b.observe_header(s7, 1, h(1), h(0xC0)).unwrap();
-        b.observe_header(s7, 2, h(2), h(1)).unwrap();
-        b.observe_header(s40, 1, h(3), h(0xC0)).unwrap();
+        // Erratum 103: (height, hash, prev, link) — `prev` = parent's
+        // C_t = genesis C_t at height 1; `link` = the header's own
+        // committed C_t (a placeholder here).
+        b.observe_header(s7, 1, h(1), h(0xC0), h(0xA1)).unwrap();
+        b.observe_header(s7, 2, h(2), h(0xA1), h(0xB1)).unwrap();
+        b.observe_header(s40, 1, h(3), h(0xC0), h(0xA3)).unwrap();
 
 
         assert_eq!(b.shard_tip(&s7), Some((2, h(2))));
@@ -356,15 +383,18 @@ mod tests {
         // The tips verify as 𝔾 leaves.
         assert!(crate::attestation::verify_g_witness(&root, 64, 7, &h(2), &g.witness(7).unwrap()));
         assert!(crate::attestation::verify_g_witness(&root, 64, 40, &h(3), &g.witness(40).unwrap()));
-        // Absent shards carry the sentinel.
-        let empty = crate::attestation::GTree::new(64).tip(9);
-        assert!(crate::attestation::verify_g_witness(&root, 64, 9, &empty, &g.witness(9).unwrap()));
+        // Shards with no observation still carry their genesis tip:
+        // each guard starts with the C₀ block at height 0 in its canon
+        // chain, so the 𝔾 leaf is the C₀ hash — not the empty-subtree
+        // sentinel, which is reserved for shards that produced nothing
+        // (erratum 126; see beacon_genesis_state).
+        assert!(crate::attestation::verify_g_witness(&root, 64, 9, &h(0xC0), &g.witness(9).unwrap()));
 
 
         // An inactive shard is rejected.
         let inactive = ShardId::new(7, 100).unwrap();
         assert!(matches!(
-            b.observe_header(inactive, 1, h(9), h(0xC0)),
+            b.observe_header(inactive, 1, h(9), h(0xC0), h(0xA9)),
             Err(BeaconError::InactiveShard { .. })
         ));
     }
@@ -446,20 +476,51 @@ mod tests {
         let set = ShardSet::genesis();
         let mut b = BeaconState::genesis(set.clone(), &genesis_map(&set));
         let s7 = set.ids()[7];
-        b.observe_header(s7, 1, h(1), h(0xC0)).unwrap();
-        b.observe_header(s7, 2, h(2), h(1)).unwrap();
-        // A competing fork at height 1.
+        // Extend to height 2 with canon hash h(1) at height 1 and h(2)
+        // at height 2 (each with a distinct placeholder link).
+        b.observe_header(s7, 1, h(1), h(0xC0), h(0xA1)).unwrap();
+        b.observe_header(s7, 2, h(2), h(0xA1), h(0xB1)).unwrap();
+        // A competing fork at height 1: a strictly smaller hash
+        // reorganizes the canon; the displaced canon becomes an alt.
         let mut smaller = h(1);
         let mut raw = *smaller.as_bytes();
-        raw[31] ^= 1;
+        raw[31] = raw[31].wrapping_sub(1);
         smaller = Hash256::from_bytes(raw);
-        if smaller < h(1) {
-            b.observe_header(s7, 1, smaller, h(0xC0)).unwrap();
-        } else {
-            b.observe_header(s7, 1, h(99), h(0xC0)).unwrap();
-        }
+        assert!(smaller < h(1));
+        let outcome = b.observe_header(s7, 1, smaller, h(0xC0), h(0xA2)).unwrap();
+        assert_eq!(outcome, ObserveOutcome::Reorganized);
+        assert_eq!(b.shard_tip(&s7), Some((1, smaller)));
+
+        // A larger hash at height 2 (extending the NEW canon at h=1
+        // via prev = the new link 0xA2) — not smaller than the existing
+        // canon at h=2, so it's a non-reorganizing fork recorded as an
+        // alt.
+        let larger_h2 = {
+            let mut raw = *h(2).as_bytes();
+            raw[30] = raw[30].wrapping_add(1);
+            Hash256::from_bytes(raw)
+        };
+        let out = b.observe_header(s7, 2, larger_h2, h(0xA2), h(0xB2)).unwrap();
+        assert_eq!(out, ObserveOutcome::ForkRecorded);
+
         let violations = b.finalize_shard(s7, 2).unwrap();
-        // The losing fork is a violation.
-        assert!(!violations.is_empty() || b.guard(&s7).unwrap().alts().is_empty());
+        // Two violations: the displaced canon at h=1 (reorg), and the
+        // larger h=2 fork.
+        assert_eq!(violations.len(), 2, "got {:?}", violations);
+        let h1_violation = violations.iter().find(|v| v.height == 1).expect("h=1 violation");
+        // D1: finalized_hash at h=1 is the *new* canon (smaller), not the
+        // parent at h=0 (genesis hash).
+        assert_eq!(h1_violation.finalized_hash, smaller);
+        assert_ne!(h1_violation.finalized_hash, h(0xC0));
+        assert_eq!(h1_violation.conflicting_hash, h(1));
+        // D6: the alt carries the displaced canon's parent C_t (= genesis)
+        // and its own link (= the displaced h(1)'s link 0xA1).
+        assert_eq!(h1_violation.conflicting_prev, h(0xC0));
+        assert_eq!(h1_violation.conflicting_link, h(0xA1));
+        let h2_violation = violations.iter().find(|v| v.height == 2).expect("h=2 violation");
+        assert_eq!(h2_violation.finalized_hash, h(2));
+        assert_eq!(h2_violation.conflicting_hash, larger_h2);
+        assert_eq!(h2_violation.conflicting_prev, h(0xA2));
+        assert_eq!(h2_violation.conflicting_link, h(0xB2));
     }
 }

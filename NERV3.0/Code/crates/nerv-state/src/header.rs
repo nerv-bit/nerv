@@ -186,7 +186,7 @@ mod tests {
     fn payout(seed: u64) -> Address {
         let mut rng = SplitMix64::new(seed);
         let wk = WalletKeys::from_master(&MasterSeed::from_bytes(rng.bytes32()));
-        Address::generate(wk.viewing(), wk.nullifier_key(), 0, &ShardSet::genesis()).unwrap()
+        Address::generate(&wk.viewing(), wk.nullifier_key(), 0, &ShardSet::genesis()).unwrap()
     }
 
     fn digest(k: u32) -> NctDigest {
@@ -341,9 +341,12 @@ mod tests {
         let h = header(0x5D08, false);
         let enc = h.encode();
 
-        // The reveal tag follows the eight 32-byte fields and the height.
+        // The reveal tag follows the seven 32-byte fields that come before it
+        // (prev, nct_root, nullifier_root, transit_root, params_root, derived,
+// ct_batch_hash) and the 8-byte height. `qc_hash` is the trailing 32-byte
+// field, after the reveal tag.
         let mut bad = enc.clone();
-        bad[8 * 32 + 8] = 2;
+        bad[7 * 32 + 8] = 2;
         assert!(matches!(
             ShardHeader::decode(&bad),
             Err(CodecError::InvalidOptionTag { tag: 2 })

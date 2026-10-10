@@ -399,6 +399,9 @@ impl FraudProof {
                 }
             },
             FraudCondition::InBlockNullifier { leg } => {
+                // A proof pointing past the leg set is malformed: the prover
+                // is naming a leg that does not exist.
+                leg_of(leg)?;
                 Ok(first_nullifier_conflict(&resolved) == Some(leg))
             }
             FraudCondition::SettlementDeadline { leg } => {
@@ -537,8 +540,8 @@ impl Decode for ReexecutionFraud {
 mod tests {
     use super::*;
     use crate::block::{SettledLeg, TransitEvidence};
-    use crate::testutil::harness::{
-        block, empty_anchor, h, leg, params, register_tau, seal, valid_block, World, TAU0,
+    use crate::testkit::{
+        block, empty_anchor, h, leg, params, register_tau, seal, valid_block, TestWorld, TAU0,
     };
     use crate::testutil::SplitMix64;
     use nerv_core::types::{FeeSats, ShardSet};
@@ -551,7 +554,7 @@ mod tests {
 
     fn settle_shell(
         st: &ShardState,
-        world: &mut World,
+        world: &mut TestWorld,
         legs: Vec<LegShell>,
         leg_index: u8,
     ) -> ShardBlock {
@@ -565,22 +568,24 @@ mod tests {
             tau: tree.witness(0).unwrap(),
             siblings: vec![],
         };
-        let mut b = block(st.shard(), interval, vec![sl]);
-        seal(st, &mut b, world);
+        let mut b = block(st.shard(), interval, vec![sl], vec![], vec![]);
+        seal(st, &mut b, world, &[]);
         b
     }
 
     /// [spend@7, issue@40] with a shared expiry; the spend settled at
     /// shard-7 height 1 (its transit root registered); the issue block
     /// for shard 40 at height 1, returned un-applied.
-    fn issue_fixture(seed: u64, expiry: u64) -> (World, ShardBlock, ShardState) {
+    fn issue_fixture(seed: u64, expiry: u64) -> (TestWorld, ShardBlock, ShardState) {
         let set = ShardSet::genesis();
         let s7 = set.ids()[7];
         let s40 = set.ids()[40];
         let mut rng = SplitMix64::new(seed);
-        let mut world = World::default();
-        let spend = leg(&mut rng, s7, vec![h(&mut rng)], vec![], 1000, expiry, empty_anchor());
-        let issue = leg(&mut rng, s40, vec![], vec![(1_000_000_000, false)], 1000, expiry, h(&mut rng));
+        let mut world = TestWorld::default();
+        let __nf_a = h(&mut rng);
+        let spend = leg(&mut rng, s7, vec![__nf_a], vec![], 1000, expiry, empty_anchor());
+        let __h201 = h(&mut rng);
+        let issue = leg(&mut rng, s40, vec![], vec![(1_000_000_000, false)], 1000, expiry, __h201);
         let shell = TransactionShell { legs: vec![spend, issue] };
         let txid = shell.txid().unwrap();
         let st7 = genesis_state(s7);
@@ -592,12 +597,12 @@ mod tests {
             tau: tree.witness(0).unwrap(),
             siblings: vec![],
         };
-        let mut b1 = block(s7, interval, vec![sl]);
-        seal(&st7, &mut b1, &mut world);
+        let mut b1 = block(s7, interval, vec![sl], vec![], vec![]);
+        seal(&st7, &mut b1, &mut world, &[]);
         let (st7_1, _) = apply_block(st7, &b1, &world, &world).unwrap();
         world.transit_roots.insert((s7, 1), st7_1.transit().root());
 
-        let key7 = transit_key(&txid, s7, LegIndex::FIRST);
+        let key7 = transit_key(&txid, &s7, LegIndex::FIRST);
         let entry = st7_1.transit().get(&key7).cloned().unwrap();
         let ev = TransitEvidence {
             root_height: Height::from_u64(1),
@@ -610,8 +615,8 @@ mod tests {
             siblings: vec![ev],
         };
         let st40 = genesis_state(s40);
-        let mut b2 = block(s40, interval, vec![sl40]);
-        seal(&st40, &mut b2, &mut world);
+        let mut b2 = block(s40, interval, vec![sl40], vec![], vec![]);
+        seal(&st40, &mut b2, &mut world, &[]);
         (world, b2, st40)
     }
 
@@ -619,7 +624,7 @@ mod tests {
     fn honest_block_rejects_every_condition() {
         let set = ShardSet::genesis();
         let st = genesis_state(set.ids()[7]);
-        let mut world = World::default();
+        let mut world = TestWorld::default();
         let (b, _) = valid_block(&st, &mut world, 0xF001);
         let facts = BeaconFacts::for_block(&b, &world);
         let conditions = [
@@ -650,7 +655,7 @@ mod tests {
     fn tau_witness_fraud() {
         let set = ShardSet::genesis();
         let st = genesis_state(set.ids()[7]);
-        let mut world = World::default();
+        let mut world = TestWorld::default();
         let (b, _) = valid_block(&st, &mut world, 0xF002);
         let mut bad = b.clone();
         bad.legs[0].tau.siblings.push(Hash256::from_bytes([0xEE; 32]));
@@ -672,7 +677,7 @@ mod tests {
     fn fee_and_ct_batch_fraud() {
         let set = ShardSet::genesis();
         let st = genesis_state(set.ids()[7]);
-        let mut world = World::default();
+        let mut world = TestWorld::default();
         let (b, _) = valid_block(&st, &mut world, 0xF003);
 
         let mut bad = b.clone();
@@ -708,7 +713,7 @@ mod tests {
         let set = ShardSet::genesis();
         let s7 = set.ids()[7];
         let mut rng = SplitMix64::new(0xF004);
-        let mut world = World::default();
+        let mut world = TestWorld::default();
         let shared = h(&mut rng);
         let mk = |rng: &mut SplitMix64| {
             TransactionShell {
@@ -735,8 +740,8 @@ mod tests {
         }
         let _ = second_txid;
         let st = genesis_state(s7);
-        let mut b = block(s7, interval, legs);
-        seal(&st, &mut b, &mut world);
+        let mut b = block(s7, interval, legs, vec![], vec![]);
+        seal(&st, &mut b, &mut world, &[]);
 
         let facts = BeaconFacts::for_block(&b, &world);
         let p = FraudProof {
@@ -845,10 +850,11 @@ mod tests {
         let s9 = set.ids()[9];
 
         // Conditional output on an input-bearing leg.
-        let mut world = World::default();
+        let mut world = TestWorld::default();
         let st = genesis_state(s7);
         let mut rng = SplitMix64::new(0xF008);
-        let l = leg(&mut rng, s7, vec![h(&mut rng)], vec![(1_000, true)], 1000, 5_000, empty_anchor());
+        let __h202 = h(&mut rng);
+        let l = leg(&mut rng, s7, vec![{ __h202 }], vec![(1_000, true)], 1000, 5_000, empty_anchor());
         let b = settle_shell(&st, &mut world, vec![l], 0);
         let facts = BeaconFacts::for_block(&b, &world);
         FraudProof { block: b.clone(), facts, condition: FraudCondition::ConditionalOnSpendLeg { leg: 0 } }
@@ -860,13 +866,17 @@ mod tests {
         ));
 
         // Two spend legs around a conditional issue leg.
-        let mut world = World::default();
+        let mut world = TestWorld::default();
         let st = genesis_state(s7);
         let mut rng = SplitMix64::new(0xF009);
+        let __h203 = h(&mut rng);
+        let __h204 = h(&mut rng);
+        let __h205 = h(&mut rng);
+        let __h206_a = h(&mut rng);
         let legs = vec![
-            leg(&mut rng, s7, vec![h(&mut rng)], vec![], 1000, 5_000, empty_anchor()),
-            leg(&mut rng, s40, vec![h(&mut rng)], vec![], 1000, 5_000, h(&mut rng)),
-            leg(&mut rng, s9, vec![], vec![(1_000, true)], 1000, 5_000, h(&mut rng)),
+            leg(&mut rng, s7, vec![__h203], vec![], 1000, 5_000, empty_anchor()),
+            leg(&mut rng, s40, vec![__h204], vec![], 1000, 5_000, __h206_a),
+            leg(&mut rng, s9, vec![], vec![(1_000, true)], 1000, 5_000, __h205),
         ];
         let b = settle_shell(&st, &mut world, legs, 0);
         let facts = BeaconFacts::for_block(&b, &world);
@@ -879,12 +889,14 @@ mod tests {
         ));
 
         // Unequal expiries across a conditional shell.
-        let mut world = World::default();
+        let mut world = TestWorld::default();
         let st = genesis_state(s7);
         let mut rng = SplitMix64::new(0xF00A);
+        let __h206 = h(&mut rng);
+        let __h207 = h(&mut rng);
         let legs = vec![
-            leg(&mut rng, s7, vec![h(&mut rng)], vec![], 1000, 61, empty_anchor()),
-            leg(&mut rng, s40, vec![], vec![(1_000, true)], 1000, 62, h(&mut rng)),
+            leg(&mut rng, s7, vec![__h206], vec![], 1000, 61, empty_anchor()),
+            leg(&mut rng, s40, vec![], vec![(1_000, true)], 1000, 62, __h207),
         ];
         let b = settle_shell(&st, &mut world, legs, 0);
         let facts = BeaconFacts::for_block(&b, &world);
@@ -897,12 +909,14 @@ mod tests {
         ));
 
         // Expiry below T_min at the including height.
-        let mut world = World::default();
+        let mut world = TestWorld::default();
         let st = genesis_state(s7);
         let mut rng = SplitMix64::new(0xF00B);
+        let __h208 = h(&mut rng);
+        let __h209 = h(&mut rng);
         let legs = vec![
-            leg(&mut rng, s7, vec![h(&mut rng)], vec![], 1000, 60, empty_anchor()),
-            leg(&mut rng, s40, vec![], vec![(1_000, true)], 1000, 60, h(&mut rng)),
+            leg(&mut rng, s7, vec![__h208], vec![], 1000, 60, empty_anchor()),
+            leg(&mut rng, s40, vec![], vec![(1_000, true)], 1000, 60, __h209),
         ];
         let b = settle_shell(&st, &mut world, legs, 0);
         let facts = BeaconFacts::for_block(&b, &world);
@@ -911,7 +925,7 @@ mod tests {
             .unwrap();
         assert!(matches!(
             apply_block(st, &b, &world, &world),
-            Err(ExecutorError::ExpiryBounds { leg: 0, expiry: 60, lo: 61, hi: 14_401 })
+            Err(ExecutorError::ExpiryBounds { leg: 0, expiry: 60, lo: 101, hi: 14_401 })
         ));
     }
 
@@ -920,10 +934,11 @@ mod tests {
         let set = ShardSet::genesis();
         let s7 = set.ids()[7];
         let mut rng = SplitMix64::new(0xF00C);
-        let mut world = World::default();
+        let mut world = TestWorld::default();
         let mk = |rng: &mut SplitMix64| {
+            let __nf = h(rng);
             TransactionShell {
-                legs: vec![leg(rng, s7, vec![h(rng)], vec![(1, false)], 1000, 5_000, empty_anchor())],
+                legs: vec![leg(rng, s7, vec![__nf], vec![(1, false)], 1000, 5_000, empty_anchor())],
             }
         };
         let (sa, sb) = (mk(&mut rng), mk(&mut rng));
@@ -943,8 +958,8 @@ mod tests {
             l.tau = tree.witness(tree.position(&t).unwrap()).unwrap();
         }
         let st = genesis_state(s7);
-        let mut b = block(s7, interval, legs);
-        seal(&st, &mut b, &mut world);
+        let mut b = block(s7, interval, legs, vec![], vec![]);
+        seal(&st, &mut b, &mut world, &[]);
         let facts = BeaconFacts::for_block(&b, &world);
         let p = FraudProof { block: b.clone(), facts, condition: FraudCondition::Unresolvable };
         p.verify(&world).unwrap();
@@ -958,7 +973,7 @@ mod tests {
     fn facts_and_malformed_rejections() {
         let set = ShardSet::genesis();
         let st = genesis_state(set.ids()[7]);
-        let mut world = World::default();
+        let mut world = TestWorld::default();
         let (b, _) = valid_block(&st, &mut world, 0xF00D);
 
         let mut wrong = BeaconFacts::for_block(&b, &world);
@@ -986,7 +1001,7 @@ mod tests {
     fn reexecution_class() {
         let set = ShardSet::genesis();
         let st = genesis_state(set.ids()[7]);
-        let mut world = World::default();
+        let mut world = TestWorld::default();
         let (b, _) = valid_block(&st, &mut world, 0xF00E);
 
         assert!(matches!(
@@ -1014,7 +1029,7 @@ mod tests {
     fn digest_and_codec_roundtrips() {
         let set = ShardSet::genesis();
         let st = genesis_state(set.ids()[7]);
-        let mut world = World::default();
+        let mut world = TestWorld::default();
         let (b, _) = valid_block(&st, &mut world, 0xF00F);
         let facts = BeaconFacts::for_block(&b, &world);
 

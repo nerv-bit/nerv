@@ -34,8 +34,6 @@ use nerv_core::error::CodecError;
 use nerv_core::hash::Hash256;
 use nerv_core::types::{Height, ShardId};
 use nerv_seal::decrypt::ChunkReveal;
-use nerv_seal::dkg::sigma::Proof;
-use nerv_seal::ring::Poly;
 use nerv_seal::vpd::PartialDecryption;
 use nerv_state::ShardHeader;
 use nerv_da::{CellAuth, SetCommitment};
@@ -57,6 +55,7 @@ pub fn message_digest(payload: &[u8]) -> Hash256 {
     Hash256::concat(&GOSSIP_MSG, payload)
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GossipMessage {
     Header { shard: ShardId, header: ShardHeader },
@@ -206,6 +205,7 @@ pub enum Rejection {
 }
 
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Inbound {
     Accepted { message: GossipMessage, forward: Vec<u8> },
@@ -290,7 +290,8 @@ impl GossipEngine {
 
     /// The inbound path: decode, dedup, gate, learn, and hand back the
     /// forward frame on acceptance.
-    pub fn receive(&mut self, from: PeerId, payload: &[u8]) -> Result<Inbound, CodecError> {
+    #[allow(clippy::expect_used)]
+    pub fn receive(&mut self, _from: PeerId, payload: &[u8]) -> Result<Inbound, CodecError> {
         let message = GossipMessage::decode(payload)?;
         let digest = message_digest(payload);
         if self.seen.contains(&digest) {

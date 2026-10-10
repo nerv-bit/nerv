@@ -156,11 +156,13 @@ impl MerkleTree {
         path
     }
 
-    /// The SHARED authentication path for the top-bit-flip pair
-    /// (index, index + height/2): the full path of `index` minus its last
-    /// entry. Valid because the two indices agree on every bit below the
-    /// top, so their climbs share every sibling below the top level.
-    /// `index` must lie in the left half. FRI's prover-side pairing.
+    /// The SHARED authentication path for the value pair at domain indices
+    /// (index, index + height/2) under PAIR-MAJOR leaf order — leaf 2t
+    /// holds position t, leaf 2t+1 its negation t + height/2, so the pair
+    /// are siblings and their PARENT carries both. The path is the full
+    /// path of leaf 2·index minus its first entry (the partner leaf, which
+    /// the verifier recomputes from the revealed pair). `index` must lie
+    /// in the left half. FRI's prover-side pairing.
     pub fn auth_path_pair(&self, index: usize) -> Vec<Hash256> {
         let log = self.log_height();
         assert!(log >= 1, "a single-row tree has no pairs");
@@ -168,7 +170,7 @@ impl MerkleTree {
             index < (1usize << (log - 1)),
             "pair index {index} is not in the left half of height 2^{log}"
         );
-        self.auth_path(index)[..log - 1].to_vec()
+        self.auth_path(2 * index)[1..].to_vec()
     }
 }
 
@@ -226,12 +228,12 @@ fn climb(mut h: Hash256, index: usize, path: &[Hash256]) -> Hash256 {
     h
 }
 
-/// Verify a top-bit-flip PAIR opening: rows at leaf indices `index` and
-/// `index + 2^path.len()` differ only in the top bit, so both climbs share
-/// every sibling below the top level. The shared path has length
-/// `log_height − 1`; the root must be H(node_low, node_high) — the low
-/// index sits in the left half by construction. FRI's per-layer query
-/// authentication.
+/// Verify a value-pair opening under PAIR-MAJOR leaf order: the committed
+/// rows at tree leaves 2·index (left) and 2·index+1 (right) are the domain
+/// pair (index, index + 2^path.len()). Their parent is
+/// H(leaf_low, leaf_high) — the low value sits left by construction — and
+/// the shared path (length log_height − 1) authenticates that parent
+/// against the root with one climb. FRI's per-layer query authentication.
 pub fn verify_pair_opening(
     root: &Hash256,
     index: usize,
@@ -245,9 +247,8 @@ pub fn verify_pair_opening(
     if index >> path.len() != 0 {
         return false;
     }
-    let a = climb(leaf_hash(row_low), index, path);
-    let b = climb(leaf_hash(row_high), index, path);
-    *root == node_hash(&a, &b)
+    let parent = node_hash(&leaf_hash(row_low), &leaf_hash(row_high));
+    climb(parent, index, path) == *root
 }
 
 
@@ -377,7 +378,7 @@ mod tests {
         let row = f.matrix.row(i).to_vec();
 
         let mut bad_row = row.clone();
-        bad_row[1] = bad_row[1] + Goldilocks::ONE;
+        bad_row[1] += Goldilocks::ONE;
         assert!(!verify_opening(&root, i, &bad_row, &path));
 
         for lvl in 0..path.len() {
@@ -482,27 +483,56 @@ mod pair_tests {
     use super::*;
     use crate::testutil::SplitMix64;
 
-    fn tree_with(log: usize, width: usize, seed: u64) -> (CodewordMatrix, MerkleTree) {
+    fn gf(rng: &mut SplitMix64) -> Goldilocks {
+        Goldilocks::from_u64_reduce(rng.next_u64())
+    }
+
+    /// A PAIR-MAJOR tree over 2^log domain positions (width columns):
+    /// leaf 2t = position t, leaf 2t+1 = position t + half — FRI's layer
+    /// layout. Returns the leaf rows in tree order.
+    fn pair_tree_with(
+        log: usize,
+        width: usize,
+        seed: u64,
+    ) -> (Vec<Vec<Goldilocks>>, MerkleTree) {
         let mut rng = SplitMix64::new(seed);
-        let height = 1usize << log;
-        let columns: Vec<Vec<Goldilocks>> = (0..width)
-            .map(|_| (0..height).map(|_| Goldilocks::from_u64_reduce(rng.next_u64())).collect())
+        let n = 1usize << log;
+        let half = n / 2;
+        let pos: Vec<Vec<Goldilocks>> =
+            (0..width).map(|_| (0..n).map(|_| gf(&mut rng)).collect()).collect();
+        let cols: Vec<Vec<Goldilocks>> = pos
+            .iter()
+            .map(|c| {
+                let mut interleaved = Vec::with_capacity(n);
+                for t in 0..half {
+                    interleaved.push(c[t]);
+                    interleaved.push(c[t + half]);
+                }
+                interleaved
+            })
             .collect();
-        let m = CodewordMatrix::from_columns(&columns);
-        let t = MerkleTree::commit(&m);
-        (m, t)
+        let tree = MerkleTree::commit(&CodewordMatrix::from_columns(&cols));
+        let leaf_rows: Vec<Vec<Goldilocks>> = (0..n)
+            .map(|leaf| {
+                let t = leaf / 2;
+                let p = if leaf % 2 == 0 { t } else { t + half };
+                (0..width).map(|c| pos[c][p]).collect()
+            })
+            .collect();
+        (leaf_rows, tree)
     }
 
     #[test]
-    fn pair_paths_are_full_path_prefixes() {
+    fn pair_paths_are_parent_level_paths() {
         for log in 1..=6usize {
-            let (m, tree) = tree_with(log, 2, 0x40 + log as u64);
+            let (_rows, tree) = pair_tree_with(log, 2, 0x40 + log as u64);
             for j in 0..(1usize << (log - 1)) {
-                let full = tree.auth_path(j);
+                let full = tree.auth_path(2 * j);
                 let pair = tree.auth_path_pair(j);
                 assert_eq!(pair.len(), log - 1);
-                assert_eq!(pair, full[..log - 1]);
-                let _ = &m;
+                // the pair path is the leaf path minus the FIRST entry —
+                // the partner leaf, recomputed by the verifier.
+                assert_eq!(pair, full[1..]);
             }
         }
     }
@@ -510,12 +540,12 @@ mod pair_tests {
     #[test]
     fn pair_openings_verify_across_sizes() {
         for (log, width) in [(1usize, 1usize), (2, 3), (5, 2), (8, 4)] {
-            let (m, tree) = tree_with(log, width, 0x80 + log as u64);
+            let (rows, tree) = pair_tree_with(log, width, 0x80 + log as u64);
             let root = tree.root();
             for j in 0..(1usize << (log - 1)) {
                 let path = tree.auth_path_pair(j);
                 assert!(
-                    verify_pair_opening(&root, j, m.row(j), m.row(j + (1usize << (log - 1))), &path),
+                    verify_pair_opening(&root, j, &rows[2 * j], &rows[2 * j + 1], &path),
                     "log={log} j={j}"
                 );
             }
@@ -524,27 +554,27 @@ mod pair_tests {
 
     #[test]
     fn size_two_tree_pairs_directly() {
-        let (m, tree) = tree_with(1, 2, 0x22);
-        assert!(verify_pair_opening(&tree.root(), 0, m.row(0), m.row(1), &[]));
-        assert!(!verify_pair_opening(&tree.root(), 0, m.row(1), m.row(0), &[]));
-        assert!(!verify_pair_opening(&tree.root(), 1, m.row(0), m.row(1), &[]));
+        let (rows, tree) = pair_tree_with(1, 2, 0x22);
+        assert!(verify_pair_opening(&tree.root(), 0, &rows[0], &rows[1], &[]));
+        assert!(!verify_pair_opening(&tree.root(), 0, &rows[1], &rows[0], &[]));
+        assert!(!verify_pair_opening(&tree.root(), 1, &rows[0], &rows[1], &[]));
     }
 
     #[test]
     fn tampered_pair_openings_rejected() {
-        let (m, tree) = tree_with(4, 2, 0x77);
+        let (rows, tree) = pair_tree_with(4, 2, 0x77);
         let root = tree.root();
         let j = 3usize;
         let path = tree.auth_path_pair(j);
-        let low = m.row(j).to_vec();
-        let high = m.row(j + 8).to_vec();
+        let low = rows[2 * j].clone();
+        let high = rows[2 * j + 1].clone();
 
         let mut bad_low = low.clone();
-        bad_low[0] = bad_low[0] + Goldilocks::ONE;
+        bad_low[0] += Goldilocks::ONE;
         assert!(!verify_pair_opening(&root, j, &bad_low, &high, &path));
 
         let mut bad_high = high.clone();
-        bad_high[1] = bad_high[1] + Goldilocks::ONE;
+        bad_high[1] += Goldilocks::ONE;
         assert!(!verify_pair_opening(&root, j, &low, &bad_high, &path));
 
         for lvl in 0..path.len() {
@@ -552,6 +582,11 @@ mod pair_tests {
             bad[lvl] = Hash256::from_bytes([7u8; 32]);
             assert!(!verify_pair_opening(&root, j, &low, &high, &bad), "lvl={lvl}");
         }
+
+        // swapping the pair inverts the parent's child order
+        assert!(!verify_pair_opening(&root, j, &high, &low, &path));
+        // out-of-range pair index
+        assert!(!verify_pair_opening(&root, 1usize << 3, &low, &high, &path));
 
         let mut short = path.clone();
         short.pop();

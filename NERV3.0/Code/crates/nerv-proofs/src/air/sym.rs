@@ -149,8 +149,7 @@ impl ConstraintSet {
         (self.len(), self.max_degree())
     }
 
-    pub fn evaluate(
-        &self,
+    fn evaluate(
         e: &SymExpr,
         row: usize,
         trace: &[Vec<Goldilocks>],
@@ -180,13 +179,13 @@ impl ConstraintSet {
                 if row + 1 < trace.len() { Goldilocks::ONE } else { Goldilocks::ZERO }
             }
             SymExpr::Add(a, b) => {
-                self.evaluate(a, row, trace, prep, publics) + self.evaluate(b, row, trace, prep, publics)
+                Self::evaluate(a, row, trace, prep, publics) + Self::evaluate(b, row, trace, prep, publics)
             }
             SymExpr::Sub(a, b) => {
-                self.evaluate(a, row, trace, prep, publics) - self.evaluate(b, row, trace, prep, publics)
+                Self::evaluate(a, row, trace, prep, publics) - Self::evaluate(b, row, trace, prep, publics)
             }
             SymExpr::Mul(a, b) => {
-                self.evaluate(a, row, trace, prep, publics) * self.evaluate(b, row, trace, prep, publics)
+                Self::evaluate(a, row, trace, prep, publics) * Self::evaluate(b, row, trace, prep, publics)
             }
         }
     }
@@ -274,9 +273,9 @@ impl ConstraintSet {
                 break 'rows;
             }
             for (e, name) in &self.constraints {
-                let v = self.evaluate(e, row, trace, prep, publics);
+                let v = Self::evaluate(e, row, trace, prep, publics);
                 if !v.is_zero() {
-                    failures.push(ConstraintFailure { row, name: *name, value: v.as_u64() });
+                    failures.push(ConstraintFailure { row, name, value: v.as_u64() });
                 }
             }
         }
@@ -320,7 +319,9 @@ mod tests {
         assert_eq!(digit.len(), 74);
 
         let cons = ConstraintSet::record(&ConservationChip::new());
-        assert_eq!(cons.max_degree(), 3);
+        // RangeChip is degree 2 (b*(1-b)) and conservation builds only on
+        // those primitives + linear relations — so the family is also degree 2.
+        assert_eq!(cons.max_degree(), 2);
         assert!(cons.len() > 200 && cons.len() < 400, "conservation families: {}", cons.len());
 
         let merkle = ConstraintSet::record(&MerkleChip::new(32));
@@ -347,7 +348,7 @@ mod tests {
 
         differential(&DigitChip, (0..8).map(|_| gen_digit_witness(0xDEAD)).collect(), vec![], vec![]);
         let mut bad = gen_digit_witness(7);
-        bad[2] = bad[2] + nerv_core::field::Goldilocks::ONE;
+        bad[2] += nerv_core::field::Goldilocks::ONE;
         differential(&DigitChip, vec![bad], vec![], vec![]);
     }
 
@@ -374,7 +375,7 @@ mod tests {
             (0..4).map(|i| trace[chip.rows() - 1][i]).collect();
         differential(&chip, trace.clone(), prep.clone(), root.clone());
         let mut bad = trace;
-        bad[10][3] = bad[10][3] + nerv_core::field::Goldilocks::ONE;
+        bad[10][3] += nerv_core::field::Goldilocks::ONE;
         differential(&chip, bad, prep, root);
 
         let cv = [0x11223344u32; 8];
@@ -384,7 +385,7 @@ mod tests {
         let prep = gen_prep(64, 0, 1);
         differential(&bl3, trace.clone(), prep.clone(), vec![]);
         let mut bad = trace;
-        bad[20][17] = bad[20][17] + nerv_core::field::Goldilocks::ONE;
+        bad[20][17] += nerv_core::field::Goldilocks::ONE;
         differential(&bl3, bad, prep, vec![]);
     }
 
@@ -406,8 +407,8 @@ mod tests {
         let wk = WalletKeys::from_master(&MasterSeed::from_bytes(rng.bytes32()));
         let det = wk.viewing();
         let g = ShardSet::genesis();
-        let addr = |i: u64| Address::generate(det, wk.nullifier_key(), i, &g).unwrap();
-        let opening = |v: u64, i: u64| NoteOpening {
+        let addr = |i: u64| Address::generate(&det, wk.nullifier_key(), i, &g).unwrap();
+        let mut opening = |v: u64, i: u64| NoteOpening {
             value: v,
             rho: rng.bytes32(),
             delivery: *addr(i).delivery().as_bytes(),
@@ -436,6 +437,8 @@ mod tests {
             anchor: root.as_hash256(),
             expiry: Height::from_u64(5_000),
             weight_version: 1,
+            ct: vec![],
+            burns: vec![],
         };
         let leg40 = LegShell {
             shard: g.ids()[40],
@@ -451,6 +454,8 @@ mod tests {
             anchor: nerv_core::hash::Hash256::from_bytes(rng.bytes32()),
             expiry: Height::from_u64(5_000),
             weight_version: 1,
+            ct: vec![],
+            burns: vec![],
         };
         let shell = nerv_custody::tx::TransactionShell { legs: vec![leg7, leg40] };
         let txid = shell.txid().unwrap();

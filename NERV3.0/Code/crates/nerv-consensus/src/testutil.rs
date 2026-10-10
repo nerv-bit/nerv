@@ -32,15 +32,15 @@ pub(crate) mod harness {
     use crate::finality::ShardFinality;
     use nerv_codec::codec_w::{CodecW, WeightVersion};
     use nerv_codec::weight_gen::{certify, expand, BeaconRandomness, CertConfig};
-    use nerv_core::constants::CT_BATCH;
     use nerv_core::field::Goldilocks;
     use nerv_core::hash::Hash256;
     use nerv_core::types::{
-        Epoch, FeeSats, Height, Interval, kappa, ShardId, ShardSet, TxId,
+        Epoch, FeeSats, Height, Interval, kappa, ShardId, ShardSet,
     };
-    use nerv_crypto::mldsa::{EncapsulationKey, SigningKey, VerifyingKey};
+    use nerv_crypto::mlkem::EncapsulationKey;
+    use nerv_crypto::mldsa::{SigningKey, VerifyingKey};
     use nerv_crypto::sigaggr::{vote_bytes, QuorumCertificate, VoteCollector};
-    use nerv_custody::nct::{NctDigest, NoteCommitmentTree};
+    use nerv_custody::nct::NctDigest;
     use nerv_custody::tx::{InputSet, LegShell, Output, TransactionShell};
     use nerv_custody::Address;
     use nerv_proofs::stark::ext_field::ExtF;
@@ -50,7 +50,6 @@ pub(crate) mod harness {
     use nerv_proofs::{FriShape, TransactionProof};
     use nerv_registry::challenge::InclusionChallenge;
     use nerv_registry::mempool::{PoolEntry, VerifyContext};
-    use nerv_seal::circuit_stmt::epoch_key_identifier;
     use nerv_seal::encrypt::{derive_reference_keypair, Ciphertext, PublicKey};
     use nerv_state::block::{SettledLeg, ShardBlock};
     use nerv_state::fraud::{BeaconFacts, FraudCondition, FraudProof, ReexecutionFraud};
@@ -106,7 +105,7 @@ pub(crate) mod harness {
            .clone()
    }
 
-    pub(crate) fn header(shard: ShardId, height: u64, seed: u64) -> ShardHeader {
+    pub(crate) fn header(_shard: ShardId, height: u64, seed: u64) -> ShardHeader {
         let mut rng = SplitMix64::new(seed ^ 0xCC00_0000);
        ShardHeader {
            prev: h(&mut rng),
@@ -131,13 +130,17 @@ pub(crate) mod harness {
         }
     }
 
-    /// n aligned (signing, verifying) key pairs.
+    /// n aligned (signing, verifying) key pairs. Each call uses a different
+    /// salt derived from `n`, so `keys(m)` and `keys(n)` (m != n) always
+    /// produce disjoint key sets — letting tests build a "wrong roster"
+    /// without overlap surprises.
     pub(crate) fn keys(n: u64) -> (Vec<SigningKey>, Vec<VerifyingKey>) {
+        let salt: u64 = n.wrapping_mul(0x9E37_79B9_7F4A_7C15);
         let keys: Vec<SigningKey> = (0..n)
             .map(|i| {
                 let mut b = [0u8; 32];
-                b[..8].copy_from_slice(&(0x517_u64 + i).to_le_bytes());
-                b[24..32].copy_from_slice(&i.to_le_bytes());
+                b[..8].copy_from_slice(&(0x517_u64.wrapping_add(salt).wrapping_add(i)).to_le_bytes());
+                b[24..32].copy_from_slice(&salt.wrapping_add(i).to_le_bytes());
                 SigningKey::from_seed(&b).unwrap()
             })
             .collect();
@@ -201,19 +204,6 @@ pub(crate) mod harness {
         }
     }
 
-    /// A chain source with no history (no escrows to recover).
-    pub(crate) struct NoChain;
-
-    impl ChainSource for NoChain {
-        fn settled_leg(
-            &self,
-            _height: Height,
-            _key: &nerv_core::types::LegKey,
-        ) -> Option<nerv_state::block::ResolvedLeg> {
-            None
-        }
-    }
-
     // -- slash fixtures ------------------------------------------------------
 
     pub(crate) fn fri() -> FriShape {
@@ -273,7 +263,7 @@ pub(crate) mod harness {
     fn dummy_ct(rng: &mut SplitMix64) -> Vec<u8> {
         let mut ct = vec![0u8; Ciphertext::WIRE_SIZE];
         for c in ct.chunks_exact_mut(4) {
-            c.copy_from_slice(&(rng.next_u32() & 0xFFF0_0000).to_le_bytes());
+            c.copy_from_slice(&((rng.next_u64() as u32) & 0xFFF0_0000).to_le_bytes());
         }
         ct
     }
@@ -400,7 +390,5 @@ pub(crate) mod harness {
         (bundle, verify_ctx())
     }
 
-    // Re-exported for the tests that walk a finalized chain.
-    pub(crate) use nerv_state::canonical_txid;
     pub(crate) fn _unused(_: &ShardFinality) {}
 }

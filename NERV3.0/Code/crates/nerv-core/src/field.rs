@@ -5,7 +5,7 @@
 //! order; consensus ordering never sorts field elements.
 
 use std::fmt;
-use std::ops::{Add, Mul, Neg, Sub};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use crate::codec::{Decode, Encode, Reader};
 use crate::error::CodecError;
@@ -15,14 +15,8 @@ pub const GOLDILOCKS_PRIME: u64 = 18_446_744_069_414_584_321;
 const _: () = assert!((GOLDILOCKS_PRIME as u128) == (1u128 << 64) - (1u128 << 32) + 1);
 const _: () = assert!(GOLDILOCKS_PRIME == crate::params::PROOFS_FIELD_MODULUS);
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Goldilocks(u64);
-
-impl Default for Goldilocks {
-    fn default() -> Self {
-        Goldilocks(0)
-    }
-}
 
 impl fmt::Debug for Goldilocks {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -100,6 +94,7 @@ impl Goldilocks {
         }
     }
 
+    #[allow(clippy::should_implement_trait)] // The `Mul` trait delegates here; retain the named field API.
     pub fn mul(self, rhs: Goldilocks) -> Goldilocks {
         Goldilocks(
             (((self.0 as u128) * (rhs.0 as u128)) % (GOLDILOCKS_PRIME as u128)) as u64,
@@ -109,24 +104,26 @@ impl Goldilocks {
     /// Const-compatible modular multiplication (Goldilocks fast reduction,
     /// p = 2⁶⁴ − 2³² + 1). For a, b ∈ [0, p), returns a·b mod p with no
     /// overflow: a·b fits in 128 bits; the reduction uses 2⁶⁴ ≡ 2³² − 1
-    /// (mod p) to fold the upper half back into the lower half. Branch
-    /// count is constant-time. The runtime `mul` above is faster on
+    /// (mod p) to fold the upper half back into the lower half — twice,
+    /// because the first fold leaves up to 96 bits, and the result of the
+    /// second fold is < 4p, so the final loop is bounded by 3 subtractions.
+    /// Branch count is constant-time. The runtime `mul` above is faster on
     /// machines without `u128` overflow tricks but is not `const`-callable;
     /// this one is for `const_pow` and other precompile time tables.
     pub const fn const_mul(self, rhs: Goldilocks) -> Goldilocks {
         let n = (self.0 as u128) * (rhs.0 as u128);
         let hi = (n >> 64) as u64;
         let lo = n as u64;
-        // result = hi * 2^32 - hi + lo (may underflow to a negative i128)
-        let r = (hi as i128) * (1i128 << 32) - (hi as i128) + (lo as i128);
-        let r = if r < 0 {
-            (r + GOLDILOCKS_PRIME as i128) as u64
-        } else if r >= GOLDILOCKS_PRIME as i128 {
-            (r - GOLDILOCKS_PRIME as i128) as u64
-        } else {
-            r as u64
-        };
-        Goldilocks(r)
+        // Fold #1: n = hi·2⁶⁴ + lo ≡ hi·(2³² − 1) + lo  (< 2⁹⁶).
+        let t = (hi as u128) * ((1u128 << 32) - 1) + (lo as u128);
+        // Fold #2: t = hi₂·2⁶⁴ + lo₂ ≡ hi₂·(2³² − 1) + lo₂  (< 4p).
+        let hi2 = (t >> 64) as u64;
+        let lo2 = t as u64;
+        let mut r = (hi2 as u128) * ((1u128 << 32) - 1) + (lo2 as u128);
+        while r >= GOLDILOCKS_PRIME as u128 {
+            r -= GOLDILOCKS_PRIME as u128;
+        }
+        Goldilocks(r as u64)
     }
 
     pub const fn neg(self) -> Goldilocks {
@@ -190,6 +187,21 @@ impl Neg for Goldilocks {
         Goldilocks::neg(self)
     }
 }
+impl AddAssign for Goldilocks {
+    fn add_assign(&mut self, rhs: Goldilocks) {
+        *self = Goldilocks::add(*self, rhs);
+    }
+}
+impl SubAssign for Goldilocks {
+    fn sub_assign(&mut self, rhs: Goldilocks) {
+        *self = Goldilocks::sub(*self, rhs);
+    }
+}
+impl MulAssign for Goldilocks {
+    fn mul_assign(&mut self, rhs: Goldilocks) {
+        *self = Goldilocks::mul(*self, rhs);
+    }
+}
 
 impl Encode for Goldilocks {
     fn encode_into(&self, out: &mut Vec<u8>) {
@@ -220,7 +232,52 @@ mod tests {
     fn prime_value() {
         assert_eq!(GOLDILOCKS_PRIME, 18446744069414584321u64);
         assert_eq!((GOLDILOCKS_PRIME as u128), (1u128 << 64) - (1u128 << 32) + 1);
-        assert_eq!(Goldilocks::from_u64_reduce(u64::MAX).as_u64(), u64::MAX - GOLDILOCKS_PRIME + 1);
+        assert_eq!(Goldilocks::from_u64_reduce(u64::MAX).as_u64(), u64::MAX - GOLDILOCKS_PRIME);
+    }
+
+    /// The const evaluator must agree with the runtime `% p` multiply on
+    /// every operand class — the two-adic domain constants are computed
+    /// with it at compile time, so a divergence poisons the whole STARK
+    /// engine while every runtime path still looks healthy.
+    #[test]
+    fn const_mul_matches_runtime_mul() {
+        let mut rng = SplitMix64::new(0xC0DE);
+        // Random pairs.
+        for _ in 0..500 {
+            let (a, b) = (fe(&mut rng), fe(&mut rng));
+            assert_eq!(a.const_mul(b), a.mul(b));
+        }
+        // Extremes: near-p operands, p−1, and the largest products.
+        let p_minus_1 = Goldilocks::from_u64_reduce(GOLDILOCKS_PRIME - 1);
+        let big = Goldilocks::from_u64_reduce(GOLDILOCKS_PRIME - 2);
+        let one = Goldilocks::ONE;
+        for a in [one, p_minus_1, big] {
+            for b in [one, p_minus_1, big] {
+                assert_eq!(a.const_mul(b), a.mul(b));
+            }
+        }
+        // The Fermat endpoint the two-adic generator construction leans on.
+        assert_eq!(p_minus_1.const_mul(p_minus_1), one);
+    }
+
+    /// The `*Assign` operator impls reduce to the same field ops as
+    /// their binary twins (the prover's witness-accumulation code
+    /// leans on `+=`).
+    #[test]
+    fn assign_ops_match_binary_ops() {
+        let mut rng = SplitMix64::new(0xA550);
+        for _ in 0..100 {
+            let (a, b) = (fe(&mut rng), fe(&mut rng));
+            let mut x = a;
+            x += b;
+            assert_eq!(x, a + b);
+            let mut y = a;
+            y -= b;
+            assert_eq!(y, a - b);
+            let mut z = a;
+            z *= b;
+            assert_eq!(z, a * b);
+        }
     }
 
     #[test]

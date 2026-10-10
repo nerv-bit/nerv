@@ -62,7 +62,10 @@ impl ExtF {
     }
 
     /// Karatsuba (3 base multiplications); pinned against the naive
-    /// schoolbook in the tests.
+    /// schoolbook in the tests. Named `mul` to mirror the WITNESS-side
+    /// witness-builder; not implementing `std::ops::Mul` keeps the operator
+    /// form reserved for the AIR's own `Expr` overloads.
+    #[allow(clippy::should_implement_trait)] // Intentionally a free function so the `*` operator on `Expr` is not shadowed.
     pub fn mul(self, rhs: ExtF) -> ExtF {
         let (a, b) = (self.c0, self.c1);
         let (c, d) = (rhs.c0, rhs.c1);
@@ -108,7 +111,7 @@ impl ExtF {
             return ExtF::ZERO;
         }
         let inv = n.inverse();
-        ExtF { c0: self.c0 * inv, c1: self.c1 * inv }
+        ExtF { c0: self.c0 * inv, c1: self.c1.neg() * inv }
     }
 
     pub const fn is_zero(self) -> bool {
@@ -261,6 +264,24 @@ mod tests {
         }
     }
 
+    /// Regression: `inverse` is the CONJUGATE over the norm, z⁻¹ = z̄/n —
+    /// not z/n. The unconjugated form satisfies neither z·z⁻¹ = 1 nor the
+    /// Galois identity below; it poisoned every ExtF batch inversion
+    /// (DEEP divisor, Lagrange weights) and with them every composed
+    /// proof's degree bound.
+    #[test]
+    fn inverse_is_conjugate_over_norm() {
+        let mut rng = SplitMix64::new(0x1C);
+        for _ in 0..300 {
+            let z = ef(&mut rng);
+            if z.is_zero() {
+                continue;
+            }
+            let n_inv = z.norm().inverse();
+            assert_eq!(z.inverse(), z.conjugate().scale(n_inv));
+        }
+    }
+
     #[test]
     fn karatsuba_matches_naive_schoolbook() {
         let mut rng = SplitMix64::new(0xCA);
@@ -310,7 +331,7 @@ mod tests {
             let mut acc = ExtF::ONE;
             for e in 0u64..9 {
                 assert_eq!(z.pow(e), acc, "e={e}");
-                acc = acc * z;
+                acc *= z;
             }
         }
     }
@@ -356,8 +377,10 @@ mod tests {
     #[test]
     fn extremes() {
         let pm1 = Goldilocks::from_u64_reduce(GOLDILOCKS_PRIME - 1);
-        let z_max = ExtF::new(pm1, pm1);
-        assert_eq!(z_max + ExtF::ONE, ExtF::ZERO);
+        // −1 lives in the base field: (p−1) + 1 = 0 there. A full (p−1, p−1)
+        // element has the X-component left over — not zero.
+        assert_eq!(ExtF::from_base(pm1) + ExtF::ONE, ExtF::ZERO);
+        assert_eq!(ExtF::new(pm1, pm1) + ExtF::ONE, ExtF::new(Goldilocks::ZERO, pm1));
         assert_eq!(ExtF::ONE - ExtF::ONE, ExtF::ZERO);
         assert_eq!(ExtF::ZERO - ExtF::ONE, ExtF::from_base(pm1));
         // −1 is a base element: multiplying by it negates.

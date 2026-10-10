@@ -1,2 +1,9 @@
 [alias]
 xtask = "run -p xtask --"
+
+# The STARK/seal engines' cached-NTT expand materializes several 131 KB
+# matrices; debug-build frames overflow the libtest default stack on
+# Windows (0xc00000fd in ballot/decrypt/expand paths). libtest reads this
+# for every spawned test thread.
+[env]
+RUST_MIN_STACK = "67108864"

@@ -29,7 +29,7 @@ use crate::ring::{Poly, Vec2, Vec8, N};
 /// sub-minimum batches are committee-padded to exactly CHUNK_MAX legs
 /// (§6.3.5). The privacy floor B_min is a ceremony policy, not a decode
 /// rule — decode is a pure function of (legs, su, v) (erratum 35).
-pub const CHUNK_MAX: u64 = nerv_core::params::SEAL_CHUNK_MAX as u64;
+pub const CHUNK_MAX: u64 = nerv_core::params::SEAL_CHUNK_MAX;
 
 /// A verified chunk reveal: per-slot digit sums inside the canonical
 /// envelope. Constructed only by `decode_chunk` / `decrypt_native`, and by
@@ -194,7 +194,7 @@ mod tests {
     }
 
     fn raw_coeff(x: i64) -> u64 {
-        let m = x.unsigned_abs() as u64;
+        let m = x.unsigned_abs();
         if x >= 0 { m } else { Q - m }
     }
 
@@ -273,7 +273,7 @@ mod tests {
             Err(RevealError::DigitSumAboveEnvelope { slot: 511, value: 300, envelope: 255 }) => {}
             other => panic!("{other:?}"),
         }
-        let v = one_slot_hat(0, -SCALE as i64);
+        let v = one_slot_hat(0, -(SCALE as i64));
         match decode_chunk(legs, &Poly::zero(), &v) {
             Err(RevealError::NegativeDigit { slot: 0, value: -1 }) => {}
             other => panic!("{other:?}"),

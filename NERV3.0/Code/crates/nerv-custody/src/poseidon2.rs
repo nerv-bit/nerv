@@ -81,7 +81,7 @@ fn sbox(x: Goldilocks) -> Goldilocks {
 fn m4(v: &mut [Goldilocks]) {
     let t = v[0] + v[1] + v[2] + v[3];
     for e in v.iter_mut() {
-        *e = *e + t;
+        *e += t;
     }
 }
 
@@ -96,14 +96,14 @@ fn internal_linear(x: &mut [Goldilocks; T]) {
 fn external_linear(x: &mut [Goldilocks; T]) {
     let mut s = [Goldilocks::ZERO; 4];
     for g in 0..4 {
-        for i in 0..4 {
-            s[i] = s[i] + x[g * 4 + i];
+        for (i, s_i) in s.iter_mut().enumerate() {
+            *s_i += x[g * 4 + i];
         }
     }
     for g in 0..4 {
         let mut v = [Goldilocks::ZERO; 4];
-        for i in 0..4 {
-            v[i] = x[g * 4 + i] + s[i];
+        for (i, v_i) in v.iter_mut().enumerate() {
+            *v_i = x[g * 4 + i] + s[i];
         }
         m4(&mut v);
         x[g * 4..g * 4 + 4].copy_from_slice(&v);
@@ -111,8 +111,8 @@ fn external_linear(x: &mut [Goldilocks; T]) {
 }
 
 fn full_round(x: &mut [Goldilocks; T], rc: &[Goldilocks; T]) {
-    for i in 0..T {
-        x[i] = x[i] + rc[i];
+    for (i, x_i) in x.iter_mut().enumerate() {
+        *x_i += rc[i];
     }
     for e in x.iter_mut() {
         *e = sbox(*e);
@@ -121,8 +121,8 @@ fn full_round(x: &mut [Goldilocks; T], rc: &[Goldilocks; T]) {
 }
 
 fn partial_round(x: &mut [Goldilocks; T], rc: &[Goldilocks; T]) {
-    for i in 0..T {
-        x[i] = x[i] + rc[i];
+    for (i, x_i) in x.iter_mut().enumerate() {
+        *x_i += rc[i];
     }
     x[0] = sbox(x[0]);
     internal_linear(x);
@@ -131,14 +131,14 @@ fn partial_round(x: &mut [Goldilocks; T], rc: &[Goldilocks; T]) {
 /// The permutation P. Deterministic, total, platform-stable.
 pub fn permute(state: &mut [Goldilocks; T]) {
     let rc = round_constants();
-    for r in 0..HALF {
-        full_round(state, &rc[r]);
+    for r in &rc[..HALF] {
+        full_round(state, r);
     }
-    for r in HALF..HALF + PARTIAL_ROUNDS {
-        partial_round(state, &rc[r]);
+    for r in &rc[HALF..HALF + PARTIAL_ROUNDS] {
+        partial_round(state, r);
     }
-    for r in HALF + PARTIAL_ROUNDS..ROUNDS {
-        full_round(state, &rc[r]);
+    for r in &rc[HALF + PARTIAL_ROUNDS..ROUNDS] {
+        full_round(state, r);
     }
 }
 
@@ -161,16 +161,16 @@ pub fn round_trace(state: &[Goldilocks; T]) -> Vec<[Goldilocks; T]> {
     let mut x = *state;
     let mut out = Vec::with_capacity(ROUNDS + 1);
     out.push(x);
-    for r in 0..HALF {
-        full_round(&mut x, &rc[r]);
+    for r in &rc[..HALF] {
+        full_round(&mut x, r);
         out.push(x);
     }
-    for r in HALF..HALF + PARTIAL_ROUNDS {
-        partial_round(&mut x, &rc[r]);
+    for r in &rc[HALF..HALF + PARTIAL_ROUNDS] {
+        partial_round(&mut x, r);
         out.push(x);
     }
-    for r in HALF + PARTIAL_ROUNDS..ROUNDS {
-        full_round(&mut x, &rc[r]);
+    for r in &rc[HALF + PARTIAL_ROUNDS..ROUNDS] {
+        full_round(&mut x, r);
         out.push(x);
     }
     out
@@ -226,11 +226,11 @@ mod tests {
 
     fn mat_vec(m: &[[u64; 16]; 16], v: &[Goldilocks; T]) -> [Goldilocks; T] {
         let mut out = [Goldilocks::ZERO; T];
-        for i in 0..16 {
+        for (i, m_row) in m.iter().take(16).enumerate() {
             let mut acc = Goldilocks::ZERO;
-            for j in 0..16 {
-                if m[i][j] != 0 {
-                    acc = acc + v[j] * Goldilocks::from_u32(m[i][j] as u32);
+            for (j, m_cell) in m_row.iter().take(16).enumerate() {
+                if *m_cell != 0 {
+                    acc += v[j] * Goldilocks::from_u32(*m_cell as u32);
                 }
             }
             out[i] = acc;
@@ -334,7 +334,7 @@ mod tests {
             let base = random_state(&mut rng);
             let pos = (rng.next_u64() % T as u64) as usize;
             let mut flipped = base;
-            flipped[pos] = flipped[pos] + Goldilocks::ONE;
+            flipped[pos] += Goldilocks::ONE;
             let (mut pa, mut pb) = (base, flipped);
             permute(&mut pa);
             permute(&mut pb);

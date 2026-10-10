@@ -3,12 +3,12 @@
 //! types, no I/O. Every UI renders this.
 
 use std::collections::VecDeque;
+use std::fmt::Write;
 
-use nerv_core::hash::Hash256;
-use nerv_core::types::{ShardId, TxId};
+use nerv_core::types::TxId;
 use nerv_custody::WalletKeys;
 use nerv_wallet::keys::AddressSet;
-use nerv_wallet::scan::{ScannedNote, WalletNoteSet};
+use nerv_wallet::scan::WalletNoteSet;
 
 /// Which screen the UI is showing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -524,7 +524,11 @@ impl WalletState {
             .as_ref()
             .and_then(|a| a.addresses().first())
             .map(|addr| {
-                addr.ek.as_bytes().iter().map(|b| format!("{b:02x}")).collect()
+                let mut s = String::with_capacity(64);
+                for b in addr.ek.as_bytes() {
+                    let _ = write!(s, "{b:02x}");
+                }
+                s
             })
     }
 

@@ -83,12 +83,11 @@ pub fn encode_parity(data: &[Vec<u8>], parity_count: usize) -> Result<Vec<Vec<u8
     }
     let mut parity = vec![vec![0u8; len]; parity_count];
     let (log, exp) = TABLES;
-    for a in 0..parity_count {
-        for j in 0..k {
+    for (a, dst) in parity.iter_mut().take(parity_count).enumerate() {
+        for (j, d_row) in data.iter().take(k).enumerate() {
             let c = gf_inv(a as u8 ^ ((n - k + j) as u8));
             let lc = log[c as usize] as usize;
-            let dst = &mut parity[a];
-            for (d, &s) in dst.iter_mut().zip(data[j].iter()) {
+            for (d, &s) in dst.iter_mut().zip(d_row.iter()) {
                 if s != 0 {
                     *d ^= exp[(log[s as usize] as usize) + lc];
                 }
@@ -159,10 +158,10 @@ fn decode_data(
     let minv = invert(&m).ok_or(ErasureError::Singular)?;
     let mut out = vec![vec![0u8; len]; k];
     for (j, o) in out.iter_mut().enumerate() {
-        for t in 0..k {
+        for (t, s_row) in shards.iter().take(k).enumerate() {
             let c = minv[j][t];
             if c != 0 {
-                for (d, &s) in o.iter_mut().zip(shards[t].1.iter()) {
+                for (d, &s) in o.iter_mut().zip(s_row.1.iter()) {
                     if s != 0 {
                         *d ^= gf_mul(c, s);
                     }
@@ -247,17 +246,17 @@ mod tests {
         for (n, k) in [(6usize, 3usize), (8, 4), (5, 2), (4, 1), (10, 5)] {
             let rows: Vec<Vec<u8>> = (0..n).map(|i| generator_row(i, k, n)).collect();
             // Identity rows.
-            for i in 0..k {
-                for j in 0..k {
-                    assert_eq!(rows[i][j], u8::from(i == j));
+            for (i, row) in rows.iter().take(k).enumerate() {
+                for (j, cell) in row.iter().take(k).enumerate() {
+                    assert_eq!(*cell, u8::from(i == j));
                 }
             }
             // Every k-subset of rows inverts.
             let mut subset = vec![0usize; k];
             let mut ok = 0usize;
             let mut total = 0usize;
-            let mut all: Vec<usize> = (0..n).collect();
-            combine(&mut all, k, &mut subset, 0, &mut |sel| {
+            let all: Vec<usize> = (0..n).collect();
+            combine(&all, k, &mut subset, 0, &mut |sel| {
                 let m: Vec<Vec<u8>> = sel.iter().map(|&i| rows[i].clone()).collect();
                 assert!(invert(&m).is_some(), "singular subset {sel:?} (n={n},k={k})");
                 ok += 1;

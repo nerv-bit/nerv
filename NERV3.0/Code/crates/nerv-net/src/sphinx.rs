@@ -248,6 +248,7 @@ pub fn build(
     Ok(Packet(bytes))
 }
 
+#[allow(clippy::expect_used)]
 pub fn peel(packet: &Packet, dk: &DecapsulationKey) -> Result<Peeled, SphinxError> {
     let ct0: &[u8; CT_LEN] = packet.0[..CT_LEN].try_into().expect("ct slice");
     let capsule0 = &packet.0[HEADER_LEN..HEADER_LEN + CAPSULE_LEN];
@@ -404,7 +405,7 @@ pub fn parse_frame(bytes: &[u8]) -> Result<FragmentFrame, SphinxError> {
 }
 
 pub fn fragment_class(len: usize) -> Result<usize, SphinxError> {
-    let needed = (len + MAX_FRAG_DATA - 1) / MAX_FRAG_DATA;
+    let needed = len.div_ceil(MAX_FRAG_DATA);
     FRAG_CLASSES
         .iter()
         .copied()
@@ -507,7 +508,7 @@ mod tests {
         }
         let mut cap = [0u8; CAPSULE_LEN];
         for c in cap.chunks_mut(8) {
-            c.copy_from_slice(&rng.next_u64().to_le_bytes());
+            c.copy_from_slice(&rng.next_u64().to_le_bytes()[..c.len()]);
         }
         (ct, cap)
     }
@@ -522,7 +523,7 @@ mod tests {
         terminal: TerminalAction,
     ) -> PathSpec {
         let arr: [(PeerId, EncapsulationKey); PATH_RELAYS] =
-            core::array::from_fn(|i| (relays[i].0, relays[i].1.clone()));
+            core::array::from_fn(|i| (relays[i].0, relays[i].1));
         PathSpec::new(arr, dest, terminal)
     }
 
@@ -551,7 +552,7 @@ mod tests {
 
         let mut current = packet.clone();
         let mut tags = Vec::new();
-        for hop in 0..4 {
+        for (hop, _) in (0..4).enumerate() {
             let peeled = peel(&current, &r[hop].2).unwrap();
             assert!(matches!(peeled.action, Action::Relay), "hop {hop}");
             assert_eq!(peeled.next, r[hop + 1].0);
@@ -627,7 +628,7 @@ mod tests {
         // blindly (their capsules are intact); the terminal detects.
         packet.0[HEADER_LEN + META_REGION + 700] ^= 1;
         let mut current = packet;
-        for hop in 0..4 {
+        for (hop, _) in (0..4).enumerate() {
             let peeled = peel(&current, &r[hop].2).unwrap();
             let (ct_pad, cap_pad) = pads(70 + hop as u64);
             current = forward(peeled.forward.as_ref().unwrap(), &ct_pad, &cap_pad).unwrap();
@@ -641,7 +642,7 @@ mod tests {
         let spec = spec_for(&r, r[0].0, TerminalAction::Drop);
         let packet = build(&spec, &[0u8; 64], &encap_rand(7)).unwrap();
         let mut current = packet;
-        for hop in 0..4 {
+        for (hop, _) in (0..4).enumerate() {
             let peeled = peel(&current, &r[hop].2).unwrap();
             let (ct_pad, cap_pad) = pads(80 + hop as u64);
             current = forward(peeled.forward.as_ref().unwrap(), &ct_pad, &cap_pad).unwrap();
@@ -658,7 +659,7 @@ mod tests {
         let full = vec![0xA5u8; MAX_DATA];
         let p = build(&spec, &full, &encap_rand(8)).unwrap();
         let mut current = p;
-        for hop in 0..4 {
+        for (hop, _) in (0..4).enumerate() {
             let peeled = peel(&current, &r[hop].2).unwrap();
             let (ct_pad, cap_pad) = pads(90 + hop as u64);
             current = forward(peeled.forward.as_ref().unwrap(), &ct_pad, &cap_pad).unwrap();
@@ -809,7 +810,7 @@ mod tests {
         bad[34..38].copy_from_slice(&u32::MAX.to_le_bytes());
         assert!(parse_frame(&bad).is_err());
         let mut bad = enc.clone();
-        let dl = enc.len() - 2;
+        let dl = FRAG_HEADER - 2; // the data-length prefix
         bad[dl..dl + 2].copy_from_slice(&7u16.to_le_bytes());
         assert!(parse_frame(&bad).is_err());
         assert!(parse_frame(&enc[..enc.len() - 1]).is_err());

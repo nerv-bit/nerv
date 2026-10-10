@@ -256,8 +256,8 @@ mod tests {
             FriQuery::decode(&huge),
             Err(CodecError::SeqTooLarge { .. })
         ));
-        // Just under the cap but past the input: overrun, not allocation.
-        let over = 65u32.to_le_bytes().to_vec();
+        // At the cap but past the input: overrun, not allocation.
+        let over = 64u32.to_le_bytes().to_vec();
         assert!(matches!(
             FriProof::decode(&over),
             Err(CodecError::SeqLenOverrun { .. })

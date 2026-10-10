@@ -242,12 +242,13 @@ mod tests {
         y.absorb_bytes(&0x1122334455667788u64.to_le_bytes());
         assert_eq!(sample_ext(&mut x, TAG_ZETA), sample_ext(&mut y, TAG_ZETA));
 
-        // The empty instance is still one distinct op.
+        // The empty instance is still one distinct op (seeded() itself
+        // already cost one absorb).
         let mut e = seeded(5);
         absorb_instance(&mut e, &[]);
         let mut n = seeded(5);
         assert_ne!(sample_ext(&mut e, TAG_ZETA), sample_ext(&mut n, TAG_ZETA));
-        assert_eq!(e.ops(), 1);
+        assert_eq!(e.ops(), 3, "seed absorb + empty-instance absorb + the roll above");
     }
 
     #[test]
@@ -261,9 +262,9 @@ mod tests {
 
         let mut z = seeded(0x99);
         assert_eq!(grind(&mut z, TAG_POW, 0), 0);
-        assert_eq!(z.ops(), 0);
+        assert_eq!(z.ops(), 1, "bits==0: no absorb, no roll (seeded() cost one op)");
         assert!(check_grind(&mut z, TAG_POW, 0, 0));
-        assert_eq!(z.ops(), 0);
+        assert_eq!(z.ops(), 1);
     }
 
     #[test]

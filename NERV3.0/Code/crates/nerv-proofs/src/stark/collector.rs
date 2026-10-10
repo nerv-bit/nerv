@@ -76,7 +76,7 @@ pub fn selector_vals_ext(log_n: usize, x: ExtF) -> SelectorVals<ExtF> {
     let n = 1u64 << log_n;
     let h_last = two_adic_generator(log_n).inverse(); // h^{N−1}
     let zh = x.pow(n) - ExtF::ONE;
-    let n_inv = ExtF::from_base(Goldilocks::from_u64_reduce(n as u64).inverse());
+    let n_inv = ExtF::from_base(Goldilocks::from_u64_reduce(n).inverse());
     SelectorVals {
         first: zh * (x - ExtF::ONE).inverse() * n_inv,
         last: zh * (x - ExtF::from_base(h_last)).inverse() * n_inv,
@@ -159,8 +159,8 @@ impl<V: AirExpr + LiftExtF + Copy> AirBuilder for PointCollector<'_, V> {
     }
 
     fn assert_zero(&mut self, expr: V, _name: &'static str) {
-        self.fold = self.fold + self.alpha_pow * expr.lift();
-        self.alpha_pow = self.alpha_pow * self.alpha;
+        self.fold += self.alpha_pow * expr.lift();
+        self.alpha_pow *= self.alpha;
         self.count += 1;
     }
 }
@@ -238,10 +238,14 @@ pub fn measure_true<A: Air<TrueDegreeBuilder>>(air: &A) -> TrueDegree {
 
 /// Upper bound on the quotient polynomial's coefficient count at trace
 /// size N = 2^log_n: deg C ≤ k(N−1) + t, Q = C/Z_H has at most
-/// k(N−1) + t − N + 1 coefficients (clamped to ≥ 1).
+/// k(N−1) + t − N + 1 coefficients (clamped to ≥ 1; a degree-0 constraint
+/// that vanishes on H is identically zero, so the bound saturates rather
+/// than underflows).
 pub fn quotient_coeff_bound(td: &TrueDegree, log_n: usize) -> usize {
     let n = 1usize << log_n;
-    (td.max_heavy * (n - 1) + usize::from(td.uses_transition) + 1 - n).max(1)
+    (td.max_heavy * (n - 1) + usize::from(td.uses_transition) + 1)
+        .saturating_sub(n)
+        .max(1)
 }
 
 #[cfg(test)]
@@ -265,7 +269,7 @@ mod tests {
             let nxt = b.witness(1, 0);
             let one = B::constant(1);
             let step = b.is_transition();
-            b.assert_zero(step * (nxt - cur - one), "counter_step");
+            b.assert_zero(step * (nxt - cur.clone() - one), "counter_step");
             let first = b.is_first_row();
             let want = b.public(0);
             b.assert_zero(first * (cur - want), "counter_init");
@@ -319,8 +323,8 @@ mod tests {
         let mut rng = SplitMix64::new(0xC01);
         let alpha = extf(&mut rng);
         let n = 8usize;
-        let honest: Vec<Goldilocks> =
-            (0..n).map(|i| Goldilocks::from_u64_reduce(i as u64)).collect();
+        let honest: Vec<Vec<Goldilocks>> =
+            (0..n).map(|i| vec![Goldilocks::from_u64_reduce(i as u64)]).collect();
         let empty: [Vec<Goldilocks>; 0] = [];
         let pubs = [Goldilocks::ZERO];
 
@@ -338,7 +342,7 @@ mod tests {
         );
 
         let mut bad = honest.clone();
-        bad[2] = Goldilocks::from_u64_reduce(5);
+        bad[2][0] = Goldilocks::from_u64_reduce(5);
         let folds = all_folds(&CounterAir, &bad, &empty, &pubs, alpha);
         assert!(!folds[1].is_zero(), "broken step constraint must bind");
         assert!(folds[0].is_zero());
@@ -363,7 +367,7 @@ mod tests {
         assert!(NativeEval::check(rows.clone(), vec![], &chip, 16).is_ok());
 
         let mut bad = rows.clone();
-        bad[3][0] = bad[3][0] + Goldilocks::ONE;
+        bad[3][0] += Goldilocks::ONE;
         assert!(all_folds(&chip, &bad, &empty, &pubs, alpha).iter().any(|f| !f.is_zero()));
         assert!(NativeEval::check(bad, vec![], &chip, 16).is_err());
 
@@ -383,7 +387,7 @@ mod tests {
         );
 
         let mut bad_cons = cons_rows;
-        bad_cons[1][ACCP_BASE] = bad_cons[1][ACCP_BASE] + Goldilocks::ONE;
+        bad_cons[1][ACCP_BASE] += Goldilocks::ONE;
         assert!(all_folds(&cons, &bad_cons, &cons_prep, &pubs, alpha).iter().any(|f| !f.is_zero()));
         assert!(
             NativeEval::check_with_prep(bad_cons, cons_prep, vec![], &cons, 16).is_err()
@@ -478,11 +482,11 @@ mod tests {
             let p = b.preprocessed(0);
             let w0 = b.witness(0, 0);
             let w1 = b.witness(1, 1);
-            b.assert_zero(p * w0 * w1, "k3");
-            b.assert_zero(b.is_first_row() * w0, "k2");
-            b.assert_zero(b.is_transition() * w0, "k1t");
-            b.assert_zero(w0 + b.public(0), "k1");
-            b.assert_zero(b.is_last_row() * p * w0 * w0, "k4");
+            b.assert_zero(p.clone() * w0.clone() * w1, "k3");
+            b.assert_zero(b.is_first_row() * w0.clone(), "k2");
+            b.assert_zero(b.is_transition() * w0.clone(), "k1t");
+            b.assert_zero(w0.clone() + b.public(0), "k1");
+            b.assert_zero(b.is_last_row() * p * w0.clone() * w0, "k4");
         }
     }
 
@@ -494,7 +498,8 @@ mod tests {
         );
         // N = 8: 4·7 + 1 − 8 + 1 = 22.
         assert_eq!(quotient_coeff_bound(&TrueDegree { max_heavy: 4, uses_transition: true }, 3), 22);
-        assert_eq!(quotient_coeff_bound(&TrueDegree { max_heavy: 5, uses_transition: false }, 4), 17);
+        // N = 16: 5·15 + 0 + 1 − 16 = 60.
+        assert_eq!(quotient_coeff_bound(&TrueDegree { max_heavy: 5, uses_transition: false }, 4), 60);
         assert_eq!(quotient_coeff_bound(&TrueDegree { max_heavy: 0, uses_transition: false }, 5), 1);
     }
 

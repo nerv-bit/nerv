@@ -38,11 +38,11 @@ pub struct SlashRecord {
     pub epoch: Epoch,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum StakeError {
     #[error("validator {offender:?} has no stake")]
-    NotStaked { offender: VerifyingKey },
+    NotStaked { offender: Box<VerifyingKey> },
     #[error("withdrawal of {amount} exceeds the stake {stake}")]
     OverWithdrawal { amount: u64, stake: u64 },
     #[error("slash evidence {digest} is already consumed")]
@@ -89,7 +89,7 @@ impl StakeLedger {
     ) -> Result<Epoch, StakeError> {
         let k = vk_key(vk);
         let Some((_, stake)) = self.entries.get_mut(&k) else {
-            return Err(StakeError::NotStaked { offender: *vk });
+            return Err(StakeError::NotStaked { offender: Box::new(*vk) });
         };
         if *stake < amount_nano {
             return Err(StakeError::OverWithdrawal { amount: amount_nano, stake: *stake });
@@ -144,11 +144,11 @@ impl StakeLedger {
         // disjoint fields, because the method receiver is `&self` as a whole).
         let pending_total = self.pending_of(&k);
         let Some((_, stake)) = self.entries.get_mut(&k) else {
-            return Err(StakeError::NotStaked { offender: *vk });
+            return Err(StakeError::NotStaked { offender: Box::new(*vk) });
         };
         let bonded = u128::from(*stake + pending_total);
         let target = ((bonded * u128::from(class.slash_permille())) / 1000) as u64;
-        let mut from_stake = target.min(*stake);
+        let from_stake = target.min(*stake);
         *stake -= from_stake;
         let mut from_pending = target - from_stake;
         if from_pending > 0 {
@@ -215,7 +215,7 @@ mod tests {
         assert_eq!(l.stake_of(&avk), 1500);
         assert_eq!(l.stake_of(b.verifying_key()), 700);
         assert_eq!(l.total_stake(), 2200);
-        assert_eq!(l.stake_of(&key(99).verifying_key()), 0);
+        assert_eq!(l.stake_of(key(99).verifying_key()), 0);
 
         // Over-withdrawal rejected.
         assert!(matches!(
@@ -223,7 +223,7 @@ mod tests {
             Err(StakeError::OverWithdrawal { amount: 1501, stake: 1500 })
         ));
         assert!(matches!(
-            l.request_withdrawal(&key(99).verifying_key(), 1, Epoch::from_u64(5)),
+            l.request_withdrawal(key(99).verifying_key(), 1, Epoch::from_u64(5)),
             Err(StakeError::NotStaked { .. })
         ));
 

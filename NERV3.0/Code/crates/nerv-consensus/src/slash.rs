@@ -25,6 +25,7 @@ pub enum SlashClass {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)]
 pub enum SlashEvidence {
     /// A settlement-invalid block — the minimal, beacon-verifiable class.
     InvalidBlock { proof: FraudProof },
@@ -40,6 +41,7 @@ pub enum SlashEvidence {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)]
 pub enum Offender {
     /// The producer's header-committed payout address (§4.6).
     Payout(Address),
@@ -330,8 +332,13 @@ mod tests {
             header: ha,
             qc: qc_for(Hash256::from_bytes([0u8; 32]), Epoch::from_u64(2), 0..15, &keys, 15),
         };
+        // The QC's subject is the *body* hash (erratum 131), not the
+        // full header hash (which depends on `qc_hash`). The first
+        // `qc_for` step pins `a.qc.subject` to the body hash; the second
+        // re-signs with the real committee so the bitmap matches the
+        // roster under `validate`.
         let a = HeaderQc {
-            qc: qc_for(a.header.header_hash(), Epoch::from_u64(2), 0..15, &keys, 15),
+            qc: qc_for(crate::qc::body_hash(&a.header), Epoch::from_u64(2), 0..15, &keys, 15),
             ..a
         };
         let b = HeaderQc {
@@ -340,7 +347,7 @@ mod tests {
             qc: qc_for(Hash256::from_bytes([0u8; 32]), Epoch::from_u64(2), 5..20, &keys, 15),
         };
         let b = HeaderQc {
-            qc: qc_for(b.header.header_hash(), Epoch::from_u64(2), 5..20, &keys, 15),
+            qc: qc_for(crate::qc::body_hash(&b.header), Epoch::from_u64(2), 5..20, &keys, 15),
             ..b
         };
         let evidence = SlashEvidence::DoubleSign { a, b };
@@ -354,10 +361,12 @@ mod tests {
         let verified = evidence.verify(&ctx).unwrap();
         assert_eq!(verified.class, SlashClass::DoubleSign);
         match &verified.offenders[..] {
-            [Offender::Validators(vks)] => {
-                assert_eq!(vks.len(), 10);
-                for (i, vk) in vks.iter().enumerate() {
-                    assert_eq!(*vk, roster[5 + i]);
+            offenders if offenders.iter().all(|o| matches!(o, Offender::Validator(_))) => {
+                assert_eq!(offenders.len(), 10);
+                for (i, offender) in offenders.iter().enumerate() {
+                    if let Offender::Validator(vk) = offender {
+                        assert_eq!(*vk, roster[5 + i], "offender {i}");
+                    }
                 }
             }
             other => panic!("unexpected offenders: {other:?}"),

@@ -156,7 +156,7 @@ mod tests {
             t.observe(h, &[4i64; DIMS], &[1u64; DIMS]);
         }
         assert_eq!(t.history().len(), HISTORY);
-        assert_eq!(t.history().first().unwrap().height, 300 - HISTORY as u64 + 1);
+        assert_eq!(t.history().front().unwrap().height, 300 - HISTORY as u64 + 1);
         assert_eq!(t.last().unwrap().height, 300);
         assert_eq!(t.cascade_rate_permille(), 1000);
         for h in 301..=356u64 {

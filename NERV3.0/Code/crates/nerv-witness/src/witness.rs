@@ -365,7 +365,10 @@ mod tests {
     fn keys(seed: u64, n: usize) -> Vec<LegKey> {
         let mut out = Vec::with_capacity(n);
         for i in 0..n {
-            out.push(LegKey::new(h(seed + i as u64), nerv_core::types::LegIndex::from_u8(0)));
+            out.push(LegKey::new(
+                TxId::from_hash(h(seed + i as u64)),
+                nerv_core::types::LegIndex::from_u8(0),
+            ));
         }
         out.sort();
         out.dedup();
@@ -415,7 +418,7 @@ mod tests {
         assert!(!verify(&wit, &wrong));
         // Wrong txid.
         let mut bad = wit.clone();
-        bad.txid = h(555);
+        bad.txid = TxId::from_hash(h(555));
         assert!(!verify(&bad, &ctx));
         // Out-of-range leaf index.
         let mut bad = wit.clone();
@@ -533,8 +536,8 @@ mod tests {
         for &i in &[50, 100, 150] {
             let w = tree.witness(i).unwrap();
             legs.push(LegWitness {
-                txid: keys[i].txid,
-                leg: keys[i].leg,
+                txid: keys[i as usize].txid,
+                leg: keys[i as usize].leg,
                 leaf_index: w.index,
                 siblings: w.siblings,
             });
@@ -554,7 +557,7 @@ mod tests {
 
         // One bad leg fails the portfolio.
         let mut bad = p.clone();
-        bad.legs[1].txid = h(999);
+        bad.legs[1].txid = TxId::from_hash(h(999));
         assert!(!verify_portfolio(&bad, &ctx));
 
 

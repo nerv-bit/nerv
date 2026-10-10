@@ -92,7 +92,7 @@ fn fold_layer(values: &[ExtF], dom: &TwoAdicDomain, alpha: ExtF) -> Vec<ExtF> {
         let e = (values[j] + values[j + half]).scale(INV2);
         let o = (values[j] - values[j + half]).scale(INV2);
         out.push(e + alpha * o.scale(xinv));
-        xinv = xinv * inv_gen;
+        xinv *= inv_gen;
     }
     out
 }
@@ -105,12 +105,20 @@ fn fold_pair(low: ExtF, high: ExtF, x: Goldilocks, alpha: ExtF) -> ExtF {
     e + alpha * o.scale(x.inverse())
 }
 
+/// Commit one layer in PAIR-MAJOR leaf order: leaf 2t = the value at
+/// domain position t, leaf 2t+1 = its negation at t + half — each fold
+/// pair (x, −x) are tree siblings, so one shared path of length log−1
+/// authenticates both (`merkle::verify_pair_opening`).
 fn commit_layer(values: &[ExtF]) -> MerkleTree {
     let n = values.len();
+    let half = n / 2;
     let mut c0 = Vec::with_capacity(n);
     let mut c1 = Vec::with_capacity(n);
-    for v in values {
-        let (a, b) = v.components();
+    for (lo, hi) in values[..half].iter().zip(&values[half..]) {
+        let (a, b) = lo.components();
+        c0.push(a);
+        c1.push(b);
+        let (a, b) = hi.components();
         c0.push(a);
         c1.push(b);
     }
@@ -199,7 +207,9 @@ pub fn prove_fri(
     }
     debug_assert!(
         coeffs.len() <= cap,
-        "codeword exceeds the claimed degree bound — driver contract violated"
+        "codeword exceeds the claimed degree bound — driver contract violated (m={m} f={f} b={b} r={r} cap={cap} coeffs.len()={} final_dom.size()={})",
+        coeffs.len(),
+        final_dom.size(),
     );
     coeffs.truncate(cap);
     absorb_final(t, &coeffs);
@@ -231,8 +241,12 @@ pub fn verify_fri(
     let m = dom.log_size();
     let f = shape.log_final_poly_len;
     let b = shape.log_blowup;
-    assert!(b >= 1, "rate-1 FRI is vacuous: log_blowup must be at least 1");
-    assert!(m > f, "need at least one fold: log_size {m} > log_final {f}");
+    // Shape rejections, not panics: the verifier is total on adversarial
+    // input, and a mis-shaped configuration proves nothing (rate-1 FRI is
+    // vacuous; no fold means no low-degree claim).
+    if b == 0 || m <= f {
+        return false;
+    }
     let r = m - f;
     let cap = final_coeff_cap(f, b);
     let pow_bits = shape.commit_pow_bits + shape.query_pow_bits;
@@ -277,7 +291,7 @@ pub fn verify_fri(
         }
 
         let mut dom_i = *dom;
-        for i in 0..r {
+        for (i, _) in (0..r).enumerate() {
             let half = dom_i.size() / 2;
             let j = (q as usize) % half;
             let op = &qp.openings[i];
@@ -373,7 +387,7 @@ mod tests {
             let half = dom.size() / 2;
 
             // Reference 1: Horner at x and −x.
-            for j in 0..half {
+            for (j, _) in (0..half).enumerate() {
                 let x = dom.point(j);
                 let px = horner(&coeffs, x);
                 let pnx = horner(&coeffs, -x);
@@ -428,6 +442,10 @@ mod tests {
             (4, 1, 1, 12, 8),
             (2, 1, 1, 4, 0),
             (3, 2, 1, 8, 0),
+            // Frozen genesis-config shape (errata 66: b=4, f=1). Honest
+            // low-degree codeword; cap = 2^(f-b) = 2^-3 → floor 1.
+            (5, 1, 4, 16, 0),
+            (8, 1, 4, 16, 0),
         ];
         for (m, f, b, q, pow) in configs {
             let dom = TwoAdicDomain::standard_coset(m);
@@ -564,13 +582,14 @@ mod tests {
         }
         {
             let mut p = proof.clone();
-            p.roots.swap(0, 1.min(p.roots.len() - 1));
+            let k = 1.min(p.roots.len() - 1);
+            p.roots.swap(0, k);
             assert!(!check(&p), "swapped roots change the transcript order");
         }
 
         {
             let mut p = proof.clone();
-            p.final_coeffs[0] = p.final_coeffs[0] + ExtF::ONE;
+            p.final_coeffs[0] += ExtF::ONE;
             assert!(!check(&p));
         }
         {
@@ -601,12 +620,12 @@ mod tests {
         }
         {
             let mut p = proof.clone();
-            p.queries[0].openings[0].low = p.queries[0].openings[0].low + ExtF::ONE;
+            p.queries[0].openings[0].low += ExtF::ONE;
             assert!(!check(&p));
         }
         {
             let mut p = proof.clone();
-            p.queries[0].openings[0].high = p.queries[0].openings[0].high + ExtF::ONE;
+            p.queries[0].openings[0].high += ExtF::ONE;
             assert!(!check(&p));
         }
         {
@@ -664,6 +683,6 @@ mod tests {
         let dom = TwoAdicDomain::standard_coset(4);
         let sh = shape(1, 2, 4, 0);
         let mut t = seeded(1);
-        let _ = prove_fri(&vec![ExtF::ZERO; 8], &dom, &sh, &mut t);
+        let _ = prove_fri(&[ExtF::ZERO; 8], &dom, &sh, &mut t);
     }
 }

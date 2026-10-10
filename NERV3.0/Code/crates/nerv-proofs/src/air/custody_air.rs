@@ -1,26 +1,27 @@
-//! The custody module AIR (WP §5.1 statements 1–5, as amended by erratum
+//!   The custody module AIR (WP §5.1 statements 1–5, as amended by erratum
 //! 72): n_inputs Merkle memberships (statement 1), per-input cm / nf /
-//! pk_n BLAKE3 streams and per-output cm streams (statements 2–3, output
-//! binding), conservation (statement 4), ranges (statement 5).
+//!   pk_n BLAKE3 streams and per-output cm streams (statements 2–3, output
+//!   binding), conservation (statement 4), ranges (statement 5).
 //!
-//! Layout: columns [0, 53·n_in) Merkle instances (side-by-side, shared
+//!   Layout: columns [0, 53·n_in) Merkle instances (side-by-side, shared
 //! 2,145-row pattern) ‖ [.., +171) conservation ‖ [.., +713) the shared
-//! BLAKE3 chip (all hash windows share these columns; phase-multiplexed)
+//!   BLAKE3 chip (all hash windows share these columns; phase-multiplexed)
 //! ‖ registers. Rows = 66·(25·n_in + 22·n_out) (windows: per input 22 cm
 //! + 2 nf + 1 pk_n; per output 22 cm). Preprocessed: Merkle [0..25) ‖
-//! conservation [25..31) ‖ BLAKE3 [31..311) ‖ boundary flags [311..).
-//! Publics: 4 anchor elements per input ‖ 8 nf words per input ‖ 8 cm
-//! words per output.
+//!      conservation [25..31) ‖ BLAKE3 [31..311) ‖ boundary flags [311..).
+//!      Publics: 4 anchor elements per input ‖ 8 nf words per input ‖ 8 cm
+//!      words per output.
 //!
-//! Shared-secret registers (row-invariant copies — the cross-statement
-//! consistency load): per input v(64b), ρ(256b), nk(256b), pk_n (8 words
+//!   Shared-secret registers (row-invariant copies — the cross-statement
+//!   consistency load): per input v(64b), ρ(256b), nk(256b), pk_n (8 words
 //! + 256b, unconditionally decomposed), cm words (8); per output v(64b);
-//! one aux CV (8 words, per-stream cv0 with load holes). The wiring:
-//! v/ρ/nk/pk_n bits into the hash windows' message decompositions (the
-//! byte misalignment from the 7/11-byte domain prefixes is why wiring is
-//! bit-level); nf = H("nerv.nf"‖nk‖ρ) with the same nk whose
-//! H("nerv.nf.pk"‖nk) sits in the cm — the erratum-72 binding; input cm
-//! → Merkle leaf (row-0 binding); output cm → public.
+//!      one aux CV (8 words, per-stream cv0 with load holes). The wiring:
+//!      v/ρ/nk/pk_n bits into the hash windows' message decompositions (the
+//!      byte misalignment from the 7/11-byte domain prefixes is why wiring is
+//!      bit-level); nf = H("nerv.nf"‖nk‖ρ) with the same nk whose
+//!      H("nerv.nf.pk"‖nk) sits in the cm — the erratum-72 binding; input cm
+//!    → Merkle leaf (row-0 binding); output cm → public.
+//!
 
 use nerv_core::field::Goldilocks;
 use nerv_core::hash::Hash256;
@@ -40,7 +41,7 @@ use crate::air::chips::conservation::{
     gen_cons_prep, gen_cons_trace, ConservationChip, V_BITS_BASE,
 };
 use crate::air::chips::merkle_poseidon2::{
-    gen_merkle_trace, MerkleChip, PERM_ROWS as MERKLE_PERM, STATE_COLS as MERKLE_STATE,
+    gen_merkle_trace, MerkleChip, PERM_ROWS as MERKLE_PERM,
     WITNESS_COLS as MERKLE_W,
 };
 
@@ -73,7 +74,9 @@ const F_PARENT: usize = 2;
 const F_PCV1: usize = 3;
 const F_CVLOAD: usize = 4;
 pub const IN_FLAGS: usize = 5; // stride 12: TGT_NF, TGT_CMR, TGT_PKN, W_V, W_RHO_CM, W_RHO_NF, W_RHO_NF2, W_NK_NF, W_NK_PK, W_PKN_A, W_PKN_B, CV_IN
-const OUT_FLAGS: usize = 0; // stride 3 (at BP+5+12n_in): TGT_CM, CV_OUT, W_V
+/// Layout origin of the output-flag block (TGT_CM, CV_OUT, W_V) at BP+5+12·n_in.
+#[allow(dead_code)]
+const OUT_FLAGS: usize = 0;
 
 pub const REV_REG_W: usize = 64;
 pub const BURN_REG_W: usize = 64;
@@ -235,7 +238,7 @@ impl<B: AirBuilder> Air<B> for CustodyAir {
             b.assert_zero(chain.clone() * (o - c), "hb_chain");
         }
         let iv = b.preprocessed(BP + F_IV);
-        for j in 0..8 {
+        for (j, _) in (0..8).enumerate() {
             let c = b.witness(0, bl3 + BL3_CV + j);
             let ivj = B::constant(u64::from(BL3_IV[j]));
             b.assert_zero(iv.clone() * (c - ivj), "hb_iv");
@@ -294,7 +297,7 @@ impl<B: AirBuilder> Air<B> for CustodyAir {
         for i in 0..n_in {
             for w in 0..8 {
                 let r = b.witness(0, self.in_reg(i) + REG_CM + w);
-                let s = b.witness(0, MERKLE_W * i + MERKLE_STATE + w);
+                let s = b.witness(0, MERKLE_W * i + w);
                 b.assert_zero(first.clone() * (r - s), "hb_leaf");
             }
         }
@@ -328,7 +331,7 @@ impl<B: AirBuilder> Air<B> for CustodyAir {
             wire(b, &w_rho_nf, 39, rb + REG_RHO, 25);
             wire(b, &w_rho_nf2, 0, rb + REG_RHO + 200, 7);
             wire(b, &w_nk_nf, 7, rb + REG_NK, 32);
-            wire(b, &w_nk_pk, 11, rb + REG_NK, 32);
+            wire(b, &w_nk_pk, 10, rb + REG_NK, 32);
             wire(b, &w_pkn_a, 47, rb + REG_PKN_B, 17);
             wire(b, &w_pkn_b, 0, rb + REG_PKN_B + 136, 15);
         }
@@ -643,7 +646,7 @@ fn put_word(row: &mut [Goldilocks], col: usize, v: u32) {
 
 fn words_of(h: &Hash256) -> [u32; 8] {
     let mut w = [0u32; 8];
-    for i in 0..8 {
+    for (i, _) in (0..8).enumerate() {
         w[i] = u32::from_le_bytes([
             h.as_bytes()[4 * i], h.as_bytes()[4 * i + 1], h.as_bytes()[4 * i + 2],
             h.as_bytes()[4 * i + 3],
@@ -682,7 +685,7 @@ struct Placer<'a> {
 }
 
 impl Placer<'_> {
-    fn window(&mut self, gw: usize, cv: &[u32; 8], block: &[u8; 64], len: u8, flags: u32) -> [u32; 16] {
+    fn window(&mut self, gw: usize, cv: &[u32; 8], block: &[u8; 64], len: u8, counter: u64, flags: u32) -> [u32; 16] {
         // BLAKE3's native block is 16 little-endian u32 words (64 bytes);
         // reinterpret the byte block so the trace and compress_native both
         // see the words in the layout blake3's algorithm expects.
@@ -696,8 +699,8 @@ impl Placer<'_> {
                 block[off + 3],
             ]);
         }
-        let rows = bl3_trace(cv, &words, len, 0, flags);
-        let prep = bl3_prep(len, 0, flags);
+        let rows = bl3_trace(cv, &words, len, counter, flags);
+        let prep = bl3_prep(len, counter, flags);
         for r in 0..66 {
             let src = &rows[r];
             self.trace[66 * gw + r][self.bl3_base..self.bl3_base + BL3_W]
@@ -705,7 +708,7 @@ impl Placer<'_> {
             self.prep[66 * gw + r][BL3_PREP_BASE..BL3_PREP_BASE + BL3_PREP_W]
                 .copy_from_slice(&prep[r]);
         }
-        compress_native(cv, &words, len, 0, flags)
+        compress_native(cv, &words, len, counter, flags)
     }
 
     /// A 2-chunk (1295-byte) stream: 22 windows; returns (digest, cv0).
@@ -729,7 +732,7 @@ impl Placer<'_> {
                 if bi == nblocks - 1 {
                     flags |= CHUNK_END;
                 }
-                let out = self.window(gw, &cv, &block, (bend - bstart) as u8, flags);
+                let out = self.window(gw, &cv, &block, (bend - bstart) as u8, c as u64, flags);
                 cv = [out[0], out[1], out[2], out[3], out[4], out[5], out[6], out[7]];
                 gw += 1;
             }
@@ -742,7 +745,7 @@ impl Placer<'_> {
             pblock[4 * j..4 * j + 4].copy_from_slice(&cv0[j].to_le_bytes());
             pblock[32 + 4 * j..36 + 4 * j].copy_from_slice(&cv1[j].to_le_bytes());
         }
-        let out = self.window(w0 + 21, &BL3_IV, &pblock, 64, PARENT | ROOT);
+        let out = self.window(w0 + 21, &BL3_IV, &pblock, 64, 0, PARENT | ROOT);
         ([out[0], out[1], out[2], out[3], out[4], out[5], out[6], out[7]], cv0)
     }
 
@@ -762,7 +765,7 @@ impl Placer<'_> {
             if bi == nblocks - 1 {
                 flags |= CHUNK_END | ROOT;
             }
-            let out = self.window(w0 + bi, &cv, &block, (bend - bstart) as u8, flags);
+            let out = self.window(w0 + bi, &cv, &block, (bend - bstart) as u8, 0, flags);
             cv = [out[0], out[1], out[2], out[3], out[4], out[5], out[6], out[7]];
         }
         cv
@@ -791,10 +794,10 @@ pub fn set_input_flags(prep: &mut [Vec<Goldilocks>], i: usize, w0: usize) {
     set_flag(prep, 66 * (w0 + 20) + 65, BP + F_PCV1);
     set_flag(prep, 66 * (w0 + 15) + 65, BP + F_CVLOAD);
     set_flag(prep, 66 * (w0 + 21) + 65, nf + 1); // TGT_CMR
-    set_flag(prep, 66 * (w0 + 23) + 65, nf + 0); // TGT_NF
+    set_flag(prep, 66 * (w0 + 23) + 65, nf); // TGT_NF
     set_flag(prep, 66 * (w0 + 24) + 65, nf + 2); // TGT_PKN
-    set_flag(prep, 66 * (w0 + 0), nf + 3); // W_V
-    set_flag(prep, 66 * (w0 + 0), nf + 4); // W_RHO_CM
+    set_flag(prep, 66 * w0, nf + 3); // W_V
+    set_flag(prep, 66 * w0, nf + 4); // W_RHO_CM
     set_flag(prep, 66 * (w0 + 22), nf + 5); // W_RHO_NF
     set_flag(prep, 66 * (w0 + 23), nf + 6); // W_RHO_NF2
     set_flag(prep, 66 * (w0 + 22), nf + 7); // W_NK_NF
@@ -818,7 +821,7 @@ pub fn set_output_flags(prep: &mut [Vec<Goldilocks>], o: usize, n_in: usize, w0:
     set_flag(prep, 66 * (w0 + 20) + 65, BP + F_PCV1);
     set_flag(prep, 66 * (w0 + 15) + 65, BP + F_CVLOAD);
     set_flag(prep, 66 * (w0 + 21) + 65, of); // TGT_CM
-    set_flag(prep, 66 * (w0 + 0), of + 2); // W_V
+    set_flag(prep, 66 * w0, of + 2); // W_V
 }
 
 pub fn set_revert_flags(prep: &mut [Vec<Goldilocks>], k: usize, n_in: usize, n_out: usize, w0: usize) {
@@ -988,7 +991,7 @@ pub fn gen_custody_trace(
     let reg = air.reg_base();
     let aux = air.aux_base();
     aux_loads.sort_unstable_by_key(|(r, _)| *r);
-    for r in 0..rows {
+    for (r, _) in (0..rows).enumerate() {
         for (i, iw) in w.inputs.iter().enumerate() {
             let rb = reg + INPUT_REG_W * i;
             fill_bits(&mut trace[r], rb + REG_V, &iw.opening.value.to_le_bytes());
@@ -1145,7 +1148,11 @@ pub fn bind_witness_to_shell(
         for out in &leg.outputs {
             if out.conditional {
                 let rw = &w.reverts[next_rev];
-                if rw.opening.commitment()? != *out.revert_cm.as_ref().unwrap() {
+                let revert_cm = out
+                    .revert_cm
+                    .as_ref()
+                    .ok_or(WitnessError::RevertCmMissing { index: next_rev })?;
+                if rw.opening.commitment()? != *revert_cm {
                     return Err(WitnessError::RevertCmMismatch { index: next_rev });
                 }
                 if rw.opening.value != out.value {
@@ -1195,9 +1202,9 @@ mod tests {
         let det = wk.viewing();
         let nk_tree = *wk.nullifier_key();
         let g = ShardSet::genesis();
-        let addr = |i: u64| Address_gen(&det, &nk_tree, i, &g);
+        let addr = |i: u64| address_gen(&det, &nk_tree, i, &g);
         let nanos = 1_000_000_000u64;
-        let opening = |v: u64, i: u64| NoteOpening {
+        let mut opening = |v: u64, i: u64| NoteOpening {
             value: v,
             rho: rng.bytes32(),
             delivery: *addr(i).delivery().as_bytes(),
@@ -1294,7 +1301,7 @@ mod tests {
             (
                 CustodyWitness {
                     inputs: vec![inputs[0].clone()],
-                    outputs: vec![OutputWitness { opening: out_1x1 }],
+                    outputs: vec![OutputWitness { opening: out_1x1.clone() }],
                     reverts: vec![],
                     burns: vec![],
                     fees: vec![600_000],
@@ -1319,7 +1326,7 @@ mod tests {
         Fixture { witness, shell, key_id }
     }
 
-    fn Address_gen(det: &nerv_custody::DetectionSeed, nk: &[u8; 32], i: u64, set: &ShardSet) -> nerv_custody::Address {
+    fn address_gen(det: &nerv_custody::DetectionSeed, nk: &[u8; 32], i: u64, set: &ShardSet) -> nerv_custody::Address {
         nerv_custody::Address::generate(det, nk, i, set).unwrap()
     }
 
@@ -1328,8 +1335,8 @@ mod tests {
         let air = CustodyAir::new(2, 3, vec![], 0, NCT_DEPTH);
         assert_eq!(air.n_windows(), 25 * 2 + 22 * 3);
         assert_eq!(air.rows(), 66 * air.n_windows());
-        assert_eq!(air.cols(), 53 * 2 + 171 + 713 + 848 * 2 + 64 * 3 + 8);
-        assert_eq!(air.prep_cols(), 311 + 5 + 24 + 9);
+        assert_eq!(air.cols(), 53 * 2 + 171 + 714 + 848 * 2 + 64 * 3 + 8);
+        assert_eq!(air.prep_cols(), 327 + 5 + 24 + 9);
     }
 
     #[test]
@@ -1370,7 +1377,7 @@ mod tests {
     #[test]
     fn tamper_classes() {
         let f = fixture(0xA3, false);
-        let air = CustodyAir::new(1, 1, NCT_DEPTH);
+        let air = CustodyAir::new(1, 1, vec![], 0, NCT_DEPTH);
         let ct = gen_custody_trace(&f.witness, &f.shell, NCT_DEPTH).unwrap();
         assert!(NativeEval::check_with_prep(
             ct.trace.clone(), ct.prep.clone(), ct.publics.clone(), &air, 8
@@ -1398,7 +1405,7 @@ mod tests {
 
         // Wrong public nullifier word.
         let mut bad = ct.publics.clone();
-        bad[8] = bad[8] + Goldilocks::ONE;
+        bad[8] += Goldilocks::ONE;
         let errs = NativeEval::check_with_prep(
             ct.trace.clone(), ct.prep.clone(), bad, &air, 8,
         )
@@ -1408,7 +1415,7 @@ mod tests {
         // Wrong public output-cm word.
         let mut bad = ct.publics.clone();
         let cm_off = 4 + 8; // 4·n_in + 8·n_in with n_in = 1
-        bad[cm_off] = bad[cm_off] + Goldilocks::ONE;
+        bad[cm_off] += Goldilocks::ONE;
         let errs = NativeEval::check_with_prep(
             ct.trace.clone(), ct.prep.clone(), bad, &air, 8,
         )
@@ -1430,7 +1437,7 @@ mod tests {
         // anchor (merkle_root fails); bind never validated siblings, so
         // generate directly with the tampered witness.
         let mut w = f.witness.clone();
-        w.inputs[0].siblings[5][0] = w.inputs[0].siblings[5][0] + Goldilocks::ONE;
+        w.inputs[0].siblings[5][0] += Goldilocks::ONE;
         let ct2 = gen_custody_trace(&w, &f.shell, NCT_DEPTH).unwrap();
         assert!(NativeEval::check_with_prep(
             ct2.trace.clone(), ct2.prep.clone(), ct2.publics.clone(), &air, 8
@@ -1461,9 +1468,9 @@ mod tests {
             Err(WitnessError::NullifierKeyMismatch { index: 0 })
         ));
          let mut w = f.witness.clone();
-        let mut pk = *w.inputs[0].opening.pk_n.as_bytes();
+        let mut pk = w.inputs[0].opening.pk_n;
         pk[3] ^= 1;
-        w.inputs[0].opening.pk_n = Hash256::from_bytes(pk);
+        w.inputs[0].opening.pk_n = pk;
         assert!(matches!(
             bind_witness_to_shell(&w, &f.shell),
             Err(WitnessError::NullifierKeyMismatch { index: 0 })
@@ -1477,7 +1484,7 @@ mod tests {
         let det = wk.viewing();
         let g = ShardSet::genesis();
         let addr = |i: u64| nerv_custody::Address::generate(&det, wk.nullifier_key(), i, &g).unwrap();
-        let opening = |v: u64, i: u64| NoteOpening {
+        let mut opening = |v: u64, i: u64| NoteOpening {
             value: v,
             rho: rng.bytes32(),
             delivery: *addr(i).delivery().as_bytes(),
@@ -1573,7 +1580,7 @@ mod tests {
         // Wrong burn public.
         let mut pubs = ct.publics.clone();
         let burn_off = 4 + 8 + 8 + 8;
-        pubs[burn_off] = pubs[burn_off] + Goldilocks::ONE;
+        pubs[burn_off] += Goldilocks::ONE;
         let errs =
             NativeEval::check_with_prep(ct.trace.clone(), ct.prep.clone(), pubs, &air, 8).unwrap_err();
         assert!(errs.iter().any(|e| e.name == "hb_tgt_burn"));
@@ -1581,8 +1588,10 @@ mod tests {
         // Bind-side: value mismatch caught pre-proof.
         let mut w2 = witness.clone();
         w2.reverts[0].opening.value = 501;
+        let mut shell2 = shell.clone();
+        shell2.legs[1].outputs[0].revert_cm = Some(w2.reverts[0].opening.commitment().unwrap());
         assert!(matches!(
-            bind_witness_to_shell(&w2, &shell),
+            bind_witness_to_shell(&w2, &shell2),
             Err(WitnessError::RevertValueMismatch { index: 0 })
         ));
         let mut w3 = witness;

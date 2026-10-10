@@ -20,18 +20,14 @@ use nerv_seal::sampling::{derive_short_triplet, NoiseSeed};
 
 use nerv_custody::tx::TransactionShell;
 
-use crate::air::custody_air::{bind_witness_to_shell, CustodyWitness, InputWitness, OutputWitness};
+use crate::air::custody_air::{bind_witness_to_shell, CustodyWitness};
 use crate::error::WitnessGenError;
 
 /// Build a `LegMovement` from the leg's `LegShell` plus the wallet-side
 /// `InputWitness`/`OutputWitness` slices. The classification (`LegKind`)
-/// derives from the canonical shell's per-leg pattern: empty-input
-/// conditional-output legs are the canonical reversion-bearing kind;
-/// everything else follows the movement tuple.
-///
-/// The `total_legs` argument is reserved for future cross-leg consistency
-/// checks (e.g., slot-budget reconciliation across conditional outputs);
-/// for now it's a documentation witness.
+/// derives from the transaction shape: a one-leg transaction is single-shard;
+/// a multi-leg transaction with inputs spends across shards; and a
+/// multi-leg transaction without inputs issues across shards.
 fn derive_movement(
     leg: &nerv_custody::tx::LegShell,
     total_legs: usize,
@@ -39,9 +35,8 @@ fn derive_movement(
     outputs: &[crate::air::custody_air::OutputWitness],
     epoch_length_blocks: u64,
 ) -> LegMovement {
-    let _ = total_legs;
-    let kind = if leg.outputs.iter().any(|o| o.conditional) && leg.inputs.nullifiers.is_empty() {
-        LegKind::Claim
+    let kind = if total_legs == 1 {
+        LegKind::SingleShard
     } else if !leg.inputs.nullifiers.is_empty() {
         LegKind::CrossShardSpend
     } else {
@@ -259,9 +254,10 @@ impl TransactionWitness {
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(clippy::items_after_test_module)]
 mod tests {
     use super::*;
-    use crate::air::custody_air::{BurnWitness, InputWitness, OutputWitness, RevertWitness};
+    use crate::air::custody_air::{InputWitness, OutputWitness, RevertWitness};
     use crate::testutil::SplitMix64;
     use nerv_codec::codec_w::WeightVersion;
     use nerv_codec::features::RAIL_COUNT;
@@ -272,7 +268,7 @@ mod tests {
     use nerv_custody::{MasterSeed, WalletKeys};
     use nerv_seal::encrypt::derive_reference_keypair;
 
-    const DEPTH: usize = nerv_custody::nct::DEPTH;
+    const _DEPTH: usize = nerv_custody::nct::DEPTH;
 
     struct Fixture {
         shell: TransactionShell,
@@ -285,8 +281,8 @@ mod tests {
         let wk = WalletKeys::from_master(&MasterSeed::from_bytes(rng.bytes32()));
         let det = wk.viewing();
         let g = ShardSet::genesis();
-        let addr = |i: u64| nerv_custody::Address::generate(det, wk.nullifier_key(), i, &g).unwrap();
-        let opening = |v: u64, i: u64| nerv_custody::commitment::NoteOpening {
+        let addr = |i: u64| nerv_custody::Address::generate(&det, wk.nullifier_key(), i, &g).unwrap();
+        let mut opening = |v: u64, i: u64| nerv_custody::commitment::NoteOpening {
             value: v,
             rho: rng.bytes32(),
             delivery: *addr(i).delivery().as_bytes(),
@@ -452,13 +448,13 @@ mod tests {
 
     #[test]
     fn inadmissible_features_rejected() {
-        // 1 input, 7 outputs to 7 distinct addresses: 8 active slots > 6.
+        // 1 input plus 7 outputs occupy 8 distinct account slots, above the 6-slot cap.
         let mut rng = SplitMix64::new(0x57A3);
         let wk = WalletKeys::from_master(&MasterSeed::from_bytes(rng.bytes32()));
         let det = wk.viewing();
         let g = ShardSet::genesis();
-        let addr = |i: u64| nerv_custody::Address::generate(det, wk.nullifier_key(), i, &g).unwrap();
-        let mk = |i: u64| nerv_custody::commitment::NoteOpening {
+        let addr = |i: u64| nerv_custody::Address::generate(&det, wk.nullifier_key(), i, &g).unwrap();
+        let mut mk = |i: u64| nerv_custody::commitment::NoteOpening {
             value: 100,
             rho: rng.bytes32(),
             delivery: *addr(i).delivery().as_bytes(),
@@ -466,7 +462,33 @@ mod tests {
             pk_n: *addr(i).pk_n(),
         };
         let input = mk(0);
-        let outs: Vec<_> = (1..=7).map(mk).collect();
+        let mut active_slots = vec![nerv_codec::features::slot_index(&input.delivery)];
+        let mut outs = Vec::with_capacity(7);
+        for i in 1..=4096 {
+            let candidate = mk(i);
+            let slot = nerv_codec::features::slot_index(&candidate.delivery);
+            if !active_slots.contains(&slot) {
+                active_slots.push(slot);
+                outs.push(candidate);
+                if outs.len() == 7 {
+                    break;
+                }
+            }
+        }
+        assert_eq!(outs.len(), 7, "fixture must find seven distinct output slots");
+        let movement = LegMovement {
+            inputs: vec![(input.delivery.to_vec(), input.value)],
+            outputs: outs
+                .iter()
+                .map(|o| (o.delivery.to_vec(), o.value))
+                .collect(),
+            fee_nano: 1000,
+            kind: LegKind::CrossShardSpend,
+            expiry_height: 5_000,
+            epoch_length_blocks: INTERVALS_PER_EPOCH,
+        };
+        let features = build_leg_features(&movement).unwrap();
+        assert_eq!(features.active_account_slot_count(), 8);
         let mut tree = NoteCommitmentTree::new();
         let idx = tree.append(&input.commitment().unwrap()).unwrap();
         let root = tree.root();
@@ -512,14 +534,15 @@ mod tests {
             outputs: outs.into_iter().map(|o| OutputWitness { opening: o }).collect(),
             reverts: vec![],
             burns: vec![],
-            fees: vec![700],
+            fees: vec![1000],
         };
         let seeds = vec![NoiseSeed::from_bytes(rng.bytes32())];
         let (w, pk) = (w(), epoch_pk());
-        assert!(matches!(
-            TransactionWitness::generate(&shell, custody, &w, &pk, &seeds),
-            Err(WitnessGenError::Inadmissible(_))
-        ));
+        let result = TransactionWitness::generate(&shell, custody, &w, &pk, &seeds);
+        assert!(
+            matches!(&result, Err(WitnessGenError::Inadmissible(_))),
+            "expected inadmissible feature error, got {result:?}"
+        );
     }
 
     #[test]

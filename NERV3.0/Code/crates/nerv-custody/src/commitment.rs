@@ -81,7 +81,7 @@ impl Encode for NoteOpening {
 impl Decode for NoteOpening {
     fn decode_from(r: &mut Reader<'_>) -> Result<Self, CodecError> {
         let value = r.read_u64()?;
-        if value < CUSTODY_VALUE_MIN_NANO || value > CUSTODY_VALUE_MAX_NANO {
+        if !(CUSTODY_VALUE_MIN_NANO..=CUSTODY_VALUE_MAX_NANO).contains(&value) {
             return Err(CodecError::InvariantViolated("note value outside (0, 2^60]"));
         }
         Ok(NoteOpening {

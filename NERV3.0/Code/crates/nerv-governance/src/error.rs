@@ -39,6 +39,7 @@ pub enum ChamberError {
 }
 
 
+#[allow(clippy::result_large_err, clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum TallyError {

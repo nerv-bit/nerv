@@ -189,6 +189,7 @@ impl RelayEngine {
 
     /// One packet: replay-check (pre-decapsulation), peel, jitter, and the
     /// next action. `entropy` drives the jitter draw and the forward pads.
+    #[allow(clippy::expect_used)]
     pub fn handle_packet(&mut self, packet: &Packet, entropy: u64) -> RelayAction {
         self.stats.packets_seen += 1;
         let ct0: &[u8; CT_LEN] = packet.0[..CT_LEN].try_into().expect("ct slice");
@@ -359,6 +360,7 @@ mod tests {
     use crate::submission::{ingest, IngestOutcome, SubmissionMessage};
     use crate::testutil::harness::{node_full, tx_entry, verify_ctx};
     use crate::testutil::{node_keys, SplitMix64};
+    use nerv_core::codec::Encode;
     use nerv_core::hash::Hash256;
     use nerv_core::types::TxId;
     use nerv_registry::mempool::Mempool;
@@ -394,7 +396,7 @@ mod tests {
         dest: PeerId,
         terminal: TerminalAction,
     ) -> PathSpec {
-        let arr = core::array::from_fn(|i| (r[i].0, r[i].1.clone()));
+        let arr = core::array::from_fn(|i| (r[i].0, r[i].1));
         PathSpec::new(arr, dest, terminal)
     }
 
@@ -408,13 +410,15 @@ mod tests {
         assert!(jitter_millis(u64::MAX) <= 500);
         let mid = jitter_millis(1u64 << 63);
         assert!((66..=71).contains(&mid), "median ≈ 68.7, got {mid}");
-        // Monotone in the draw.
+        // Monotone in the draw; the cap only clamps.
         let mut prev = 0;
         for i in 0..2_000u64 {
-            let d = jitter_millis(i.wrapping_mul(0x9E37_79B9_7F4A_7C15));
+            let draw = (i as u128 * u64::MAX as u128 / 1_999) as u64;
+            let d = jitter_millis(draw);
             assert!(d >= prev, "monotonicity broke at {i}: {d} < {prev}");
             prev = d;
         }
+        assert_eq!(jitter_millis(u64::MAX), JITTER_CAP_MS);
         // Determinism.
         assert_eq!(jitter_millis(12345), jitter_millis(12345));
     }
@@ -425,15 +429,15 @@ mod tests {
         let mut rng = SplitMix64::new(0x319);
         for _ in 0..500 {
             let y_q = rng.next_u64() | 1;
-            let got = ln_q64(y_q) as f64 / 18446744073709551616.0;
+            let got = ln_q64(y_q.into()) as f64 / 18446744073709551616.0;
             let want = (y_q as f64 / 18446744073709551616.0).ln();
             assert!((got - want).abs() < 1e-12, "y_q={y_q}: {got} vs {want}");
         }
         assert_eq!(ln_q64(Q), 0);
         let l = ln_q64(1);
-        assert!((l as f64 / 18446744073709551616.0 - (-44.36141955583650)).abs() < 1e-10);
+        assert!((l as f64 / 18446744073709551616.0 - (-44.361_419_555_836_5)).abs() < 1e-10);
         let ln2 = LN2_Q64 as f64 / 18446744073709551616.0;
-        assert!((ln2 - 0.6931471805599453).abs() < 1e-15, "{ln2}");
+        assert!((ln2 - std::f64::consts::LN_2).abs() < 1e-15, "{ln2}");
         let e5 = E_R_Q64 as f64 / 18446744073709551616.0;
         assert!((e5 - 0.006737946999085467).abs() < 1e-17, "{e5}");
     }
@@ -480,7 +484,7 @@ mod tests {
         assert!((63_000..=64_300).contains(&le100), "P(≤100ms) ≈ 0.636, got {le100}");
         assert!((150..1_000).contains(&zeros), "P(0ms) ≈ 0.5%, got {zeros}");
         assert_eq!(max, 500, "the cap is reachable");
-        assert!(delays[(n as usize * 999 / 1000)] >= 350, "the tail reaches deep");
+        assert!(delays[n as usize * 999 / 1000] >= 350, "the tail reaches deep");
     }
 
     // -- the replay cache ------------------------------------------------------
@@ -575,11 +579,21 @@ mod tests {
         assert_eq!(e0.stats().replayed, 1);
         assert_eq!(e0.stats().forwarded, 1);
 
-        // A cover terminal: Drop with the cover stat.
+        // A cover terminal: Drop with the cover stat. The packet must
+        // reach terminal alignment before relay 5's engine sees it.
         let cover_spec = spec_over(&r, r[0].0, TerminalAction::Drop);
         let cover = build(&cover_spec, &[0u8; 32], &encap_rand(9)).unwrap();
+        let mut current = cover;
+        for (i, _) in (0..4).enumerate() {
+            let mut hop = RelayEngine::new(r[i].2.clone());
+            let RelayAction::Forward { frame, .. } = hop.handle_packet(&current, 40 + i as u64)
+            else {
+                panic!("cover hop {i}")
+            };
+            current = Packet::from_frame(&frame).unwrap();
+        }
         let mut e4 = RelayEngine::new(r[4].2.clone());
-        assert!(matches!(e4.handle_packet(&cover, 4), RelayAction::Drop));
+        assert!(matches!(e4.handle_packet(&current, 4), RelayAction::Drop));
         assert_eq!(e4.stats().cover_dropped, 1);
         assert_eq!(e4.stats().packets_seen, 1);
 
@@ -598,6 +612,7 @@ mod tests {
 
     struct Mesh {
         client: Host,
+        #[allow(dead_code)]
         agg: Host,
         agg_events: mpsc::Receiver<HostEvent>,
         relay_hosts: Vec<Host>,
@@ -647,10 +662,10 @@ mod tests {
         let mut registry = RelayRegistry::new();
         for i in 1..=5usize {
             let mut operator = [0u8; crate::relay_registry::OPERATOR_LEN];
-            operator[0] = i as u8;
+            operator[0] = ((i + 1) / 2) as u8;
             let rec = RelayRecord {
                 vk: nodes[i].info.vk,
-                kem_ek: nodes[i].info.kem_ek.clone(),
+                kem_ek: nodes[i].info.kem_ek,
                 addrs: nodes[i].info.addrs.clone(),
                 operator,
                 stake_nerv: 1_000,
@@ -674,7 +689,7 @@ mod tests {
         }
 
         let ids: Vec<PeerId> = (1..=5usize).map(|i| nodes[i].info.id()).collect();
-        let path = core::array::from_fn(|k| (ids[k], nodes[k + 1].info.kem_ek.clone()));
+        let path = core::array::from_fn(|k| (ids[k], nodes[k + 1].info.kem_ek));
         let mut nodes = nodes;
         let client = nodes.remove(0);
         let agg = nodes.pop().unwrap();

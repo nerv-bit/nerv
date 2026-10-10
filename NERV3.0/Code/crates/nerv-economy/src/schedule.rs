@@ -117,7 +117,7 @@ impl BucketSchedule {
     pub fn window_open(&self, day: u64) -> bool {
         match self.curve {
             Curve::ClaimWindow { window_days } | Curve::MilestoneWindow { window_days } => {
-                day >= 1 && day <= window_days
+                (1..=window_days).contains(&day)
             }
             _ => false,
         }
@@ -274,6 +274,11 @@ impl EmissionSchedule {
     /// The committed schedule: the compile-time params static. The parse
     /// is total on the committed file; nerv-conformance re-runs both
     /// validations against the live tree.
+    /// Build the canonical genesis schedule. The input `ECONOMY_BUCKETS`
+    /// constant is a build-time-validated table; failure to parse or to
+    /// satisfy the allocation invariants is a build-time bug, not a
+    /// runtime condition callers can handle.
+    #[allow(clippy::expect_used)] // Genesis table is conformance-validated at build time; panic on a stale table is a developer-facing signal, not a runtime error path.
     pub fn genesis() -> EmissionSchedule {
         let schedule = EmissionSchedule::from_params(&params::ECONOMY_BUCKETS)
             .expect("specs/params.toml [economy] parses (conformance-validated)");
@@ -399,7 +404,7 @@ fn parse_curve(b: &EconomyBucket) -> Result<(Curve, u128, bool), ScheduleError> 
                 return Err(bad("ratio_num must be in 1..ratio_den"));
             }
             let denom = quarterly_denominator(quarters, num, den)
-                .ok_or_else(|| ScheduleError::Overflow { bucket: b.name })?;
+                .ok_or(ScheduleError::Overflow { bucket: b.name })?;
             Ok((
                 Curve::QuarterlyGeometric { quarters, quarter_days, num, den },
                 denom,
@@ -645,7 +650,7 @@ mod tests {
         );
         assert_eq!(quarterly_denominator(4, 1, 2), Some(15));
         assert_eq!(quarterly_denominator(1, 1, 2), Some(1));
-        assert_eq!(quarterly_denominator(64, 1, 2), Some(u128::from(2u128.pow(63))));
+        assert_eq!(quarterly_denominator(64, 1, 2), Some(2u128.pow(63)));
         assert_eq!(quarterly_denominator(64, u64::MAX - 1, u64::MAX), None, "overflow");
     }
 
@@ -897,7 +902,7 @@ mod tests {
         let mut a = EconomyBucket { share_permille: 500, ..raw("a", "linear-vesting", 5_000_000_000) };
         a.cliff_days = Some(0);
         a.linear_days = Some(3600);
-        let mut b = a.clone();
+        let mut b = a;
         b.name = "b";
         b.share_permille = 499;
         let s = EmissionSchedule::from_params(&[a, b]).unwrap();
@@ -909,7 +914,7 @@ mod tests {
         let mut a = EconomyBucket { share_permille: 500, ..raw("a", "linear-vesting", 5_000_000_000) };
         a.cliff_days = Some(0);
         a.linear_days = Some(3600);
-        let mut b = a.clone();
+        let mut b = a;
         b.name = "b";
         b.total_nerv = 4_000_000_000;
         let s = EmissionSchedule::from_params(&[a, b]).unwrap();
@@ -921,7 +926,7 @@ mod tests {
         let mut a = EconomyBucket { share_permille: 500, ..raw("dup", "linear-vesting", 5_000_000_000) };
         a.cliff_days = Some(0);
         a.linear_days = Some(3600);
-        let mut b = a.clone();
+        let mut b = a;
         b.share_permille = 500;
         let s = EmissionSchedule::from_params(&[a, b]).unwrap();
         assert_eq!(

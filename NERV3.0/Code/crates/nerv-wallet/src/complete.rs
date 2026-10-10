@@ -2,10 +2,10 @@
 
 use nerv_core::hash::Hash256;
 use nerv_core::types::{Height, LegIndex, ShardId, TxId};
-use nerv_custody::tx::TransactionShell;
+
 use nerv_state::block::{SettledLeg, TransitEvidence};
 use nerv_state::ttau::TauTree;
-use nerv_state::{BeaconView, ShardHeader};
+use nerv_state::BeaconView;
 
 use crate::prove::ProvedTx;
 
@@ -14,8 +14,8 @@ pub fn check_finalized(
     view: &dyn BeaconView,
     spend_shard: ShardId,
     height: Height,
-    txid: &TxId,
-    spend_leg: LegIndex,
+    _txid: &TxId,
+    _spend_leg: LegIndex,
 ) -> Option<Hash256> {
     view.transit_root(spend_shard, height)
         .map(|_| Hash256::from_bytes([0u8; 32])) // The root itself; the caller checks membership separately.
@@ -39,7 +39,7 @@ pub fn build_witness(
         .ok_or_else(|| "transit root not finalized".to_string())?;
     Ok(TransitEvidence {
         root_height: finalized_height,
-        proof: transit_log.membership_proof(&entry),
+        proof: transit_log.membership_proof(entry),
     })
 }
 
@@ -60,7 +60,7 @@ pub fn build_completion(
 ) -> Result<SettledLeg, String> {
     let canon = package.proved_tx.shell.canonicalize()
         .map_err(|e| format!("shell: {e}"))?;
-    let leg = canon.legs.get(package.issue_leg_index)
+    let _leg = canon.legs.get(package.issue_leg_index)
         .ok_or_else(|| "issue leg index out of range".to_string())?;
     Ok(SettledLeg {
         shell: canon,

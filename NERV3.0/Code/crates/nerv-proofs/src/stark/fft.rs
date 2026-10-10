@@ -90,7 +90,7 @@ fn dit_inplace<V: FftValue>(vals: &mut [V], gen: Goldilocks) {
                 let t = vals[start + k + half].scale(w);
                 vals[start + k] = u.add(t);
                 vals[start + k + half] = u.sub(t);
-                w = w * w_step;
+                w *= w_step;
             }
         }
         m <<= 1;
@@ -114,7 +114,7 @@ pub fn evaluate<V: FftValue>(coeffs: &[V], dom: &TwoAdicDomain) -> Vec<V> {
         let mut spow = Goldilocks::ONE;
         for v in vals.iter_mut() {
             *v = v.scale(spow);
-            spow = spow * s;
+            spow *= s;
         }
     }
     dit_inplace(&mut vals, dom.gen());
@@ -145,7 +145,7 @@ pub fn interpolate<V: FftValue>(evals: &[V], dom: &TwoAdicDomain) -> Vec<V> {
         let mut scalar = n_inv;
         for v in vals.iter_mut() {
             *v = v.scale(scalar);
-            scalar = scalar * s_inv;
+            scalar *= s_inv;
         }
     }
     vals

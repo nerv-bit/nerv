@@ -3,14 +3,11 @@
 //! carries individual weights.
 
 
-use std::collections::BTreeMap;
-
-
 use nerv_core::hash::Hash256;
 use nerv_seal::dkg::CommitMatrix;
 
 
-use crate::ballot::{Choice, ShieldedBallot, ValidatorVote, WeightOpening};
+use crate::ballot::{ShieldedBallot, ValidatorVote, WeightOpening};
 use crate::chambers::{ChamberTally, BootstrapPhase};
 use crate::error::TallyError;
 
@@ -63,6 +60,7 @@ impl TallyResult {
 
 /// Tally the note-holder chamber: voting phase (ballots verified, no
 /// weights opened), then reveal phase (openings verified, sums computed).
+#[allow(clippy::result_large_err)]
 pub fn tally_note_holder(
     ballots: &[ShieldedBallot],
     openings: &[WeightOpening],
@@ -103,6 +101,7 @@ pub fn tally_note_holder(
 
 
 /// Tally the validator chamber: transparent stake-weighted votes.
+#[allow(clippy::result_large_err)]
 pub fn tally_validator(
     votes: &[ValidatorVote],
     stake_of: &dyn Fn(&nerv_crypto::mldsa::VerifyingKey) -> u64,
@@ -136,6 +135,7 @@ pub fn tally_validator(
 
 
 /// The combined result (erratum 180).
+#[allow(clippy::result_large_err)]
 pub fn combined_result(
     referendum_id: &Hash256,
     ballots: &[ShieldedBallot],
@@ -160,9 +160,10 @@ pub fn combined_result(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::ballot::{ballot_matrix, ShieldedBallot, ValidatorVote, WeightOpening};
+    use crate::ballot::{ballot_matrix, Choice, ShieldedBallot, ValidatorVote, WeightOpening};
     use crate::error::BallotError;
     use nerv_core::hash::Xof;
+    use std::collections::BTreeMap;
     use nerv_crypto::mldsa::SigningKey;
     use nerv_seal::ring::{Poly, Vec8, N};
 
@@ -303,7 +304,7 @@ mod tests {
             else if *vk == *sk2.verifying_key() { 500 }
             else { 0 }
         };
-        let t = tally_validator(&[v1, v2], &stake_fn).unwrap();
+        let t = tally_validator(&[v1.clone(), v2], &stake_fn).unwrap();
         assert_eq!(t.yes_nano, 1_000);
         assert_eq!(t.no_nano, 500);
         assert!(t.majority_yes());
@@ -343,7 +344,7 @@ mod tests {
         let stake_fn = |vk: &nerv_crypto::mldsa::VerifyingKey| -> u64 {
             if *vk == *sk.verifying_key() { 1_000 } else { 0 }
         };
-        let result = combined_result(&r, &[vb], &[vo], &m, &[vv], &stake_fn).unwrap();
+        let result = combined_result(&r, &[vb], &[vo], &m, &[vv.clone()], &stake_fn).unwrap();
         assert_eq!(result.bootstrap, BootstrapPhase::Bootstrap);
         assert!(result.majority_yes(), "the validator chamber alone decides in bootstrap");
 

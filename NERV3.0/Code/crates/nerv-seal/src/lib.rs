@@ -38,7 +38,7 @@ pub mod sampling;
 pub mod vpd;
 
 
-pub use error::{CircuitStmtError, DkgError, RevealError, SealError, SigmaError, VpdError};
+pub use error::{CircuitStmtError, DkgError, EpochError, RevealError, SealError, SigmaError, VpdError};
 
 
 // Parameter pins — the codegen seam (names per specs/params.toml; erratum 57).

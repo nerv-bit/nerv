@@ -287,9 +287,9 @@ mod tests {
         assert_eq!(evaluate_split(&short, Epoch::from_u64(10)), SplitDecision::None);
         // Window boundary: at=10 uses 3..=9.
         let l = load_from(10, 7, 346_000_000);
-        assert_eq!(l.contains_key(&Epoch::from_u64(3)), true);
-        assert_eq!(l.contains_key(&Epoch::from_u64(9)), true);
-        assert_eq!(l.contains_key(&Epoch::from_u64(10)), false);
+        assert!(l.contains_key(&Epoch::from_u64(3)));
+        assert!(l.contains_key(&Epoch::from_u64(9)));
+        assert!(!l.contains_key(&Epoch::from_u64(10)));
         // Not enough history at all.
         assert_eq!(trailing_legs_per_sec(&ShardLoad::new(), Epoch::from_u64(3), 7), None);
     }
@@ -371,7 +371,7 @@ mod tests {
         let full: Vec<ShardId> = (0..1024u16)
             .map(|v| ShardId::new(10, v).unwrap())
             .collect();
-        let engine = TopologyEngine::new(ShardSet::from_vec(full).unwrap());
+        let mut engine = TopologyEngine::new(ShardSet::from_vec(full).unwrap());
         let hot = engine.active().ids()[7];
         let mut loads = ShardLoads::new();
         loads.insert(hot, load_from(10, 7, 400_000_000));

@@ -248,10 +248,10 @@ mod tests {
     #[test]
     fn identity_round_trips_through_seed() {
         let id_a =
-            ProducerIdentity::from_seed(&seed_bytes(0xA1), ShardId::new(6, 7), 1_000_000_000)
+            ProducerIdentity::from_seed(&seed_bytes(0xA1), ShardId::new(6, 7).unwrap(), 1_000_000_000)
                 .expect("identity a");
         let id_b =
-            ProducerIdentity::from_seed(&seed_bytes(0xA1), ShardId::new(6, 7), 1_000_000_000)
+            ProducerIdentity::from_seed(&seed_bytes(0xA1), ShardId::new(6, 7).unwrap(), 1_000_000_000)
                 .expect("identity b");
         // Same seed → same payout address (the address-derivation is
         // deterministic from the master seed).
@@ -263,7 +263,7 @@ mod tests {
     #[test]
     fn register_stake_is_idempotent_and_observable() {
         let identity =
-            ProducerIdentity::from_seed(&seed_bytes(0xB2), ShardId::new(6, 0), 500).unwrap();
+            ProducerIdentity::from_seed(&seed_bytes(0xB2), ShardId::new(6, 0).unwrap(), 500).unwrap();
         let mut ledger = StakeLedger::new();
         assert_eq!(identity.stake_of(&ledger), 0);
         identity.register_stake(&mut ledger);
@@ -276,7 +276,7 @@ mod tests {
     #[test]
     fn epoch_payout_nano_uses_validator_subsidy_bucket() {
         let identity =
-            ProducerIdentity::from_seed(&seed_bytes(0xC3), ShardId::new(6, 0), 100).unwrap();
+            ProducerIdentity::from_seed(&seed_bytes(0xC3), ShardId::new(6, 0).unwrap(), 100).unwrap();
         let schedule = EmissionSchedule::genesis();
         let payout = identity
             .epoch_payout_nano(&schedule, Epoch::from_u64(0), &active())
@@ -290,7 +290,7 @@ mod tests {
     fn inactive_shard_returns_inactive_shard_error() {
         // A shard id outside the active set: bits == 6, value > 63 is
         // outside the genesis 64 shards.
-        let bad_shard = ShardId::new(6, 200);
+        let bad_shard = ShardId::new(6, 200).unwrap();
         let identity = ProducerIdentity::from_seed(&seed_bytes(0xD4), bad_shard, 100).unwrap();
         let schedule = EmissionSchedule::genesis();
         let err = identity
@@ -302,10 +302,10 @@ mod tests {
     #[test]
     fn producer_role_delegates_to_identity() {
         let identity =
-            ProducerIdentity::from_seed(&seed_bytes(0xE5), ShardId::new(6, 9), 1_000).unwrap();
+            ProducerIdentity::from_seed(&seed_bytes(0xE5), ShardId::new(6, 9).unwrap(), 1_000).unwrap();
         let role = ProducerRole::new(identity.clone());
         assert_eq!(role.verifying_key(), identity.verifying_key);
-        assert_eq!(role.shard(), ShardId::new(6, 9));
+        assert_eq!(role.shard(), ShardId::new(6, 9).unwrap());
         assert_eq!(role.stake_nano(), 1_000);
         // The role registers the identity's stake on the ledger.
         let mut ledger = StakeLedger::new();
@@ -334,7 +334,7 @@ mod tests {
         // verifies under the producer's public key (the same VK the
         // consensus committee uses to count the producer's votes).
         let identity =
-            ProducerIdentity::from_seed(&seed_bytes(0xF6), ShardId::new(6, 0), 100).unwrap();
+            ProducerIdentity::from_seed(&seed_bytes(0xF6), ShardId::new(6, 0).unwrap(), 100).unwrap();
         let message = b"test header hash bytes";
         let signature = identity.sign(message).expect("sign");
         assert!(
@@ -347,13 +347,13 @@ mod tests {
     fn with_signing_key_overrides_only_the_mldsa_key() {
         // Production HSM flow: replace the ML-DSA signing key but keep
         // the custody Address (still derived from the master seed).
-        let mut external = SigningKey::generate();
+        let mut external = SigningKey::from_seed(&[0x42; 32]).unwrap();
         let seed = seed_bytes(0xA7);
         let id_a =
-            ProducerIdentity::with_signing_key(external.clone(), &seed, ShardId::new(6, 0), 100)
+            ProducerIdentity::with_signing_key(external.clone(), &seed, ShardId::new(6, 0).unwrap(), 100)
                 .unwrap();
         let id_b =
-            ProducerIdentity::from_seed(&seed, ShardId::new(6, 0), 100).unwrap();
+            ProducerIdentity::from_seed(&seed, ShardId::new(6, 0).unwrap(), 100).unwrap();
         // Same seed → same payout Address.
         assert_eq!(id_a.payout_address, id_b.payout_address);
         // Different ML-DSA keys (external vs internal gen).
@@ -362,6 +362,6 @@ mod tests {
         let sig = id_a.sign(b"hello").expect("sign");
         assert!(id_a.verifying_key.verify(b"hello", &sig));
         // Use the external key once to confirm it's stored.
-        let _ = external.sign(b"unused");
+        let _ = external.sign(b"unused").unwrap();
     }
 }

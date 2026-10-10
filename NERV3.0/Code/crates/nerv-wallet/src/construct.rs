@@ -1,7 +1,7 @@
 //! Transaction construction (WP §3.6, App A; erratum 186): note
 //! selection, output creation, leg assembly, delta computation, sealing.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use nerv_codec::codec_w::CodecW;
 use nerv_codec::features::{build_leg_features, LegKind, LegMovement};
@@ -65,6 +65,8 @@ pub enum ConstructError {
         leg: usize,
         source: nerv_codec::features::FeatureError,
     },
+    #[error("internal: output openings do not line up with the canonical leg order")]
+    InconsistentOpenings,
 
     #[error("custody: {0}")]
     Custody(#[from] nerv_custody::CustodyError),
@@ -83,11 +85,13 @@ pub enum ConstructError {
 /// OS entropy for production use.
 pub fn os_entropy() -> [u8; 32] {
     let mut b = [0u8; 32];
+    #[allow(clippy::expect_used)]
     getrandom::getrandom(&mut b).expect("OS entropy unavailable");
     b
 }
 
 /// Select the smallest sufficient set of unspent notes.
+#[allow(clippy::type_complexity)]
 fn select_notes(
     wallet: &WalletNoteSet,
     needed: u64,
@@ -185,11 +189,11 @@ pub fn construct_payment(
     spec: &PaymentSpec,
     wallet: &WalletNoteSet,
     addresses: &AddressSet,
-    keys: &WalletKeys,
+    _keys: &WalletKeys,
     active: &ShardSet,
     codec: &CodecW,
     epoch_pk: &PublicKey,
-    current_height: u64,
+    _current_height: u64,
     entropy: &mut WalletEntropy<'_>,
 ) -> Result<ConstructedTx, ConstructError> {
     let needed = spec.amount_nano + spec.fee_nano;
@@ -220,7 +224,7 @@ pub fn construct_payment(
         .ok_or(ConstructError::NoChangeAddress { shard: input_shard })?;
 
     // Nullifiers (precomputed from the scan).
-    let nullifiers: Vec<Hash256> = selected
+    let _nullifiers: Vec<Hash256> = selected
         .iter()
         .map(|(_, n)| n.nullifier)
         .collect();
@@ -287,10 +291,37 @@ pub fn construct_payment(
         });
     }
 
+    // Bind the output openings to the canonical leg order. `output_openings`
+    // is in construction order (e.g. cross-shard: [recipient, change]); the
+    // canonical shell has legs in a deterministic order that does NOT match
+    // construction order, so `bind_witness_to_shell` (in nerv-proofs) walks
+    // canon.legs and expects `custody.outputs[i]` to match `canon.legs[*].outputs[i]`.
+    // Index them by commitment (each opening's cm equals the shell output's
+    // cm by construction) and consume them in canonical order.
+    let mut openings_by_cm: BTreeMap<Hash256, NoteOpening> = output_openings
+        .iter()
+        .map(|o| {
+            let cm = o.commitment().map_err(|_| ConstructError::InconsistentOpenings)?;
+            Ok::<_, ConstructError>((cm, o.clone()))
+        })
+        .collect::<Result<_, _>>()?;
+    let mut canon_outputs: Vec<OutputWitness> = Vec::new();
+    for leg in &canon.legs {
+        for out in &leg.outputs {
+            let op = openings_by_cm
+                .remove(&out.cm)
+                .ok_or(ConstructError::InconsistentOpenings)?;
+            canon_outputs.push(OutputWitness { opening: op });
+        }
+    }
+    if !openings_by_cm.is_empty() {
+        return Err(ConstructError::InconsistentOpenings);
+    }
+
     let fees: Vec<u64> = canon.legs.iter().map(|l| l.fee.as_u64()).collect();
     let custody_witness = CustodyWitness {
         inputs,
-        outputs: output_openings.iter().map(|o| OutputWitness { opening: o.clone() }).collect(),
+        outputs: canon_outputs,
         fees,
         reverts: revert_openings.iter().map(|o| RevertWitness { opening: o.clone() }).collect(),
         burns: vec![],
@@ -380,7 +411,7 @@ fn build_single_shard(
 fn build_cross_shard(
     spec: &PaymentSpec,
     selected: &[(&[u8; 32], &ScannedNote)],
-    wallet: &WalletNoteSet,
+    _wallet: &WalletNoteSet,
     change_addr: &crate::keys::WalletAddress,
     codec: &CodecW,
     epoch_pk: &PublicKey,
@@ -486,6 +517,7 @@ mod tests {
     use crate::keys::AddressSet;
     use crate::scan::{scan_sealed_note, NotePosition, WalletNoteSet};
     use crate::testutil::SplitMix64;
+    use nerv_core::types::TxId;
     use nerv_custody::nct::NoteCommitmentTree;
     use nerv_custody::{MasterSeed, WalletKeys};
     use nerv_seal::encrypt::derive_reference_keypair;
@@ -522,7 +554,7 @@ mod tests {
         let mut tree = NoteCommitmentTree::new();
         let mut rng = SplitMix64::new(seed ^ 0xF00D);
         let anchor = tree.root();
-        for i in 0..n {
+        for _i in 0..n {
             let pt = NotePlaintext::new(value, rng.bytes32(), rng.bytes32(), None).unwrap();
             let (cm, sealed) = seal_note(&pt, &addr.address, &rng.bytes32()).unwrap();
             let idx = tree.append(&cm).unwrap();
@@ -536,7 +568,7 @@ mod tests {
                 NotePosition {
                     leaf_index: idx,
                     anchor,
-                    siblings: wit.siblings.iter().map(|d| d.to_elements().unwrap()).collect(),
+                    siblings: wit.siblings.iter().flat_map(|d| d.to_elements().unwrap()).collect(),
                     shard,
                     received_height: 1,
                 },
@@ -553,7 +585,7 @@ mod tests {
     #[test]
     fn single_shard_construction() {
         let shard = ShardSet::genesis().ids()[7];
-        let (w, addrs, notes, anchor, total) =
+        let (w, addrs, notes, _anchor, _total) =
             funded_wallet(0xC0, 3, 10_000_000_000, shard);
         let active = ShardSet::genesis();
         let c = codec();
@@ -587,7 +619,7 @@ mod tests {
 
         // The txid is deterministic.
         assert_eq!(ctx.txid, TxId::from_hash(Hash256::concat(
-            &nerv_core::constants::Domain::new("nerv.txid"),
+            &nerv_core::constants::TXID,
             &{
                 let mut buf = Vec::new();
                 for l in &canon.legs { l.encode_into(&mut buf); }
@@ -597,7 +629,7 @@ mod tests {
 
         // The custody witness has the right input count.
         assert_eq!(ctx.custody_witness.inputs.len(), 2); // 15G needs 2 notes of 10G
-        assert!(ctx.custody_witness.outputs.len() >= 1);
+        assert!(!ctx.custody_witness.outputs.is_empty());
         assert_eq!(ctx.custody_witness.reverts.len(), 0);
         assert_eq!(ctx.noise_seeds.len(), 1);
 

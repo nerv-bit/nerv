@@ -128,10 +128,9 @@ impl MerkleChip {
         let half = FULL_ROUNDS / 2;
         let rows = self.rows();
         let mut table = vec![vec![Goldilocks::ZERO; PREP_COLS]; rows];
-        for row in 0..rows {
+        for (row, e) in table.iter_mut().enumerate().take(rows) {
             let p = row / PERM_ROWS;
             let rr = row % PERM_ROWS;
-            let e = &mut table[row];
              if rr == PERM_ROWS - 1 {
                 e[PREP_IS_PERM_END] = Goldilocks::ONE;
                 if p < self.depth {
@@ -144,9 +143,7 @@ impl MerkleChip {
                 if rr < half || rr >= half + PARTIAL_ROUNDS {
                     e[PREP_ROUND_TYPE] = Goldilocks::ONE;
                 }
-                for i in 0..STATE_COLS {
-                    e[PREP_RC_BASE + i] = rc[rr][i];
-                }
+                e[PREP_RC_BASE..(STATE_COLS + PREP_RC_BASE)].copy_from_slice(&rc[rr][..STATE_COLS]);
             }
             if rr == 0 {
                 e[PREP_IS_INPUT] = Goldilocks::ONE;
@@ -176,10 +173,10 @@ impl<B: AirBuilder> Air<B> for MerkleChip {
             t.push(x + rc);
         }
 
-        for i in 0..STATE_COLS {
+        for (i, ti) in t.iter().enumerate().take(STATE_COLS) {
             let a = builder.witness(0, cb + T2_BASE + i);
             let b = builder.witness(0, cb + T4_BASE + i);
-            let t2_diff = a.clone() - t[i].clone() * t[i].clone();
+            let t2_diff = a.clone() - ti.clone() * ti.clone();
             let t4_diff = b - a.clone() * a.clone();
             if i == 0 {
                 builder.assert_zero(is_round.clone() * t2_diff, "poseidon_t2_0");
@@ -194,12 +191,12 @@ impl<B: AirBuilder> Air<B> for MerkleChip {
         for j in 0..STATE_COLS {
             let y = builder.witness(1, cb + j);
             let mut sum = B::constant(0);
-            for i in 0..STATE_COLS {
+            for (i, ti) in t.iter().enumerate().take(STATE_COLS) {
                 let m = me_entry(j, i);
                 if m != 0 {
                     let a = builder.witness(0, cb + T2_BASE + i);
                     let b = builder.witness(0, cb + T4_BASE + i);
-                    let s = b * a * t[i].clone();
+                    let s = b * a * ti.clone();
                     sum = sum + s * B::constant(m);
                 }
             }
@@ -211,20 +208,24 @@ impl<B: AirBuilder> Air<B> for MerkleChip {
         let s0 = b0 * a0 * t[0].clone();
         let mut v: Vec<B::Expr> = Vec::with_capacity(STATE_COLS);
         v.push(s0);
-        for c in 1..STATE_COLS {
-            v.push(t[c].clone());
+        for tc in t.iter().take(STATE_COLS).skip(1) {
+            v.push(tc.clone());
         }
         let mut block_sum: Vec<B::Expr> = Vec::with_capacity(4);
         for blk in 0..4 {
             let mut s = B::constant(0);
-            for c in blk * 4..blk * 4 + 4 {
-                s = s + v[c].clone();
+            for vc in v.iter().skip(blk * 4).take(4) {
+                s = s + vc.clone();
             }
             block_sum.push(s);
         }
         for j in 0..STATE_COLS {
             let y = builder.witness(1, cb + j);
-            let out = block_sum[j / 4].clone() + v[j % 4].clone();
+            // After internal_linear (M_I = blockdiag(M4×4)): for block blk
+            // and column j = blk·4 + pos, new_v[j] = v[j] + sum_of_block.
+            // `v[j % 4]` (the previous version) crossed blocks and the
+            // partial-round check failed for every column past column 0.
+            let out = block_sum[j / 4].clone() + v[j].clone();
             builder.assert_zero(
                 is_round.clone() * not_rt.clone() * (y - out),
                 "poseidon_partial_out",
@@ -392,8 +393,8 @@ mod tests {
         assert_eq!(prep[64][PREP_IS_ROOT_ROW], Goldilocks::ZERO);
 
         // Round types: rounds 0–3 and 60–63 full; 4–59 partial.
-        for rr in 0..64 {
-            let want = rr < 4 || rr >= 60;
+        for (rr, _) in (0..64).enumerate() {
+            let want = !(4..60).contains(&rr);
             assert_eq!(
                 prep[rr][PREP_ROUND_TYPE] == Goldilocks::ONE,
                 want,
@@ -423,7 +424,7 @@ mod tests {
         let root = root_elements(&leaf_digest(&cm));
         assert!(check_path(0, &cm, 0, &[], &root).is_ok());
         let mut bad = root;
-        bad[0] = bad[0] + Goldilocks::ONE;
+        bad[0] += Goldilocks::ONE;
         let errs = check_path(0, &cm, 0, &[], &bad).unwrap_err();
         assert!(errs.iter().any(|e| e.name == "merkle_root"));
         // The leaf input words are witness: a different cm gives a
@@ -460,7 +461,7 @@ mod tests {
         let w = tree.witness(5).unwrap();
         let mut sibs = w.siblings;
         let mut bad = sibs[7].to_elements().unwrap();
-        bad[0] = bad[0] + Goldilocks::ONE;
+        bad[0] += Goldilocks::ONE;
         sibs[7] = NctDigest::from_elements(&bad);
         assert!(!verify_witness(&root, 5, &cms[5], &sibs));
         let sib_e = sib_elements(&sibs);
@@ -479,11 +480,11 @@ mod tests {
         // boundary-representative rows is constrained.
         let mut rng = SplitMix64::new(0x4E3D);
         let cm = Hash256::from_bytes(rng.bytes32());
-        let sibs = [[Goldilocks::from_u32(11); 4], [Goldilocks::from_u32(22); 4]];
-        let sibs: Vec<[Goldilocks; 4]> = (0..DEPTH)
+        // chip depth = 1 → exactly one sibling.
+        let sibs: Vec<[Goldilocks; 4]> = (0..1)
             .map(|k| {
                 let mut e = [Goldilocks::ZERO; 4];
-                for (i, x) in e.iter_mut().enumerate() {
+                for x in e.iter_mut() {
                     *x = Goldilocks::from_u64_reduce(rng.next_u64());
                 }
                 e[0] = Goldilocks::from_u32(k as u32);
@@ -494,7 +495,7 @@ mod tests {
         let prep = chip.gen_prep();
         let trace = gen_merkle_trace(1, &cm, 0b01, &sibs);
         // The correct root: recompute via the native verifier.
-        let sib_d: [NctDigest; 1] = [NctDigest::from_elements(&sibs[0])];
+        let _sib_d: [NctDigest; 1] = [NctDigest::from_elements(&sibs[0])];
         // (Depth-1 cross-check goes through gen + permute directly.)
 
         // Root from the trace's last row.
@@ -506,7 +507,7 @@ mod tests {
         for &row_idx in &[0usize, 1, 5, 32, 63, 64, 65, 66, 129] {
             for col in 0..STATE_COLS {
                 let mut bad = trace.clone();
-                bad[row_idx][col] = bad[row_idx][col] + Goldilocks::ONE;
+                bad[row_idx][col] += Goldilocks::ONE;
                 assert!(
                     NativeEval::check_with_prep(bad, prep.clone(), root.to_vec(), &chip, 8)
                         .is_err(),
@@ -521,7 +522,8 @@ mod tests {
     fn tamper_aux_and_documented_freedom() {
         let mut rng = SplitMix64::new(0x4E3E);
         let cm = Hash256::from_bytes(rng.bytes32());
-        let sibs: Vec<[Goldilocks; 4]> = (0..2)
+        // depth = 1 → one node compression; exactly one sibling.
+        let sibs: Vec<[Goldilocks; 4]> = (0..1)
             .map(|_| core::array::from_fn(|_| Goldilocks::from_u64_reduce(rng.next_u64())))
             .collect();
         let chip = MerkleChip::new(1);
@@ -534,7 +536,7 @@ mod tests {
         for i in [0usize, 5, 15] {
             for &base in &[T2_BASE, T4_BASE] {
                 let mut bad = trace.clone();
-                bad[0][base + i] = bad[0][base + i] + Goldilocks::ONE;
+                bad[0][base + i] += Goldilocks::ONE;
                 assert!(
                     NativeEval::check_with_prep(bad, prep.clone(), root.to_vec(), &chip, 8)
                         .is_err(),
@@ -545,7 +547,7 @@ mod tests {
         // Partial-round row 10: position 0 constrained…
         for &base in &[T2_BASE, T4_BASE] {
             let mut bad = trace.clone();
-            bad[10][base] = bad[10][base] + Goldilocks::ONE;
+            bad[10][base] += Goldilocks::ONE;
             assert!(
                 NativeEval::check_with_prep(bad, prep.clone(), root.to_vec(), &chip, 8).is_err()
             );
@@ -568,7 +570,8 @@ mod tests {
     fn tamper_wiring_row() {
         let mut rng = SplitMix64::new(0x4E3F);
         let cm = Hash256::from_bytes(rng.bytes32());
-        let sibs: Vec<[Goldilocks; 4]> = (0..2)
+        // depth = 1 → exactly one sibling in the column-set.
+        let sibs: Vec<[Goldilocks; 4]> = (0..1)
             .map(|_| core::array::from_fn(|_| Goldilocks::from_u64_reduce(rng.next_u64())))
             .collect();
         let chip = MerkleChip::new(1);
@@ -592,7 +595,7 @@ mod tests {
 
         for i in 0..4 {
             let mut bad = trace.clone();
-            bad[64][SIB_BASE + i] = bad[64][SIB_BASE + i] + Goldilocks::ONE;
+            bad[64][SIB_BASE + i] += Goldilocks::ONE;
             assert!(
                 NativeEval::check_with_prep(bad, prep.clone(), root.to_vec(), &chip, 8).is_err(),
                 "sibling col {i}"

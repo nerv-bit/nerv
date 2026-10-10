@@ -20,7 +20,7 @@ use crate::error::{CustodyError, NoteError};
 pub const MEMO_MAX: usize = CUSTODY_MEMO_MAX_BYTES as usize;
 
 fn check_value(value: u64) -> Result<(), CustodyError> {
-    if value < CUSTODY_VALUE_MIN_NANO || value > CUSTODY_VALUE_MAX_NANO {
+    if !(CUSTODY_VALUE_MIN_NANO..=CUSTODY_VALUE_MAX_NANO).contains(&value) {
         return Err(CustodyError::ValueOutOfRange {
             value,
             min: CUSTODY_VALUE_MIN_NANO,
@@ -111,7 +111,7 @@ impl Encode for NotePlaintext {
 impl Decode for NotePlaintext {
     fn decode_from(r: &mut Reader<'_>) -> Result<Self, CodecError> {
         let value = r.read_u64()?;
-        if value < CUSTODY_VALUE_MIN_NANO || value > CUSTODY_VALUE_MAX_NANO {
+        if !(CUSTODY_VALUE_MIN_NANO..=CUSTODY_VALUE_MAX_NANO).contains(&value) {
             return Err(CodecError::InvariantViolated("note value outside (0, 2^60]"));
         }
         let rho = r.take_array::<NONCE_LEN>()?;
@@ -285,7 +285,7 @@ pub fn trial_decrypt(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::address::{DetectionSeed, MasterSeed, WalletKeys};
+    use crate::address::{MasterSeed, WalletKeys};
     use crate::testutil::SplitMix64;
     use nerv_core::types::ShardSet;
 
@@ -332,8 +332,10 @@ mod tests {
         let mut rng = SplitMix64::new(2);
         let p = pt(&mut rng, None);
         let d = *addr(&wallet(10), 4).delivery().as_bytes();
-        let pk_a = addr(&wallet(10), 4).pk_n();
-        let pk_b = addr(&wallet(10), 5).pk_n();
+        let a4 = addr(&wallet(10), 4);
+        let a5 = addr(&wallet(10), 5);
+        let pk_a = a4.pk_n();
+        let pk_b = a5.pk_n();
         let n = Note::from_parts(&p, d, *pk_a);
         let cm = n.commitment().unwrap();
         assert_eq!(

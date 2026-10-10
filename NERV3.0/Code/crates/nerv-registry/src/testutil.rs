@@ -4,7 +4,6 @@
 /// frozen FRI shape, real-seal shells, and shape-consistent garbage
 /// proofs that exercise the full verification pipeline before failing.
 pub(crate) mod harness {
-    use super::SplitMix64;
     use crate::mempool::{PoolEntry, VerifyContext};
     use nerv_codec::codec_w::{CodecW, WeightVersion};
     use nerv_codec::weight_gen::{certify, expand, BeaconRandomness, CertConfig};
@@ -129,6 +128,7 @@ pub(crate) mod harness {
     }
 
 
+    #[allow(dead_code)]
     pub(crate) fn entry_for(shell: &TransactionShell) -> PoolEntry {
         let canon = shell.canonicalize().unwrap();
         PoolEntry {

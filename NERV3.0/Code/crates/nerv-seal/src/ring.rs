@@ -43,8 +43,6 @@ pub const LOG2_N: u32 = 8;
 /// exists and the complete negacyclic NTT of length 256 is available.
 /// Primality is proven at compile time via Proth's theorem
 /// (`PROTH_WITNESS`); a deterministic Miller–Rabin re-verifies at runtime.
-
-
 pub const Q: u64 = 4_293_918_721; // 0xFFF00001 = 4095·2^20 + 1
 
 
@@ -311,18 +309,16 @@ fn poly_divmod(a_in: &[u64], b_in: &[u64]) -> Option<(Vec<u64>, Vec<u64>)> {
     }
     let b = &b_in[..b_trim_len];
 
-    let lead_b = *b.last().expect("b_trim_len > 0 ⇒ b.last() is Some");
+    // `b_trim_len > 0` was checked above, so `b` is non-empty and `b[b_trim_len - 1]`
+    // is the leading coefficient.
+    let lead_b = b[b_trim_len - 1];
     let lead_b_inv = mod_pow(lead_b, Q - 2, Q);
 
     let mut r = a_in.to_vec();
     let q_len = if a_in.len() >= b.len() { a_in.len() - b.len() + 1 } else { 0 };
     let mut q = vec![0u64; q_len];
 
-    loop {
-        let r_deg = match r.iter().rposition(|&x| x != 0) {
-            Some(i) => i,
-            None => break,
-        };
+    while let Some(r_deg) = r.iter().rposition(|&x| x != 0) {
         let b_deg = b.len() - 1;
         if r_deg < b_deg {
             break;
@@ -1223,13 +1219,23 @@ mod tests {
     #[test]
     fn vec_trim_strips_only_trailing_zeros() {
         // Leading zeros survive (the polynomial 0 + x is still `x`).
-        assert_eq!(vec_trim(&[0, 1, 2, 0]), vec![0, 1, 2]);
+        let mut leading = [0u64; N];
+        leading[1] = 1;
+        leading[2] = 2;
+        assert_eq!(vec_trim(&leading), vec![0, 1, 2]);
         // The zero polynomial trims to empty (its canonical form).
-        assert_eq!(vec_trim(&[0u64; 8]), Vec::<u64>::new());
+        assert_eq!(vec_trim(&[0u64; N]), Vec::<u64>::new());
         // Already-trimmed input is a no-op.
-        assert_eq!(vec_trim(&[1, 2, 3]), vec![1, 2, 3]);
+        let mut trimmed = [0u64; N];
+        trimmed[0] = 1;
+        trimmed[1] = 2;
+        trimmed[2] = 3;
+        assert_eq!(vec_trim(&trimmed), vec![1, 2, 3]);
         // Only trailing zeros are removed.
-        assert_eq!(vec_trim(&[1, 0, 2, 0, 0]), vec![1, 0, 2]);
+        let mut inner = [0u64; N];
+        inner[0] = 1;
+        inner[2] = 2;
+        assert_eq!(vec_trim(&inner), vec![1, 0, 2]);
     }
 
     #[test]
@@ -1237,7 +1243,7 @@ mod tests {
         // Use a tiny non-splitmix64 deterministic seed so this test stays
         // fast and reproducible (the poly degree is small enough that
         // exhaustive-checking a few random cases catches real bugs).
-        let mut s: u64 = 0xC0FFEE_BEEF;
+        let mut s: u64 = 0xC0_FFEE_BEEF;
         for _ in 0..16 {
             let a_len = (s % 8 + 1) as usize;
             s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
@@ -1503,7 +1509,7 @@ fn poly_divmod(a: &[u64], b: &[u64]) -> Option<(Vec<u64>, Vec<u64>)> {
     #[test]
     fn q_is_prime_and_well_shaped() {
         assert!(is_prime(Q));
-        assert!(Q > (1 << 31) && Q < (1 << 32));
+        assert!(((1u64 << 31)..(1u64 << 32)).contains(&Q));
         assert_eq!((Q - 1) % 512, 0);
         // Proth witness semantics: a^((Q−1)/2) ≡ −1 (mod Q).
         assert_eq!(t_pow(PROTH_WITNESS, (Q - 1) / 2, Q), Q - 1);
@@ -1674,7 +1680,13 @@ fn poly_divmod(a: &[u64], b: &[u64]) -> Option<(Vec<u64>, Vec<u64>)> {
         assert_eq!(cl[2], -1);
         assert_eq!(Poly::from_centered(&cl), p);
         // from_centered is total at the extremes.
-        let vals = [i64::MIN, -Q as i64, -1, 0, 1, Q as i64, i64::MAX, 0];
+        let mut vals = [0i64; N];
+        vals[0] = i64::MIN;
+        vals[1] = -(Q as i64);
+        vals[2] = -1;
+        vals[4] = 1;
+        vals[5] = Q as i64;
+        vals[6] = i64::MAX;
         let p2 = Poly::from_centered(&vals);
         let _ = p2.coefficient(0);
     }
@@ -1699,7 +1711,7 @@ fn poly_divmod(a: &[u64], b: &[u64]) -> Option<(Vec<u64>, Vec<u64>)> {
 
         // Rejections: wrong length, unreduced coefficient.
         let p = rand_poly(&mut s);
-        let mut bad = p.to_bytes();
+        let mut bad = p.to_bytes().to_vec();
         bad.push(0);
         assert!(matches!(
             Poly::from_bytes(&bad),

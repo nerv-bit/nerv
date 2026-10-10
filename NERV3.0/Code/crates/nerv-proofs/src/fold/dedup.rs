@@ -61,7 +61,7 @@ impl IntervalSet {
     /// Kept-txid counts per contributing bundle index.
     pub fn bundle_contributions(&self) -> BTreeMap<u32, usize> {
         let mut out = BTreeMap::new();
-        for (_, &b) in &self.txids {
+        for &b in self.txids.values() {
             *out.entry(b).or_insert(0) += 1;
         }
         out
@@ -174,13 +174,20 @@ impl IntervalLedger {
 
 
     /// Commits an interval's set into the ledger. The +1 chain is the
-    /// integrity check: the registry commits one set per beacon interval
-    /// (empty when no valid bundles arrived) — the chain must not skip.
+    /// integrity check within an epoch: the registry commits one set per
+    /// beacon interval (empty when no valid bundles arrived) and the
+    /// `dedup`-produced set's txids are tagged with this interval.
+    /// Epoch-boundary jumps are allowed — `close_epoch` advances the
+    /// registry without going through every skipped interval — so a
+    /// later commit may target `c.as_u64() + 2` or higher when the
+    /// epochs differ.
     pub fn commit(&mut self, set: &IntervalSet) -> Result<(), DedupError> {
         if let Some(c) = self.current {
-            let expected = Interval::from_u64(c.as_u64() + 1);
-            if set.interval != expected {
-                return Err(DedupError::Gap { expected, got: set.interval });
+            if set.interval.epoch() == c.epoch() && set.interval.as_u64() != c.as_u64() + 1 {
+                return Err(DedupError::Gap {
+                    expected: Interval::from_u64(c.as_u64() + 1),
+                    got: set.interval,
+                });
             }
         }
         for txid in set.txids.keys() {
@@ -260,7 +267,11 @@ mod tests {
         assert_eq!(r1, r2, "list order within a bundle is irrelevant");
 
 
-        // Arrival index, not slice position, carries first-wins.
+        // Commit interval 0 so the next dedup sees `a` as cross-interval.
+        ledger.commit(&r2.set).unwrap();
+
+
+// Arrival index, not slice position, carries first-wins.
         let r3 = ledger
             .dedup(
                 Interval::from_u64(1),
@@ -272,7 +283,7 @@ mod tests {
             .unwrap();
         assert!(r3.set.is_empty(), "a settled in interval 0 — cross-interval drop");
         assert_eq!(r3.cross_interval, vec![(a, Interval::from_u64(0)), (a, Interval::from_u64(0))]);
-        let mut ledger2 = IntervalLedger::new();
+        let ledger2 = IntervalLedger::new();
         let r4 = ledger2
             .dedup(
                 Interval::from_u64(1),
@@ -404,7 +415,7 @@ mod tests {
         let r6 = ledger.dedup(Interval::from_u64(6), &[]).unwrap();
         assert!(matches!(
             ledger.commit(&r6.set),
-            Err(DedupError::Gap { expected: Interval, .. }) if expected == Interval::from_u64(5)
+            Err(DedupError::Gap { expected, .. }) if expected == Interval::from_u64(5)
         ));
         let r5 = ledger.dedup(Interval::from_u64(5), &[]).unwrap();
         ledger.commit(&r5.set).unwrap();
@@ -444,7 +455,7 @@ mod tests {
         let report = ledger.dedup(Interval::from_u64(0), &bundles).unwrap();
         assert_eq!(report.set.len(), 200);
         for (i, x) in t.iter().enumerate() {
-            assert_eq!(report.set.provenance(x), Some((i as u32 % 8)), "txid {i}");
+            assert_eq!(report.set.provenance(x), Some(i as u32 % 8), "txid {i}");
         }
         // Determinism across runs.
         let report2 = ledger.dedup(Interval::from_u64(0), &bundles).unwrap();

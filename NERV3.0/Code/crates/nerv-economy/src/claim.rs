@@ -1,7 +1,6 @@
 //! The claim rail (WP §12.3; erratum 160): the EMISSION tree, claim
 //! witnesses, and claim-leg validation.
 
-use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
 use nerv_core::constants::{EMISSION_EMPTY, EMISSION_LEAF, EMISSION_NODE};
@@ -11,11 +10,11 @@ use crate::emission::{
     claim_nullifier, eligibility_digest, note_commitment, AccountId, EmissionLedger, LedgerError,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum ClaimError {
     #[error("inclusion proof failed for account {account:?}")]
-    InclusionFailed { account: AccountId },
+    InclusionFailed { account: Box<AccountId> },
     #[error("claim nullifier {nullifier:?} is already spent")]
     NullifierSpent { nullifier: [u8; 32] },
     #[error("declared input {declared} exceeds the grantable {spendable}")]
@@ -114,13 +113,13 @@ impl EmissionTree {
             return empty[EMISSION_TREE_DEPTH];
         }
         let mut r = empty[0];
-        for k in 0..EMISSION_TREE_DEPTH {
+        for (k, empty_k) in empty.iter().take(EMISSION_TREE_DEPTH).enumerate() {
             if (self.count >> k) & 1 == 1 {
                 let left = self
                     .levels
                     .get(k)
                     .and_then(|l| l.last().copied())
-                    .unwrap_or(empty[k]);
+                    .unwrap_or(*empty_k);
                 r = emission_node(&left, &r);
             } else {
                 r = emission_node(&r, &empty[k]);
@@ -145,7 +144,7 @@ impl EmissionTree {
         let empty = empty_digests();
         let mut siblings = Vec::with_capacity(EMISSION_TREE_DEPTH);
         let mut j = index;
-        for k in 0..EMISSION_TREE_DEPTH {
+        for (k, empty_k) in empty.iter().take(EMISSION_TREE_DEPTH).enumerate() {
             let sib = j ^ 1;
             siblings.push(
                 self.levels
@@ -153,7 +152,7 @@ impl EmissionTree {
                     .filter(|l| (sib as usize) < l.len())
                     .and_then(|l| l.get(sib as usize))
                     .copied()
-                    .unwrap_or(empty[k]),
+                    .unwrap_or(*empty_k),
             );
             j >>= 1;
         }
@@ -235,13 +234,13 @@ impl ClaimLegParts {
 /// the state layer's; this is the ledger-side gate.
 pub fn verify_claim_leg(
     ledger: &mut EmissionLedger,
-    tree: &EmissionTree,
+    _tree: &EmissionTree,
     root: &Hash256,
     witness: &ClaimWitness,
     declared_amount_nano: u64,
 ) -> Result<AccountId, ClaimError> {
     if !witness.verify_inclusion(root) {
-        return Err(ClaimError::InclusionFailed { account: witness.account });
+        return Err(ClaimError::InclusionFailed { account: Box::new(witness.account) });
     }
     if ledger.nullifiers().contains(&witness.nullifier) {
         return Err(ClaimError::NullifierSpent { nullifier: witness.nullifier });
@@ -267,15 +266,14 @@ pub fn verify_claim_leg(
             LedgerError::Insufficient { amount, spendable } => {
                 ClaimError::OverSpend { declared: amount, spendable }
             }
-            other => ClaimError::BadProof,
+            _other => ClaimError::BadProof,
         })
 }
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::emission::{derive_claim_key, AccountEntry, AccountHolder, NoteAccount, SignedAccount};
-    use crate::schedule::EmissionSchedule;
+    use crate::emission::{derive_claim_key, NoteAccount};
     use crate::testutil::SplitMix64;
 
     fn h(seed: u64) -> Hash256 {
@@ -415,7 +413,7 @@ mod tests {
         ));
         // Stale spendable in the witness (already partially claimed).
         let (mut l3, cm3, el3, nf3, id3) = note_fixture(100);
-        let mut t3 = EmissionTree::from_ledger(&l3);
+        let t3 = EmissionTree::from_ledger(&l3);
         let r3 = t3.root();
         let w3 = witness_for(&l3, &t3, &id3, &nf3, &el3);
         verify_claim_leg(&mut l3, &t3, &r3, &w3, 60).unwrap();
@@ -450,7 +448,7 @@ mod tests {
     fn from_ledger_over_mixed_accounts() {
         let mut ledger = EmissionLedger::new();
         let lk = crate::emission::derive_lek(&[4u8; 32]);
-        ledger.add_signed(lk, "founder", *crate::emission::test_vk(1));
+        ledger.add_signed(lk, "founder", crate::emission::test_vk(1));
         let ck = derive_claim_key(&[5u8; 32]);
         let cm = note_commitment(&ck, "community", 9, &[0u8; 32]);
         let id2 = ledger.add_note(

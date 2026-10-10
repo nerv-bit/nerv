@@ -22,6 +22,8 @@ use nerv_core::codec::Encode;
 use nerv_core::constants;
 use nerv_core::hash::Hash256;
 use nerv_core::types::{ShardId, ShardSet};
+use std::fmt::Write;
+
 use nerv_core::TypeError;
 use nerv_crypto::mldsa::{SigningKey, VerifyingKey};
 use nerv_custody::{Address, MasterSeed, WalletKeys};
@@ -129,14 +131,16 @@ pub fn register_producer_stake(
     ledger.stake(verifying_key, stake_nano);
     let balance = ledger.stake_of(&verifying_key);
 
-    let vk_hex: String = verifying_key
-        .as_bytes()
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect();
+    let mut vk_hex = String::with_capacity(verifying_key.as_bytes().len() * 2);
+    for b in verifying_key.as_bytes() {
+        let _ = write!(vk_hex, "{b:02x}");
+    }
     // Address wire form: delivery (EK) + tag (ShardId, 3 bytes) + pk_n (32).
     let payout_bytes = payout_address.encode();
-    let payout_hex: String = payout_bytes.iter().map(|b| format!("{b:02x}")).collect();
+    let mut payout_hex = String::with_capacity(payout_bytes.len() * 2);
+    for b in &payout_bytes {
+        let _ = write!(payout_hex, "{b:02x}");
+    }
     let account_id = *Hash256::concat(&constants::SLASH, verifying_key.as_bytes()).as_bytes();
 
     Ok(ProducerSubmitResult::Registered {

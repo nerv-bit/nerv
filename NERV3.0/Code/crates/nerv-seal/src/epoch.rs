@@ -40,7 +40,7 @@ use crate::sampling::{expand_matrix, ASeed, NoiseSeed};
 
 
 /// Genesis privacy floor (params' chunk_min; equals chunk_max, erratum 40).
-pub const CHUNK_MIN: u64 = nerv_core::params::SEAL_CHUNK_MIN as u64;
+pub const CHUNK_MIN: u64 = nerv_core::params::SEAL_CHUNK_MIN;
 /// Handoff window length in beacon intervals (Appendix D.6).
 pub const HANDOFF_INTERVALS: u64 = nerv_core::params::SEAL_PSS_HANDOFF_INTERVALS;
 /// LWE samples published per reveal: the combined value plus t partials.
@@ -582,7 +582,7 @@ mod tests {
             ]),
             Err(EpochError::DuplicateBatch { batch: 5 })
         ));
-        let empty = HandoffWindow::new(e, 1, vec![]).unwrap();
+        let mut empty = HandoffWindow::new(e, 1, vec![]).unwrap();
         assert_eq!(empty.close(), vec![]);
     }
 

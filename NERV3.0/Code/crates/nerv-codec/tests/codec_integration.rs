@@ -3,9 +3,11 @@
 //! across all three serialized types, and the embedding accumulator's group
 //! law.
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use nerv_codec::codec_w::{CodecW, Delta, WeightVersion, EMBEDDING_DIM};
 use nerv_codec::features::{
-    build_leg_features, slot_index, FeatureVector, LegKind, LegMovement, MAX_ACTIVE_ACCOUNT_SLOTS,
+    build_leg_features, slot_index, LegKind, LegMovement, MAX_ACTIVE_ACCOUNT_SLOTS,
     RAIL_COUNT, RAIL_VOLUME, FEATURE_COUNT,
 };
 

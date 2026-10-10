@@ -1,8 +1,7 @@
 //! Entitlement claiming (WP §12.3; erratum 178/180): the wallet's
 //! claim-leg construction for emission commitment-notes.
 
-use nerv_core::hash::Hash256;
-use nerv_core::types::TxId;
+
 use nerv_economy::claim::ClaimLegParts;
 use nerv_economy::emission::{
     derive_claim_key, eligibility_digest, note_commitment, claim_nullifier,

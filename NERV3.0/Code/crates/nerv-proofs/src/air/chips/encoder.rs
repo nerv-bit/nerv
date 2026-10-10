@@ -17,7 +17,6 @@
 //! boolean carries; the Ppos/Pneg limbs are boolean-decomposed (u32 force,
 //! carry uniqueness). Max degree 3.
 
-use nerv_core::field::Goldilocks;
 use crate::air::builder::{Air, AirBuilder};
 
 pub const N_COORDS: usize = 64;
@@ -107,6 +106,25 @@ impl EncoderChip {
     }
 }
 
+struct GatedBuilder<'a, B: AirBuilder> {
+    inner: &'a mut B,
+    gate: B::Expr,
+}
+
+impl<B: AirBuilder> AirBuilder for GatedBuilder<'_, B> {
+    type Expr = B::Expr;
+
+    fn witness(&self, offset: usize, col: usize) -> Self::Expr { self.inner.witness(offset, col) }
+    fn public(&self, idx: usize) -> Self::Expr { self.inner.public(idx) }
+    fn preprocessed(&self, col: usize) -> Self::Expr { self.inner.preprocessed(col) }
+    fn is_first_row(&self) -> Self::Expr { self.inner.is_first_row() }
+    fn is_last_row(&self) -> Self::Expr { self.inner.is_last_row() }
+    fn is_transition(&self) -> Self::Expr { self.inner.is_transition() }
+    fn assert_zero(&mut self, expr: Self::Expr, name: &'static str) {
+        self.inner.assert_zero(self.gate.clone() * expr, name);
+    }
+}
+
 impl<B: AirBuilder> Air<B> for EncoderChip {
     fn eval(&self, b: &mut B) {
         let pb = self.prep_base;
@@ -115,6 +133,8 @@ impl<B: AirBuilder> Air<B> for EncoderChip {
         let is_mac = b.preprocessed(pb + PF_MAC);
         let is_start = b.preprocessed(pb + PF_MAC_START);
         let is_final = b.preprocessed(pb + PF_MAC_FINAL);
+        let mut mac_scope = GatedBuilder { inner: &mut *b, gate: is_mac.clone() };
+        let b = &mut mac_scope;
         let mid = is_mac.clone() - is_final.clone(); // 1 on non-final MAC rows
 
         // -- x / w selection (prep-driven; F_SEL is preprocessed one-hot) --
@@ -143,9 +163,9 @@ let f = |i: usize| pf_sel[i].clone();
         xlo = xlo + f(3) * b.witness(0, e + R_LOGA);
         for i in 0..6 {
             let sb = e + R_SLOT + 228 * i;
-            xlo = xlo + f(6 + i) * b.witness(0, sb + 224);
-            xhi = xhi + f(6 + i) * b.witness(0, sb + 225);
-            xs = xs + f(6 + i) * b.witness(0, sb + 226);
+            xlo = xlo + f(6 + i) * b.witness(0, sb + 225);
+            xhi = xhi + f(6 + i) * b.witness(0, sb + 226);
+            xs = xs + f(6 + i) * b.witness(0, sb + 224);
         }
         b.assert_zero(b.witness(0, e + XLO) - xlo, "enc_xlo_sel");
         b.assert_zero(b.witness(0, e + XHI) - xhi, "enc_xhi_sel");
@@ -303,6 +323,8 @@ let f = |i: usize| pf_sel[i].clone();
 
         // -- Final-row rounding (gated is_final): inline post-adds, exact
         //    two's-complement subtract, floor/tie-even shift, δ limbs --
+        let mut final_scope = GatedBuilder { inner: &mut *b, gate: is_final.clone() };
+        let b = &mut final_scope;
         let mut post_pp = [B::constant(0), B::constant(0), B::constant(0)];
         let mut post_pn = [B::constant(0), B::constant(0), B::constant(0)];
         for limb in 0..3 {
@@ -364,10 +386,7 @@ let f = |i: usize| pf_sel[i].clone();
 
         // Rounding adjust: gt = r > 2^14; tie = r == 2^14 ∧ q odd.
         let r14 = b.witness(0, e + RRB + 14);
-        let mut r_lo13 = B::constant(0);
-        for t in 0..14 {
-            r_lo13 = r_lo13 + b.witness(0, e + RRB + t);
-        }
+        let r_lo13 = recompose(b, e + RRB, 14);
         let nz = b.witness(0, e + NZ);
         b.assert_zero(nz.clone() * (nz.clone() - one.clone()), "enc_nz_bool");
         b.assert_zero(r_lo13 * b.witness(0, e + INVL) - nz.clone(), "enc_nz");

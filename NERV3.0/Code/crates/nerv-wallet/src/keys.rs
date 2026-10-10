@@ -6,10 +6,10 @@
 use std::collections::BTreeMap;
 
 
-use nerv_core::types::{kappa, ShardId, ShardSet};
+use nerv_core::types::{ShardId, ShardSet};
 use nerv_crypto::mlkem::{DecapsulationKey, EncapsulationKey};
 use nerv_custody::{
-    Address, DetectionSeed, MasterSeed, WalletKeys,
+    Address, WalletKeys,
 };
 
 
@@ -190,6 +190,7 @@ impl AddressSet {
             }
             // Not the target shard; only add if it's a new shard.
             let tag = address.tag();
+            #[allow(clippy::map_entry)]
             if !self.by_shard.contains_key(&tag) {
                 let nk = keys.nullifier_key_at(index);
                 let kp = detection_ref.delivery_keypair(index)?;
@@ -209,6 +210,8 @@ impl AddressSet {
 mod tests {
     use super::*;
     use crate::testutil::SplitMix64;
+    use nerv_core::kappa;
+    use nerv_custody::MasterSeed;
 
 
     fn wallet(seed: u64) -> WalletKeys {
@@ -219,7 +222,7 @@ mod tests {
     #[test]
     fn pins() {
         assert_eq!(DEFAULT_SHARD_COVERAGE, 8);
-        assert!(MAX_GENERATION >= 64);
+        const _: () = assert!(MAX_GENERATION >= 64);
     }
 
 
@@ -287,7 +290,7 @@ mod tests {
         // Find an uncovered shard.
         let target = set.ids().iter().find(|s| !a.by_shard.contains_key(s)).copied().unwrap();
         a.ensure_shard(&w, &set, target).unwrap();
-        assert!(a.indices_for_shard(&target).len() >= 1);
+        assert!(!a.indices_for_shard(&target).is_empty());
         assert!(a.coverage() > 1);
     }
 

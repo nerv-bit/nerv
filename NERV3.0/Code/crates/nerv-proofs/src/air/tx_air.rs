@@ -37,7 +37,7 @@ use nerv_custody::tx::TransactionShell;
 use nerv_seal::SealError;
 use nerv_seal::digitize::Plaintext;
 use nerv_seal::encrypt::PublicKey;
-use nerv_seal::ring::{fwd_twiddle, inv_twiddle, Mat2x8, Mat2x8Ntt, Mat8x8Ntt, Poly, Vec8};
+use nerv_seal::ring::{fwd_twiddle, inv_twiddle, Mat2x8, Mat8x8Ntt, Poly};
 use nerv_seal::sampling::expand_matrix;
 
 
@@ -57,7 +57,7 @@ use crate::air::chips::seal_chip::{
     LEG_W as SEAL_LEG_W, PREP_COLS as SEAL_PREP, ROWS as SEAL_ROWS,
 };
 use crate::air::custody_air::{
-    gen_custody_trace, set_burn_flags, set_input_flags, set_output_flags, set_revert_flags,
+    gen_custody_trace, set_burn_flags, set_flag, set_input_flags, set_output_flags, set_revert_flags,
     BL3_PREP_BASE, BL3_PREP_W, BP, BURN_REG_W, CONS_PREP_BASE, IN_FLAGS, INPUT_REG_W,
     MERKLE_PREP_W, OUT_REG_W, REV_REG_W, CustodyAir,
 };
@@ -74,7 +74,6 @@ use crate::security::FriShape;
 use crate::stark::prover::{ProveError, Prover};
 use crate::stark::verifier::{Verifier, VerifyError};
 use crate::witness_gen::TransactionWitness;
-use crate::stark::prover::Proved; 
 
 
 const MASK32: u64 = 0xFFFF_FFFF;
@@ -437,8 +436,8 @@ fn digits_of(pt: &Plaintext) -> [u16; 512] {
 
 fn mat2x8_of(pk: &PublicKey) -> Mat2x8 {
     Mat2x8::new([
-        pk.t().row(0).clone(),
-        pk.t().row(1).clone(),
+        *pk.t().row(0),
+        *pk.t().row(1),
     ])
 }
 
@@ -492,7 +491,7 @@ fn place_type_flags(prep: &mut [Vec<Goldilocks>], air: &TxAir) {
     let h_d = air.delta.rows();
     for l in 0..air.delta.n_legs() {
         let k = leg_kind_index(air, l);
-        for r in 0..h_d {
+        for (r, _) in (0..h_d).enumerate() {
             prep[r][air.tx_prep_base + 5 * l + k] = Goldilocks::ONE;
         }
     }
@@ -518,6 +517,15 @@ pub fn gen_tx_trace(
     w: &CodecW,
     epoch_pk: &PublicKey,
 ) -> Result<TxTrace, TxError> {
+    // Driver obligation: every leg's expiry must fit in EXPIRY_BITS. Reject
+    // here, before the heavy witness/custody/seal work, so an over-large
+    // expiry is observable without first having to re-derive the witness.
+    for (l, leg) in shell.legs.iter().enumerate() {
+        let e = leg.expiry.as_u64();
+        if e >= (1u64 << EXPIRY_BITS) {
+            return Err(TxError::ExpiryTooLarge { leg: l, value: e });
+        }
+    }
     witness.validate(shell, w, epoch_pk)?;
     let air = build_tx_air(shell)?;
     let canon = shell.canonicalize()?;
@@ -598,15 +606,15 @@ pub fn gen_tx_trace(
         }
     }
     let s_prep = air.seal_prep_base;
-    for r in 0..SEAL_ROWS {
+    for (r, _) in (0..SEAL_ROWS).enumerate() {
         for (c, v) in seal_traces[0].prep[r].iter().enumerate() {
             prep[r][s_prep + c] = *v;
         }
     }
-    for l in 0..n {
+    for (l, _) in (0..n).enumerate() {
         let s_col = air.seal_col_base + SEAL_LEG_W * l;
-        for r in 0..SEAL_ROWS {
-            for (c, v) in seal_traces[l].trace[r].iter().enumerate() {
+        for (r, st_row) in seal_traces[l].trace.iter().take(SEAL_ROWS).enumerate() {
+            for (c, v) in st_row.iter().enumerate() {
                 trace[r][s_col + c] = *v;
             }
         }
@@ -615,16 +623,16 @@ pub fn gen_tx_trace(
     place_composed_flags(&mut prep, &air);
     for l in 0..n {
         let e = canon.legs[l].expiry.as_u64();
-        if e >= (1u64 << EXPIRY_BITS) {
-            return Err(TxError::ExpiryTooLarge { leg: l, value: e });
-        }
+        // The EXPIRY_BITS guard has already fired at function top; here we
+        // simply write the expiry block (the in-circuit cap is enforced
+        // once, before any heavy work).
         fill_expiry_block(&mut trace, air.exp_col_base + EXP_STRIDE * l, e);
     }
 
 
     let mut publics = Vec::with_capacity(air.pub_count());
     publics.extend_from_slice(&ct.publics);
-    for l in 0..n {
+    for (l, _) in (0..n).enumerate() {
         publics.extend_from_slice(&seal_traces[l].publics);
     }
     for l in 0..n {
@@ -660,9 +668,11 @@ fn custody_prep(air: &TxAir) -> Vec<Vec<Goldilocks>> {
     }
     for i in 0..n_in {
         set_input_flags(&mut prep, i, 25 * i);
+        set_flag(&mut prep, i, BP + IN_FLAGS + 12 * i + 11);
     }
     for o in 0..n_out {
         set_output_flags(&mut prep, o, n_in, 25 * n_in + 22 * o);
+        set_flag(&mut prep, n_in + o, BP + IN_FLAGS + 12 * n_in + 3 * o + 1);
     }
     for k in 0..n_cond {
         set_revert_flags(&mut prep, k, n_in, n_out, 25 * n_in + 22 * n_out + 22 * k);
@@ -683,8 +693,8 @@ fn custody_prep(air: &TxAir) -> Vec<Vec<Goldilocks>> {
     }
 
 
-    let place = |prep: &mut Vec<Vec<Goldilocks>>, gw: usize, len: u8, flags: u32| {
-        let bp = bl3_prep(len, 0, flags);
+    let place = |prep: &mut Vec<Vec<Goldilocks>>, gw: usize, len: u8, counter: u64, flags: u32| {
+        let bp = bl3_prep(len, counter, flags);
         for r in 0..66 {
             prep[66 * gw + r][BL3_PREP_BASE..BL3_PREP_BASE + BL3_PREP_W]
                 .copy_from_slice(&bp[r]);
@@ -699,7 +709,7 @@ fn custody_prep(air: &TxAir) -> Vec<Vec<Goldilocks>> {
             if bi == 15 {
                 f |= CHUNK_END;
             }
-            place(prep, w0 + bi, 64, f);
+            place(prep, w0 + bi, 64, 0, f);
         }
         for bi in 0..5 {
             let mut f = 0;
@@ -710,16 +720,16 @@ fn custody_prep(air: &TxAir) -> Vec<Vec<Goldilocks>> {
                 f |= CHUNK_END;
             }
             let len = if bi < 4 { 64 } else { 15 };
-            place(prep, w0 + 16 + bi, len, f);
+            place(prep, w0 + 16 + bi, len, 1, f);
         }
-        place(prep, w0 + 21, 64, PARENT | ROOT);
+        place(prep, w0 + 21, 64, 0, PARENT | ROOT);
     };
     for i in 0..n_in {
         let w0 = 25 * i;
         cm_windows(&mut prep, w0);
-        place(&mut prep, w0 + 22, 64, CHUNK_START);
-        place(&mut prep, w0 + 23, 7, CHUNK_END | ROOT);
-        place(&mut prep, w0 + 24, 43, CHUNK_START | CHUNK_END | ROOT);
+        place(&mut prep, w0 + 22, 64, 0, CHUNK_START);
+        place(&mut prep, w0 + 23, 7, 0, CHUNK_END | ROOT);
+        place(&mut prep, w0 + 24, 42, 0, CHUNK_START | CHUNK_END | ROOT);
     }
     for o in 0..n_out {
         cm_windows(&mut prep, 25 * n_in + 22 * o);
@@ -728,7 +738,7 @@ fn custody_prep(air: &TxAir) -> Vec<Vec<Goldilocks>> {
         cm_windows(&mut prep, 25 * n_in + 22 * n_out + 22 * k);
     }
     for k in 0..n_burns {
-        place(&mut prep, 25 * n_in + 22 * n_out + 22 * n_cond + k, 50, CHUNK_START | CHUNK_END | ROOT);
+        place(&mut prep, 25 * n_in + 22 * n_out + 22 * n_cond + k, 50, 0, CHUNK_START | CHUNK_END | ROOT);
     }
     prep
 }
@@ -741,13 +751,18 @@ fn delta_prep(air: &TxAir, w: &CodecW) -> Vec<Vec<Goldilocks>> {
     let h_d = d.rows();
     let mut prep = vec![vec![Goldilocks::ZERO; d.prep_cols()]; h_d];
     let fr = ROWS_PER_LEG * n;
-    for r in 0..h_d {
+    for (r, _) in (0..h_d).enumerate() {
         prep[r][PV_DELTA_ROW] = Goldilocks::ONE;
     }
-    for r in 0..fr {
+    for (r, _) in (0..fr).enumerate() {
         prep[r][delta_air::PV_DELTA_COPY] = Goldilocks::ONE;
     }
     prep[fr][PV_FINAL] = Goldilocks::ONE;
+    for l in 0..n {
+        for (r, _) in ((ROWS_PER_LEG * l)..(ROWS_PER_LEG * (l + 1))).enumerate() {
+            prep[r][PV_TIE + TIE_STRIDE * n + l] = Goldilocks::ONE;
+        }
+    }
     for l in 0..n {
         let base = ROWS_PER_LEG * l;
         let leg = &d.legs[l];
@@ -829,7 +844,7 @@ fn seal_prep(epoch_pk: &PublicKey) -> Result<Vec<Vec<Goldilocks>>, SealError> {
     let a_ntt: Mat8x8Ntt = a.ntt();
     let t_ntt = mat2x8_of(epoch_pk).ntt();
     let mut prep = vec![vec![Goldilocks::ZERO; SEAL_PREP]; SEAL_ROWS];
-    for row in 0..SEAL_ROWS {
+    for (row, _) in (0..SEAL_ROWS).enumerate() {
         let f = if row < 72 {
             crate::air::chips::seal_chip::F_IS_FWD
         } else if row < 152 {
@@ -839,10 +854,10 @@ fn seal_prep(epoch_pk: &PublicKey) -> Result<Vec<Vec<Goldilocks>>, SealError> {
         };
         prep[row][f] = Goldilocks::ONE;
     }
-    for row in 0..SEAL_ROWS - 1 {
+    for (row, _) in (0..SEAL_ROWS - 1).enumerate() {
         prep[row][PV_SEAL_COPY] = Goldilocks::ONE;
     }
-    for j in 0..8 {
+    for (j, _) in (0..8).enumerate() {
         for l in 0..9 {
             let row = 9 * j + l;
             if l < 8 {
@@ -903,14 +918,14 @@ fn seal_prep(epoch_pk: &PublicKey) -> Result<Vec<Vec<Goldilocks>>, SealError> {
     for blk in 0..10 {
         let is_v = blk >= 8;
         let idx = blk - 8 * usize::from(is_v);
-        for jj in 0..8 {
+        for (jj, _) in (0..8).enumerate() {
             let row_i = 72 + 8 * blk + jj;
             let mop: &[u64; SEAL_N] = if is_v {
                 t_ntt.row(idx)[jj].values()
             } else {
                 a_ntt.row(idx)[jj].values()
             };
-            for c in 0..SEAL_N {
+            for (c, _) in (0..SEAL_N).enumerate() {
                 prep[row_i][MOP + c] = Goldilocks::from_u64_reduce(mop[c]);
             }
         }
@@ -1111,7 +1126,7 @@ mod tests {
     use crate::air::builder::NativeEval;
     use crate::air::custody_air::{CustodyWitness, InputWitness, OutputWitness};
     use crate::testutil::SplitMix64;
-    use nerv_codec::features::{build_leg_features, LegKind, LegMovement};
+    use nerv_codec::features::LegKind;
     use nerv_codec::weight_gen::{certify, expand, BeaconRandomness, CertConfig};
     use nerv_core::hash::Hash256;
     use nerv_core::types::{FeeSats, Height, ShardSet, INTERVALS_PER_EPOCH};
@@ -1137,8 +1152,8 @@ mod tests {
         let wk = WalletKeys::from_master(&MasterSeed::from_bytes(rng.bytes32()));
         let det = wk.viewing();
         let g = ShardSet::genesis();
-        let addr = |i: u64| Address::generate(det, wk.nullifier_key(), i, &g).unwrap();
-        let opening = |v: u64, i: u64| NoteOpening {
+        let addr = |i: u64| Address::generate(&det, wk.nullifier_key(), i, &g).unwrap();
+        let mut opening = |v: u64, i: u64| NoteOpening {
             value: v,
             rho: rng.bytes32(),
             delivery: *addr(i).delivery().as_bytes(),
@@ -1296,7 +1311,13 @@ mod tests {
         assert_eq!(air.seal_prep_base + SEAL_PREP, air.tx_prep_base);
         assert_eq!(
             air.pub_count(),
-            4 * 2 + 8 * 2 + 8 * 3 + 8 * 2 + 8 * 0 + SEAL_PUBS_PER_LEG * n + 3 * n
+            4 * air.custody.n_inputs
+                + 8 * air.custody.n_inputs
+                + 8 * air.custody.n_outputs
+                + 8 * air.custody.n_cond()
+                + 8 * air.custody.n_burns
+                + SEAL_PUBS_PER_LEG * n
+                + 3 * n
         );
         assert_eq!(SEAL_PUBS_PER_LEG, 2560);
     }
@@ -1384,14 +1405,16 @@ mod tests {
             assert_eq!(tx.trace[100][e0 + R_TIME + t], want, "t={t}");
         }
         // kinds: leg 0 CrossShardSpend (1), leg 1 CrossShardIssue (2).
+        // The 5-bit R_TYPE block is one-hot per leg; prep[tx_prep_base + 5*l + k] = 1
+        // (place_type_flags, line 491). Leg 0 → k=1, Leg 1 → k=2.
         assert_eq!(tx.trace[100][e0 + R_TYPE + 1], Goldilocks::ONE);
-        assert_eq!(tx.trace[100][e0 + R_TYPE + 2], Goldilocks::ONE);
-        for t in [0usize, 3, 4] {
-            assert_eq!(tx.trace[100][e0 + R_TYPE + t], Goldilocks::ZERO);
+        for t in [0usize, 2, 3, 4] {
+            assert_eq!(tx.trace[100][e0 + R_TYPE + t], Goldilocks::ZERO, "leg 0 t={t}");
         }
         let e1 = e0 + LEG_W;
+        assert_eq!(tx.trace[100][e1 + R_TYPE + 2], Goldilocks::ONE, "leg 1 CrossShardIssue bit");
         for t in [0usize, 1, 3, 4] {
-            assert_eq!(tx.trace[100][e1 + R_TYPE + t], Goldilocks::ZERO);
+            assert_eq!(tx.trace[100][e1 + R_TYPE + t], Goldilocks::ZERO, "leg 1 t={t}");
         }
     }
 
@@ -1402,6 +1425,27 @@ mod tests {
         let (w, pk, wit) = gen(&f);
         let tx = gen_tx_trace(&wit, &f.shell, &w, &pk).unwrap();
         let vp = gen_tx_prep(&tx.air, &w, &pk).unwrap();
+        // Surface the first divergence so a regression points at the
+        // offending (row, col). The prover and verifier each lay out
+        // custody / delta / seal prep in distinct regions of
+        // `air.prep_cols()`; once the diff coordinates are known,
+        // `air.tx_prep_base`, `air.delta.prep_base`, `air.seal_prep_base`
+        // localise it.
+        for (r, _) in (0..vp.len().min(tx.prep.len())).enumerate() {
+            for (c, _) in (0..vp[r].len().min(tx.prep[r].len())).enumerate() {
+                if vp[r][c] != tx.prep[r][c] {
+                    panic!(
+                        "first diff at r={r} c={c} prover={} verifier={} (prep cols: custody={} delta_base={} seal_base={} tx_prep_base={})",
+                        tx.prep[r][c].as_u64(),
+                        vp[r][c].as_u64(),
+                        tx.air.custody.prep_cols(),
+                        tx.air.delta.prep_base,
+                        tx.air.seal_prep_base,
+                        tx.air.tx_prep_base,
+                    );
+                }
+            }
+        }
         assert_eq!(vp, tx.prep, "the verifier's prep regeneration must be exact");
     }
 
@@ -1423,6 +1467,16 @@ mod tests {
 
     #[test]
     fn bucket_derivation_pins() {
+        // Read a multi-bit slot (cell-per-bit) back as a u64.
+        let bits_to_u64 = |row: &[Goldilocks], base: usize, n: usize| -> u64 {
+            let mut v = 0u64;
+            for t in 0..n {
+                if row[base + t].as_u64() != 0 {
+                    v |= 1u64 << t;
+                }
+            }
+            v
+        };
         for (e, want) in [
             (0u64, 0usize),
             (5399, 0),
@@ -1439,10 +1493,17 @@ mod tests {
             assert_eq!(bucket, want, "e={e}");
             let rem = e % C_EPOCH;
             let q = e / C_EPOCH;
-            assert_eq!(trace[0][EXP_Q].as_u64(), q);
-            assert_eq!(trace[0][EXP_REM].as_u64(), rem);
-            assert_eq!(trace[0][EXP_XB].as_u64(), 16 * rem - want as u64 * C_EPOCH);
-            assert_eq!(trace[0][EXP_YB].as_u64(), (want as u64 + 1) * C_EPOCH - 16 * rem - 1);
+            // EXP_Q is put_word (single cell).
+            assert_eq!(trace[0][EXP_Q].as_u64(), q, "e={e} q");
+            // EXP_REM is put_word (single cell); EXP_XB / EXP_YB are
+            // put_bits (one bit per cell) — reconstruct from cells.
+            assert_eq!(trace[0][EXP_REM].as_u64(), rem, "e={e} rem");
+            assert_eq!(bits_to_u64(&trace[0], EXP_XB, 17), 16 * rem - want as u64 * C_EPOCH, "e={e} xb");
+            assert_eq!(
+                bits_to_u64(&trace[0], EXP_YB, 17),
+                (want as u64 + 1) * C_EPOCH - 16 * rem - 1,
+                "e={e} yb"
+            );
         }
     }
 
@@ -1524,9 +1585,8 @@ mod tests {
         assert!(check_a(bad, &tx.publics).is_err(), "custody register");
 
 
-        let inr = LEG_W * 2 + tx.air.delta.col_base - tx.air.delta.col_base;
         let mut bad = tx.trace.clone();
-        let inr_col = tx.air.delta.col_base + LEG_W * 2 + 0;
+        let inr_col = tx.air.delta.col_base + LEG_W * 2;
         bad[10][inr_col] += Goldilocks::ONE;
         assert!(check_a(bad, &tx.publics).is_err(), "inr boundary");
 

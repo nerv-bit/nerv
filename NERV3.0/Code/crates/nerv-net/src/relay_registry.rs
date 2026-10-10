@@ -98,7 +98,14 @@ impl Encode for RelayRecord {
         self.vk.encoded_len()
             + self.kem_ek.encoded_len()
             + 4
-            + self.addrs.iter().map(|a| 3 + 16).sum::<usize>()
+            + self
+                .addrs
+                .iter()
+                .map(|a| match a {
+                    SocketAddr::V4(_) => 7,
+                    SocketAddr::V6(_) => 19,
+                })
+                .sum::<usize>()
             + OPERATOR_LEN
             + 8
     }
@@ -277,7 +284,7 @@ pub fn select_path(
     wallet_seed: &[u8; 32],
 ) -> Result<[(PeerId, EncapsulationKey); crate::sphinx::PATH_RELAYS], RegistryError> {
     let s = select(registry, wallet_seed, crate::sphinx::PATH_RELAYS)?;
-    Ok(core::array::from_fn(|i| (s[i].record.id(), s[i].record.kem_ek.clone())))
+    Ok(core::array::from_fn(|i| (s[i].record.id(), s[i].record.kem_ek)))
 }
 
 #[cfg(test)]

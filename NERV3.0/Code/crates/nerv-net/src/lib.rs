@@ -54,6 +54,7 @@ const _: () = assert!(nerv_core::params::MIXNET_SUBMISSION_FANOUT >= 1);
 
 /// The single frame taxonomy of the host mesh. The node dispatches every
 /// `HostEvent::Frame` through [`HostFrame::decode`] before routing.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum HostFrame {
    Gossip(GossipMessage),

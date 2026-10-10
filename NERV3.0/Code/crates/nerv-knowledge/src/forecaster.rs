@@ -127,7 +127,7 @@ pub struct Weights {
 impl Weights {
     fn check(j: usize, k: usize) {
         debug_assert!(j < DIMS, "dimension index");
-        debug_assert!(k >= 1 && k <= AR_ORDER, "lag index is 1-based");
+        debug_assert!((1..=AR_ORDER).contains(&k), "lag index is 1-based");
     }
 
 
@@ -458,7 +458,7 @@ impl Forecaster {
 pub fn predict(weights: &Weights, window: &Window) -> Delta {
     let mut out = [0u64; DIMS];
     let n = window.obs.len();
-    for j in 0..DIMS {
+    for (j, _) in (0..DIMS).enumerate() {
         let row = j * AR_ORDER;
         let mut acc: i128 = 0;
         for lag in 1..=AR_ORDER.min(n) {
@@ -867,9 +867,9 @@ mod tests {
             let mut rng = SplitMix64::new(seed);
             let f = random_forecaster(&mut rng);
             let w = Weights::from_canonical(&f.weights().canonical_bytes()).unwrap();
-            prop_assert_eq!(w, *f.weights());
+            prop_assert_eq!(w, f.weights().clone());
             let m = Moments::from_canonical(&f.moments().canonical_bytes()).unwrap();
-            prop_assert_eq!(m, *f.moments());
+            prop_assert_eq!(m, f.moments().clone());
         }
     }
 }

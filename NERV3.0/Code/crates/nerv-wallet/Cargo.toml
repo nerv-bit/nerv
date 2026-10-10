@@ -26,7 +26,19 @@ nerv-registry = { path = "../nerv-registry" }
 thiserror = { workspace = true }
 getrandom = { workspace = true }
 
+[features]
+# Pulls in the executor's test scaffolding (`nerv_state::testkit`). Used
+# by the `smoke_cross_crate` example to drive `apply_block` from outside
+# the crate. Run the example with:
+#
+#   cargo run -p nerv-wallet --example smoke_cross_crate --features testkit --release
+#
+# This is intentionally an opt-in feature so production builds (without
+# `--features testkit`) stay slim.
+testkit = ["nerv-state/testkit"]
+
 [dev-dependencies]
+nerv-wallet-core = { path = "../nerv-wallet-core" }
 blake3 = { workspace = true }
 proptest = { workspace = true }
 

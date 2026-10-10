@@ -127,7 +127,7 @@ impl TauTree {
             return empty[MAX_DEPTH];
         }
         let mut r = empty[0];
-        for k in 0..MAX_DEPTH {
+        for (k, _) in (0..MAX_DEPTH).enumerate() {
             if (self.count >> k) & 1 == 1 {
                 let left = self
                     .levels
@@ -152,14 +152,17 @@ impl TauTree {
         let mut siblings = vec![Hash256::default(); MAX_DEPTH];
         let mut j = index;
         for k in 0..MAX_DEPTH {
-            let sib = j ^ 1;
-            siblings[k] = self
+            let sib = (j ^ 1) as usize;
+            let from_levels = self
                 .levels
                 .get(k)
-                .filter(|l| (sib as usize) < l.len())
-                .and_then(|l| l.get(sib as usize))
-                .copied()
-                .unwrap_or(empty[k]);
+                .filter(|l| sib < l.len())
+                .and_then(|l| l.get(sib))
+                .copied();
+            siblings[k] = match from_levels {
+                Some(v) => v,
+                None => self.carry_up_at(k).unwrap_or(empty[k]),
+            };
             j >>= 1;
         }
         for k in (0..MAX_DEPTH).rev() {
@@ -170,6 +173,29 @@ impl TauTree {
             }
         }
         Ok(TauWitness { index, siblings })
+    }
+
+    /// Carry-up value at level `k` of the T_τ frontier fold (erratum 101):
+    /// the chain of merges `root()` applies when bits of `count` are set,
+    /// *before* the merge at level `k` itself. Returns `None` if no
+    /// carry-up exists at level `k` (bit `k` of `count` is clear, meaning
+    /// level `k` is fully paired and the right side at that level is
+    /// `empty[k]`).
+    fn carry_up_at(&self, k: usize) -> Option<Hash256> {
+        if (self.count >> k) & 1 == 0 {
+            return None;
+        }
+        let empty = empty_digests();
+        let mut v = empty[0];
+        for (i, _) in (0..k).enumerate() {
+            if (self.count >> i) & 1 == 1 {
+                let last = self.levels.get(i).and_then(|l| l.last().copied())?;
+                v = node_digest(&last, &v);
+            } else {
+                v = node_digest(&v, &empty[i]);
+            }
+        }
+        Some(v)
     }
 }
 

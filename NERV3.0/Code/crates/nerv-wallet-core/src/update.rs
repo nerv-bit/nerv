@@ -4,8 +4,8 @@
 
 use crate::action::{SendStage, WalletAction};
 use crate::state::{
-    ClaimBucket, ClaimDraft, ClaimError, ClaimStage, Direction, DraftError, HistoryEntry,
-    NotificationLevel, ProducerDraft, ProducerError, ProducerState, Screen, SyncStatus,
+    ClaimBucket, ClaimDraft, ClaimError, ClaimStage, Direction, HistoryEntry,
+    NotificationLevel, ProducerError, ProducerState, Screen, SyncStatus,
     WalletState,
 };
 
@@ -395,8 +395,9 @@ pub fn update(state: &mut WalletState, action: WalletAction) -> Vec<WalletEvent>
             state.notify(
                 NotificationLevel::Success,
                 format!(
-                    "Producer registered: {} NERV bonded",
-                    stake_balance_nano as f64 / 1e9
+                    "Producer registered: {}.{:09} NERV bonded",
+                    stake_balance_nano / 1_000_000_000,
+                    stake_balance_nano % 1_000_000_000
                 ),
             );
             events.push(WalletEvent::Redraw);
@@ -486,12 +487,7 @@ pub fn update(state: &mut WalletState, action: WalletAction) -> Vec<WalletEvent>
             let height = state.chain_height;
             // Snapshot the nullifier bytes before we move `note` into the
             // note set — the TxId derivation below needs them.
-            let nf_bytes: [u8; 32] = note
-                .nullifier
-                .as_bytes()
-                .to_owned()
-                .try_into()
-                .unwrap_or([0u8; 32]);
+            let nf_bytes: [u8; 32] = *note.nullifier.as_bytes();
             state.notes.insert(note);
             state.history.push_front(HistoryEntry {
                 txid: nerv_core::types::TxId::from_hash(
@@ -685,7 +681,7 @@ mod tests {
 
     // === Claim flow tests ===
 
-    use crate::state::{ClaimBucket, ClaimDraft, ClaimError};
+    use crate::state::{ClaimBucket, ClaimError, DraftError};
 
     #[test]
     fn start_claim_initializes_draft() {
@@ -754,7 +750,7 @@ mod tests {
         update(&mut s, WalletAction::SetClaimAmount(50_000));
         // No bucket set: draft should bounce back, no StartClaimPipeline.
         let events = update(&mut s, WalletAction::SignAndClaim);
-        assert!(!events.iter().any(|matches!(
+        assert!(!events.iter().any(|e| matches!(
             e, WalletEvent::StartClaimPipeline { .. }
         )));
         assert!(s.claim_draft.is_some());

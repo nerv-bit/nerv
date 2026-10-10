@@ -25,14 +25,13 @@
 
 
 use nerv_core::field::Goldilocks;
-use nerv_core::hash::Hash256;
 use nerv_codec::codec_w::CodecW;
-use nerv_codec::features::FeatureVector;
+use nerv_codec::features::{FeatureVector, RAIL_TIME_BASE, RAIL_TIME_COUNT, RAIL_TYPE_BASE, RAIL_VALID_TYPE_COUNT};
 use crate::air::builder::{Air, AirBuilder};
 use crate::air::chips::conservation::{ACCP_BASE, V_BITS_BASE};
 use crate::air::chips::encoder::{
     delta_hi_expr, delta_lo_expr, EncoderChip, N_COORDS, AKN, AKP, ADJ, ADJB, AHH, AHHB, AHL,
-    AHLB, BR0, BR1, BR2, C1, C2, C2C, CB, CC, INVL, MHB, MLO, MLOB, MH, N_COORDS as _, NZ, P0,
+    AHLB, BR0, BR1, BR2, C1, C2, C2C, CB, CC, INVL, MHB, MLO, MLOB, MH, NZ, P0,
     P1, P2, PB, PN, PNB, PP, PPB, PS, PF_MAC, PF_MAC_FINAL, PF_MAC_START, PF_SEL, PF_WM, PF_WMF,
     PF_WMT, PF_WMW, PF_WS, PF_WSF, PF_WST, PF_WSW, Q0, Q0B, RR, RRB, WMS, WSS, XHI, XLO, XS,
 };
@@ -163,9 +162,13 @@ impl DeltaAir {
     }
 
 
+    fn leg_selector_col(&self, l: usize) -> usize {
+        PV_TIE + TIE_STRIDE * self.legs.len() + l
+    }
+
     /// The global boundary flag's column — after all per-leg tie blocks.
     pub fn boundary_col(&self) -> usize {
-        PV_TIE + TIE_STRIDE * self.legs.len()
+        PV_TIE + TIE_STRIDE * self.legs.len() + self.legs.len()
     }
 
 
@@ -179,6 +182,43 @@ impl DeltaAir {
     }
 }
 
+
+struct ScopedBuilder<'a, B: AirBuilder> {
+    inner: &'a mut B,
+    gate: B::Expr,
+}
+
+impl<B: AirBuilder> AirBuilder for ScopedBuilder<'_, B> {
+    type Expr = B::Expr;
+
+    fn witness(&self, offset: usize, col: usize) -> Self::Expr {
+        self.inner.witness(offset, col)
+    }
+
+    fn public(&self, idx: usize) -> Self::Expr {
+        self.inner.public(idx)
+    }
+
+    fn preprocessed(&self, col: usize) -> Self::Expr {
+        self.inner.preprocessed(col)
+    }
+
+    fn is_first_row(&self) -> Self::Expr {
+        self.inner.is_first_row()
+    }
+
+    fn is_last_row(&self) -> Self::Expr {
+        self.inner.is_last_row()
+    }
+
+    fn is_transition(&self) -> Self::Expr {
+        self.inner.is_transition()
+    }
+
+    fn assert_zero(&mut self, expr: Self::Expr, name: &'static str) {
+        self.inner.assert_zero(self.gate.clone() * expr, name);
+    }
+}
 
 fn recompose<B: AirBuilder>(b: &mut B, base: usize, n: usize) -> B::Expr {
     let mut s = B::constant(0);
@@ -199,11 +239,6 @@ fn leg_out_start(air: &DeltaAir, l: usize) -> usize {
 }
 
 
-fn out_total(air: &DeltaAir) -> usize {
-    air.legs.iter().map(|s| s.n_out).sum()
-}
-
-
 impl<B: AirBuilder> Air<B> for DeltaAir {
     #[allow(clippy::too_many_lines)]
     fn eval(&self, b: &mut B) {
@@ -216,10 +251,12 @@ impl<B: AirBuilder> Air<B> for DeltaAir {
 
 
         for (l, leg) in self.legs.iter().enumerate() {
+            let leg_gate = b.preprocessed(pb + self.leg_selector_col(l));
+            let mut scoped = ScopedBuilder { inner: &mut *b, gate: leg_gate };
+            let b = &mut scoped;
             let e = cb + LEG_W * l;
             let is_vol = b.preprocessed(pb + PV_VOL);
             let is_vol0 = b.preprocessed(pb + PV_VOL0);
-            let is_vol_active = b.preprocessed(pb + PV_VOL_ACTIVE);
             let is_log = b.preprocessed(pb + PV_LOG);
             let is_log0 = b.preprocessed(pb + PV_LOG0);
             let is_log_active = b.preprocessed(pb + PV_LOG_ACTIVE);
@@ -249,14 +286,14 @@ let digj = |j: usize| digj_pre[j].clone();
                 copy.clone()
                     * (b.witness(1, e + R_VOLV)
                         - b.witness(0, e + R_VOLV)
-                        - is_vol_active.clone() * (mag_lo.clone() - vk1.clone() * B::constant(TWO32))),
+                        - is_vol.clone() * (mag_lo.clone() - vk1.clone() * B::constant(TWO32))),
                 "dl_vol_lo",
             );
             b.assert_zero(
                 copy.clone()
                     * (b.witness(1, e + R_VOLV + 1)
                         - b.witness(0, e + R_VOLV + 1)
-                        - is_vol_active.clone() * (mag_hi.clone() + vk1.clone() - vk2.clone() * B::constant(TWO32))),
+                        - is_vol.clone() * (mag_hi.clone() + vk1.clone() - vk2.clone() * B::constant(TWO32))),
                 "dl_vol_hi",
             );
             b.assert_zero(is_vol0.clone() * b.witness(0, e + R_VOLV), "dl_vol_init");
@@ -266,9 +303,9 @@ let digj = |j: usize| digj_pre[j].clone();
                 b.assert_zero(bit.clone() * (bit.clone() - one.clone()), "dl_fvolbit");
             }
             let fvol_lo = recompose(b, e + FVOLB, 32);
-            b.assert_zero(b.witness(0, e + R_VOLV) - fvol_lo, "dl_vol_lo_recomp");
+            b.assert_zero(is_log0.clone() * (b.witness(0, e + R_VOLV) - fvol_lo), "dl_vol_lo_recomp");
             let fvol_hi = recompose(b, e + FVOLB + 32, 32);
-            b.assert_zero(b.witness(0, e + R_VOLV + 1) - fvol_hi, "dl_vol_hi_recomp");
+            b.assert_zero(is_log0.clone() * (b.witness(0, e + R_VOLV + 1) - fvol_hi), "dl_vol_hi_recomp");
 
 
             // -- log rows: v+1 carry chain, selector, ℓ, LOGA threading --
@@ -608,9 +645,10 @@ let digj = |j: usize| digj_pre[j].clone();
 
 
         // -- global: INR copy + boundary tie --
+        let inr = cb + LEG_W * n + G_INR;
         for c in 0..3 {
             b.assert_zero(
-                copy.clone() * (b.witness(1, cb + G_INR + c) - b.witness(0, cb + G_INR + c)),
+                copy.clone() * (b.witness(1, inr + c) - b.witness(0, inr + c)),
                 "dl_inr_copy",
             );
         }
@@ -618,7 +656,7 @@ let digj = |j: usize| digj_pre[j].clone();
         for k in 0..3 {
             b.assert_zero(
                 bflag.clone()
-                    * (b.witness(0, cb + G_INR + k) - b.witness(0, self.cons_base + ACCP_BASE + k)),
+                    * (b.witness(0, inr + k) - b.witness(0, self.cons_base + ACCP_BASE + k)),
                 "dl_boundary_tie",
             );
         }
@@ -720,7 +758,7 @@ let digj = |j: usize| digj_pre[j].clone();
         // Identity A: Σ|negative slots| = Σ inputs (the boundary limbs).
         for k in 0..3 {
             b.assert_zero(
-                is_final.clone() * (b.witness(0, fl + FS + 3 + k) - b.witness(0, cb + G_INR + k)),
+                is_final.clone() * (b.witness(0, fl + FS + 3 + k) - b.witness(0, inr + k)),
                 "dl_sum_neg_in",
             );
         }
@@ -776,21 +814,22 @@ pub fn gen_delta_trace(
     let rows = ROWS_PER_LEG * n + 1;
     let fr = ROWS_PER_LEG * n;
     let cols = LEG_W * n + 3;
-    let prep_w = PV_TIE + TIE_STRIDE * n + 1;
+    let prep_w = PV_TIE + TIE_STRIDE * n + n + 1;
     let mut trace = vec![vec![Goldilocks::ZERO; cols]; rows];
     let mut prep = vec![vec![Goldilocks::ZERO; prep_w]; rows];
-    let pb = 0; // the caller offsets when composing
 
-
-    for r in 0..rows {
+    for (r, _) in (0..rows).enumerate() {
         prep[r][PV_DELTA_ROW] = Goldilocks::ONE;
     }
-    for r in 0..fr {
+    for (r, _) in (0..fr).enumerate() {
         prep[r][PV_DELTA_COPY] = Goldilocks::ONE;
     }
     prep[fr][PV_FINAL] = Goldilocks::ONE;
 
 
+    for f in features {
+        f.check_admissible().map_err(WitnessGenError::Inadmissible)?;
+    }
     let mut slot_entries: Vec<Vec<(usize, u64, bool)>> = Vec::with_capacity(n);
     for f in features {
         let mut ents = Vec::new();
@@ -816,6 +855,9 @@ pub fn gen_delta_trace(
 
 
     for l in 0..n {
+        for (r, _) in ((ROWS_PER_LEG * l)..(ROWS_PER_LEG * (l + 1))).enumerate() {
+            prep[r][PV_TIE + TIE_STRIDE * n + l] = Goldilocks::ONE;
+        }
         let e = LEG_W * l;
         let base = ROWS_PER_LEG * l;
         let leg = legs[l];
@@ -859,26 +901,29 @@ pub fn gen_delta_trace(
             if k == 0 {
                 prep[r][PV_LOG0] = Goldilocks::ONE;
             }
-            if k < vals.len() {
+            let is_active = k < vals.len();
+            if is_active {
                 prep[r][PV_LOG_ACTIVE] = Goldilocks::ONE;
-                let v = vals[k];
-                put_bits(&mut trace[r], e + LVB, v, 64);
                 prep[r][PV_TIE + TIE_STRIDE * l + TIE_LOG + k] = Goldilocks::ONE;
-                let vp1 = v + 1;
-                put_bits(&mut trace[r], e + LBP, vp1, 64);
-                let mut carry = 1u64;
-                for j in 0..64 {
-                    trace[r][e + LC + j] = Goldilocks::from_u32(carry as u32);
-                    if j + 1 < 64 {
-                        let bj = (v >> j) & 1;
-                        carry = bj & carry;
-                    }
+            }
+            let v = vals.get(k).copied().unwrap_or(0);
+            put_bits(&mut trace[r], e + LVB, v, 64);
+            let vp1 = v + 1;
+            put_bits(&mut trace[r], e + LBP, vp1, 64);
+            let mut carry = 1u64;
+            for j in 0..64 {
+                trace[r][e + LC + j] = Goldilocks::from_u32(carry as u32);
+                if j + 1 < 64 {
+                    let bj = (v >> j) & 1;
+                    carry &= bj;
                 }
-                let ell = 63 - vp1.leading_zeros() as u64;
-                trace[r][e + LEL] = Goldilocks::from_u64_reduce(ell);
-                for j in 0..64 {
-                    trace[r][e + LS + j] = Goldilocks::from_u32(u32::from(j as u64 > ell));
-                }
+            }
+            let ell = 63 - vp1.leading_zeros() as u64;
+            trace[r][e + LEL] = Goldilocks::from_u64_reduce(ell);
+            for j in 0..64 {
+                trace[r][e + LS + j] = Goldilocks::from_u32(u32::from(j as u64 > ell));
+            }
+            if is_active {
                 ells.push(ell);
             }
         }
@@ -892,18 +937,37 @@ pub fn gen_delta_trace(
                 run += ells[k];
             }
         }
-        for r in (base + 24)..rows {
+        for (r, _) in ((base + 24)..rows).enumerate() {
             loga_at[r] = run;
         }
         let loga = run;
 
 
+        let mut vol_at = vec![0u64; rows];
+        let mut vol_running = 0u64;
+        for k in 0..8 {
+            vol_at[base + k] = vol_running;
+            if k < leg.n_out {
+                vol_running += out_values[out_start + k];
+            }
+        }
+        for (r, _) in ((base + 8)..rows).enumerate() {
+            vol_at[r] = vol_running;
+        }
+        for k in 0..8 {
+            let value = if k < leg.n_out { out_values[out_start + k] } else { 0 };
+            let current = vol_at[base + k];
+            let carry_lo = (((current & 0xFFFF_FFFF) as u128 + (value & 0xFFFF_FFFF) as u128) >> 32) as u64;
+            let carry_hi = (((current >> 32) as u128 + (value >> 32) as u128 + carry_lo as u128) >> 32) as u64;
+            trace[base + k][e + VK1] = Goldilocks::from_u64_reduce(carry_lo);
+            trace[base + k][e + VK2] = Goldilocks::from_u64_reduce(carry_hi);
+        }
         // registers (all rows)
         for r in 0..rows {
             let row = &mut trace[r];
             put_bits(row, e + FVOLB, vol, 64);
-            put_word(row, e + R_VOLV, vol & 0xFFFF_FFFF);
-            put_word(row, e + R_VOLV + 1, vol >> 32);
+            put_word(row, e + R_VOLV, vol_at[r] & 0xFFFF_FFFF);
+            put_word(row, e + R_VOLV + 1, vol_at[r] >> 32);
             put_word(row, e + R_LOGA, loga_at[r]);
             put_bits(row, e + LOGB, loga_at[r], 10);
             put_bits(row, e + FEEB, fees[l], 64);
@@ -932,16 +996,15 @@ pub fn gen_delta_trace(
 
 
         // DREG constants (threading re-asserts them)
-        for r in 0..rows {
-            for j in 0..64 {
-                let d = delta.0[j];
+        for (r, _) in (0..rows).enumerate() {
+            for (j, d) in delta.0.iter().take(64).enumerate() {
                 put_word(&mut trace[r], e + R_DREG + 2 * j, d & 0xFFFF_FFFF);
                 put_word(&mut trace[r], e + R_DREG + 2 * j + 1, d >> 32);
             }
         }
         // PT constants (the seal's digitize)
         let pt = nerv_seal::digitize::digitize(&delta.0);
-        for r in 0..rows {
+        for (r, _) in (0..rows).enumerate() {
             for s_idx in 0..512 {
                 trace[r][e + R_PT + s_idx] = Goldilocks::from_u32(u32::from(pt.digits()[s_idx]));
             }
@@ -955,7 +1018,7 @@ pub fn gen_delta_trace(
             let inv_hi = if z_hi { 0u64 } else { Goldilocks::from_u64_reduce(hi).inverse().as_u64() };
             let inv_lo = if z_lo { 0u64 } else { Goldilocks::from_u64_reduce(lo).inverse().as_u64() };
             let zb = e + R_ZINV + 5 * j;
-            for r in 0..rows {
+            for (r, _) in (0..rows).enumerate() {
                 trace[r][zb] = Goldilocks::from_u32(u32::from(z_hi));
                 trace[r][zb + 1] = Goldilocks::from_u32(u32::from(z_lo));
                 put_word(&mut trace[r], zb + 2, inv_hi);
@@ -966,7 +1029,7 @@ pub fn gen_delta_trace(
         // BZ = 63 − #zero coordinates (statement 8 pins ≥ 1 nonzero).
         let zcount: u64 = (0..64).filter(|&j| delta.0[j] == 0).count() as u64;
         let bz = 63 - zcount.min(63);
-        for r in 0..rows {
+        for (r, _) in (0..rows).enumerate() {
             put_word(&mut trace[r], e + BZ, bz);
             put_bits(&mut trace[r], e + BZB, bz, 6);
         }
@@ -1020,11 +1083,35 @@ pub fn gen_delta_trace(
 
 
                 // x / w witnesses
-                let (xv, wv, xs): (u64, i16, u64) = if f_i < 6 {
-                    (rail(f_i), w.weight(j, 224 + f_i), 0)
-                } else {
-                    let &(idx, val, neg) = &slot_entries[l][f_i - 6];
-                    ((val as i64).unsigned_abs(), w.weight(j, idx), u64::from(neg))
+                let (xv, wv, xs): (u64, i16, u64) = match f_i {
+                    0..=3 => (rail(f_i), w.weight(j, 224 + f_i), 0),
+                    4 => {
+                        let idx = (RAIL_TYPE_BASE..RAIL_TYPE_BASE + RAIL_VALID_TYPE_COUNT)
+                            .find(|&idx| f.value(idx) == 1)
+                            .ok_or(WitnessGenError::Inadmissible(
+                                nerv_codec::features::AdmissibilityViolation::TypeRailsNotOneHot {
+                                    pattern: 0,
+                                    valid: RAIL_VALID_TYPE_COUNT,
+                                },
+                            ))?;
+                        (1, w.weight(j, idx), 0)
+                    }
+                    5 => {
+                        let idx = (RAIL_TIME_BASE..RAIL_TIME_BASE + RAIL_TIME_COUNT)
+                            .find(|&idx| f.value(idx) == 1)
+                            .ok_or(WitnessGenError::Inadmissible(
+                                nerv_codec::features::AdmissibilityViolation::TimeRailsNotOneHot { pattern: 0 },
+                            ))?;
+                        (1, w.weight(j, idx), 0)
+                    }
+                    _ => {
+                        let &(idx, val, neg) = &slot_entries[l][f_i - 6];
+                        if val == 0 && !neg {
+                            (0, 0, 0)
+                        } else {
+                            ((val as i64).unsigned_abs(), w.weight(j, idx), u64::from(neg))
+                        }
+                    }
                 };
                 let (wm, ws) = (wv.unsigned_abs() as u64, u64::from(wv < 0));
                 let row = &mut trace[r];
@@ -1089,8 +1176,17 @@ pub fn gen_delta_trace(
                 if f_i == 11 {
                     let acc: i128 = pp_to_i128(&pp) - pp_to_i128(&pn);
                     let two96: i128 = 1 << 96;
-                    let a_tc = ((acc.rem_euclid(two96)) as u128) as u64;
-                    let (a0, a1, a2) = (a_tc & 0xFFFF_FFFF, (a_tc >> 32) & 0xFFFF_FFFF, a_tc >> 64);
+                    // acc is bounded by |pp| + |pn| ≤ 3·2^96 (erratum 6), so
+                    // rem_euclid(two96) is non-negative and fits in 96 bits.
+                    // Keep it as u128 so the three 32-bit limbs (a0, a1, a2)
+                    // can be extracted without a shift-overflow trap. The
+                    // previous `as u64` truncation silently dropped the high
+                    // 32 bits and made `a_tc >> 64` arithmetic-overflow
+                    // (deny-lint error).
+                    let a_tc: u128 = (acc.rem_euclid(two96)) as u128;
+                    let a0 = (a_tc & 0xFFFF_FFFF) as u64;
+                    let a1 = ((a_tc >> 32) & 0xFFFF_FFFF) as u64;
+                    let a2 = (a_tc >> 64) as u64;
                     let rr = a0 & 0x7FFF;
                     let q0 = a0 >> 15;
                     let mlo = a1 & 0x7FFF;
@@ -1114,7 +1210,9 @@ pub fn gen_delta_trace(
                     } else {
                         (d_hi_c, 0u64)
                     };
-                    debug_assert_eq!(d_lo & 0xFFFF_FFFF, delta.0[j] & 0xFFFF_FFFF, "rounding lo");
+                    let acc_ref: i128 = f.active_features().map(|(i, x)| i128::from(w.weight(j, i)) * i128::from(x)).sum();
+                    debug_assert_eq!(acc, acc_ref, "accumulator j={j} features={:?}", f.active_features().collect::<Vec<_>>());
+                    debug_assert_eq!(d_lo & 0xFFFF_FFFF, delta.0[j] & 0xFFFF_FFFF, "rounding lo j={j} acc={acc} a_tc={a_tc} rr={rr} q0={q0} adj={adj} d_lo={d_lo} delta={}", delta.0[j]);
                     debug_assert_eq!(d_hi, delta.0[j] >> 32, "rounding hi");
                     put_word(row, e + RR, rr);
                     put_bits(row, e + RRB, rr, 15);
@@ -1130,10 +1228,12 @@ pub fn gen_delta_trace(
                     put_bits(row, e + AHHB, ahh, 17);
                     row[e + NZ] = Goldilocks::from_u32(nz as u32);
                     let r_lo = rr & 0x3FFF;
+                    let inv_r = if r_lo != 0 { Goldilocks::from_u64_reduce(r_lo).inverse().as_u64() } else { 0 };
+                    debug_assert_eq!((Goldilocks::from_u64_reduce(r_lo) * Goldilocks::from_u64_reduce(inv_r)).as_u64(), u64::from(r_lo != 0), "remainder inverse r_lo={r_lo}");
                     put_word(
                         row,
                         e + INVL,
-                        if r_lo != 0 { Goldilocks::from_u64_reduce(r_lo).inverse().as_u64() } else { 0 },
+                        inv_r,
                     );
                     put_word(row, e + ADJ, adj);
                     put_bits(row, e + ADJB, adj, 2);
@@ -1233,8 +1333,8 @@ pub fn gen_delta_trace(
     put_bits(row, fl + VKCB, vk0 as u64, 8);
     put_bits(row, fl + VKCB + 8, vk1 as u64, 8);
     // INR at all rows
-    for r in 0..rows {
-        for k in 0..3 {
+    for (r, _) in (0..rows).enumerate() {
+        for (k, _) in (0..3).enumerate() {
             put_word(&mut trace[r], LEG_W * n + G_INR + k, boundary_limbs[k]);
         }
     }
@@ -1270,6 +1370,7 @@ mod tests {
         OUT_REG_W,
     };
     use crate::testutil::SplitMix64;
+    use nerv_core::Hash256;
     use nerv_codec::features::{build_leg_features, LegKind, LegMovement};
     use nerv_codec::weight_gen::{certify, expand, BeaconRandomness, CertConfig};
     use nerv_core::types::{FeeSats, Height, ShardSet, INTERVALS_PER_EPOCH};
@@ -1294,8 +1395,8 @@ mod tests {
         let wk = WalletKeys::from_master(&MasterSeed::from_bytes(rng.bytes32()));
         let det = wk.viewing();
         let g = ShardSet::genesis();
-        let addr = |i: u64| nerv_custody::Address::generate(det, wk.nullifier_key(), i, &g).unwrap();
-        let opening = |v: u64, i: u64| nerv_custody::commitment::NoteOpening {
+        let addr = |i: u64| nerv_custody::Address::generate(&det, wk.nullifier_key(), i, &g).unwrap();
+        let mut opening = |v: u64, i: u64| nerv_custody::commitment::NoteOpening {
             value: v,
             rho: rng.bytes32(),
             delivery: *addr(i).delivery().as_bytes(),
@@ -1366,11 +1467,11 @@ mod tests {
         };
         let shell = nerv_custody::tx::TransactionShell { legs: vec![leg7, leg40] };
         let custody = CustodyWitness {
-            inputs,
+            inputs: inputs.clone(),
             outputs: vec![
-                OutputWitness { opening: out_c },
-                OutputWitness { opening: out_ch },
-                OutputWitness { opening: out_b },
+                OutputWitness { opening: out_c.clone() },
+                OutputWitness { opening: out_ch.clone() },
+                OutputWitness { opening: out_b.clone() },
             ],
             reverts: vec![],
             burns: vec![],
@@ -1458,7 +1559,7 @@ mod tests {
         let dcol = ct.trace[0].len();
         let dprep = ct.prep[0].len();
         let air_delta = DeltaAir {
-            legs,
+            legs: legs.clone(),
             cons_base: air_cust.cons_base(),
             cust_reg_base: air_cust.reg_base(),
             cust_input_reg_w: INPUT_REG_W,
@@ -1516,8 +1617,8 @@ mod tests {
         };
         assert_eq!(air.rows(), 857);
         assert_eq!(air.cols(), LEG_W + 3);
-        assert_eq!(air.prep_cols(), PV_TIE + TIE_STRIDE + 1);
-        assert_eq!(air.boundary_col(), PV_TIE + TIE_STRIDE);
+        assert_eq!(air.prep_cols(), PV_TIE + TIE_STRIDE + 2);
+        assert_eq!(air.boundary_col(), PV_TIE + TIE_STRIDE + 1);
     }
 
 
@@ -1526,8 +1627,9 @@ mod tests {
         let f = fixture(0x57A1);
         let w = w();
         let c = composed(&f);
-        let r = NativeEval::check_with_prep(c.trace, c.prep, c.publics.clone(), &c, 8);
-        assert!(r.is_ok(), "composed custody+delta: {r:?}");
+        let r = NativeEval::check_with_prep(c.trace.clone(), c.prep.clone(), c.publics.clone(), &c, 8);
+        let rlo = (0..14).map(|t| c.trace[35][c.air_delta.col_base + RRB + t].as_u64() << t).sum::<u64>();
+        assert!(r.is_ok(), "composed custody+delta: {r:?}; row35 rlo={rlo} nz={} invl={}", c.trace[35][c.air_delta.col_base + NZ].as_u64(), c.trace[35][c.air_delta.col_base + INVL].as_u64());
         for (l, feat) in f.features.iter().enumerate() {
             let delta = w.apply(feat);
             let e = c.air_delta.col_base + LEG_W * l;
@@ -1540,12 +1642,6 @@ mod tests {
             for s_idx in 0..512 {
                 assert_eq!(c.trace[zrow][e + R_PT + s_idx].as_u64(), u64::from(pt.digits()[s_idx]));
             }
-            // LOGA: running sum on log rows, total after
-            let base = ROWS_PER_LEG * l;
-            let total: u64 = (0..(f.features[l].value(224 + 3).unsigned_abs()))
-                .map(|_| 0)
-                .count() as u64 * 0 + 0; // placeholder removed below
-            
         }
     }
 
@@ -1556,12 +1652,12 @@ mod tests {
         let f = fixture(0x57A2);
         let c = composed(&f);
         let e = c.air_delta.col_base;
-        let base = ROWS_PER_LEG * 0;
+        let base = 0usize;
         // leg 0: vals = [in1, in2, out_c, out_ch] — ells over those values
         let vals = [50_000_000_000u64, 35_000_000_000, 25_000_000_000, 9_999_000_000];
         let mut run = 0u64;
         assert_eq!(c.trace[base + 8][e + R_LOGA].as_u64(), 0);
-        for k in 0..vals.len() {
+        for (k, _) in (0..vals.len()).enumerate() {
             run += 63 - (vals[k] + 1).leading_zeros() as u64;
             assert_eq!(c.trace[base + 8 + k + 1][e + R_LOGA].as_u64(), run, "k={k}");
         }
@@ -1584,12 +1680,12 @@ mod tests {
 
         let e0 = c.air_delta.col_base;
         let mut bad = c.trace.clone();
-        bad[100][e0 + R_DREG] = bad[100][e0 + R_DREG] + Goldilocks::ONE;
+        bad[100][e0 + R_DREG] += Goldilocks::ONE;
         assert!(check(bad).is_err(), "dreg");
 
 
         let mut bad = c.trace.clone();
-        bad[100][e0 + R_SLOT + 225] = bad[100][e0 + R_SLOT + 225] + Goldilocks::ONE;
+        bad[100][e0 + R_SLOT + 225] += Goldilocks::ONE;
         assert!(check(bad).is_err(), "slot mag");
 
 
@@ -1608,29 +1704,29 @@ mod tests {
 
 
         let mut bad = c.trace.clone();
-        bad[856 * 0 + 0][e0 + VLB + 5] = bad[856 * 0 + 0][e0 + VLB + 5] + Goldilocks::ONE;
+        bad[0][e0 + VLB + 5] += Goldilocks::ONE;
         assert!(check(bad).is_err(), "vol bit");
 
 
         let mut bad = c.trace.clone();
-        bad[0][e0 + FEEB + 9] = bad[0][e0 + FEEB + 9] + Goldilocks::ONE;
+        bad[0][e0 + FEEB + 9] += Goldilocks::ONE;
         assert!(check(bad).is_err(), "fee bit");
 
 
         let mut bad = c.trace.clone();
-        bad[856 * 0 + 8][e0 + LVB + 3] = bad[856 * 0 + 8][e0 + LVB + 3] + Goldilocks::ONE;
+        bad[8][e0 + LVB + 3] += Goldilocks::ONE;
         assert!(check(bad).is_err(), "log bit");
 
 
         let mut bad = c.trace.clone();
-        bad[856 * 0 + 792][e0 + D_BASE + 3] = bad[856 * 0 + 792][e0 + D_BASE + 3] + Goldilocks::ONE;
+        bad[792][e0 + D_BASE + 3] += Goldilocks::ONE;
         assert!(check(bad).is_err(), "digit");
 
 
         // INR tamper: breaks the boundary tie at the boundary row
         let mut bad = c.trace.clone();
         let inr = LEG_W * 2 + G_INR;
-        bad[10][inr] = bad[10][inr] + Goldilocks::ONE;
+        bad[10][inr] += Goldilocks::ONE;
         assert!(check(bad).is_err(), "inr");
     }
 }

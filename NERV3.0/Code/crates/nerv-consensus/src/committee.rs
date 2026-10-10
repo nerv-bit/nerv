@@ -201,7 +201,7 @@ pub fn attestation_signers(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::testutil::harness::{keys, vks_of, RandomnessMap};
+    use crate::testutil::harness::{h, keys, vks_of, RandomnessMap};
     use crate::testutil::SplitMix64;
 
    fn rmap(seed: u64, n: u64) -> RandomnessMap {
@@ -381,7 +381,7 @@ mod tests {
            Err(CommitteeError::RosterTooSmall { found: 10, min: 31 })
        ));
 
-        let (_, tiny) = keys(2);
+        let (tiny, _) = keys(2);
         let _ = vks_of(&tiny);
     }
 }

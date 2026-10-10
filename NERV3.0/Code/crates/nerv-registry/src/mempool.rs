@@ -15,7 +15,7 @@ use nerv_core::hash::Hash256;
 use nerv_core::types::TxId;
 use nerv_custody::tx::TransactionShell;
 use nerv_proofs::{
-    bind_transaction, canonical_nullifiers, shell_digest, verify_transaction, FsTranscript,
+    bind_transaction, canonical_nullifiers, shell_digest, verify_transaction,
     FriShape, TransactionProof, TxPublicInputs,
 };
 use nerv_seal::circuit_stmt::epoch_key_identifier;
@@ -255,8 +255,7 @@ impl Mempool {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::testutil::harness::{ctx, deep_garbage, shell, shell2, shallow_proof, txid_of};
-    use crate::testutil::SplitMix64;
+    use crate::testutil::harness::{ctx, deep_garbage, shell, shell2, shallow_proof, txid_of, SplitMix64};
     use proptest::prelude::*;
 
 
@@ -446,7 +445,7 @@ mod tests {
             }
             let ia: Vec<TxId> = a.txids().collect();
             let ib: Vec<TxId> = b.txids().collect();
-            prop_assert_eq!(ia, ib);
+            prop_assert_eq!(ia.clone(), ib);
             prop_assert!(ia.windows(2).all(|w| w[0] < w[1]));
             let sa = a.select_bundle(1000);
             let sb = b.select_bundle(1000);

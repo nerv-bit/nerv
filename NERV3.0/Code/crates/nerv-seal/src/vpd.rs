@@ -14,6 +14,7 @@
 //!     (the DKG transcript's value — the partial's share IS a short
 //!     opening of it), and
 //!   * row 8: p_j = λ_j·(s_j·u_B) + ε_j, coefficients λ_j·u_B[k] public.
+//!
 //! The FS context binds the full statement determiner: ASeed ‖ member ‖
 //! n ‖ t ‖ subset(ascending) ‖ u_B — a partial is valid for exactly one
 //! (key, subset, batch ciphertext) triple.
@@ -138,6 +139,12 @@ fn sample_eps(xof: &mut Xof) -> Result<Poly, SealError> {
 // ---------------------------------------------------------------------------
 
 
+// The Fiat–Shamir context for a VPD partial is the public statement
+// determiner (A ‖ member ‖ n ‖ t ‖ subset ‖ u_B) plus the per-member
+// witness bindings (W_j, p_j) and the Lagrange coefficient used in row 8.
+// All ten are part of the VPD protocol contract; the four functions
+// below take them positionally to mirror the on-the-wire verifier.
+#[allow(clippy::too_many_arguments)]
 fn build_statement(
     ac: &CommitMatrix,
     a_seed: &ASeed,
@@ -186,6 +193,7 @@ fn build_statement(
 // ---------------------------------------------------------------------------
 
 
+#[allow(clippy::too_many_arguments)]
 fn prove_with_eps(
     share: &ShareSecret,
     ac: &CommitMatrix,
@@ -219,6 +227,7 @@ fn prove_with_eps(
 /// Produces member j's partial for the chunk aggregate (u_B, ·) under the
 /// subset S. Deterministic in (share, a_seed, u_b, subset, proof_seed);
 /// production passes a fresh proof_seed per partial.
+#[allow(clippy::too_many_arguments)] // The eight inputs are the VPD prover's documented public surface (statement + witness + per-attempt proof_seed); grouping them would change the external API used by every caller.
 pub fn prove_partial(
     share: &ShareSecret,
     ac: &CommitMatrix,
@@ -237,6 +246,7 @@ pub fn prove_partial(
 /// Verifies a partial against the DKG transcript's share commitment W_j.
 /// The partial is valid for exactly the (a_seed, subset, u_b) triple it
 /// was proven under.
+#[allow(clippy::too_many_arguments)] // The eight inputs are the VPD verifier's documented public surface (partial + statement + per-member W_j); a wrapper would only hide the protocol's own argument list.
 pub fn verify_partial(
     p: &PartialDecryption,
     ac: &CommitMatrix,
@@ -263,6 +273,7 @@ pub fn verify_partial(
 /// Σ p_j — the committee's combined value for `decode_chunk`. The
 /// smudging budget holds structurally: t proven bounds of 128 give
 /// |Σp_j − s·u_B|∞ ≤ t·128 ≤ noise::SMUDGING_BUDGET.
+#[allow(clippy::too_many_arguments)] // The eight inputs are the VPD combine helper's public surface (partials, statement, per-member W_js, committee size parameters); bundling them would change the producer/consumer contract with `decode_chunk` and the chunk-reveal producer.
 pub fn combine_partials(
     partials: &[PartialDecryption],
     ac: &CommitMatrix,

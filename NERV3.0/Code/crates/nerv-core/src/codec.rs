@@ -371,6 +371,7 @@ macro_rules! impl_tuple {
     };
 }
 
+impl_tuple!((0: A));
 impl_tuple!((0: A), (1: B));
 impl_tuple!((0: A), (1: B), (2: C));
 impl_tuple!((0: A), (1: B), (2: C), (3: D));
@@ -548,7 +549,7 @@ mod tests {
         let mut by_encoded: Vec<u64> = vals.clone();
         by_encoded.sort_by(|a, b| Encoded::new(a).cmp(&Encoded::new(b)));
         let mut by_fn: Vec<u64> = vals.clone();
-        by_fn.sort_by(|a, b| canonical_cmp(a, b));
+        by_fn.sort_by(canonical_cmp);
         assert_eq!(by_encoded, by_fn, "Encoded ordering == canonical_cmp ordering");
 
         // Document the law with a ground-truth pair: LE byte-lex order is NOT
@@ -602,7 +603,10 @@ mod tests {
             roundtrip(if rng.next_bool() { Some(rng.next_u64()) } else { None });
 
             let nested: Vec<Vec<u8>> = (0..(rng.next_u64() % 8))
-                .map(|_| rng.bytes((rng.next_u64() % 17) as usize))
+                .map(|_| {
+                    let len = (rng.next_u64() % 17) as usize;
+                    rng.bytes(len)
+                })
                 .collect();
             roundtrip(nested);
 

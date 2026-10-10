@@ -11,6 +11,7 @@
 //!   2. h := M·w.
 //!   3. c := sparse challenge (weight 32, ±1) = H(domain ‖ ctx ‖ y ‖ h).
 //!   4. z := w + c·x; accept iff |z_b|∞ ≤ γ − weight·β_b for every block.
+//!
 //! Accepted z is uniform on the public inner box, independent of x (the
 //! standard box-rejection lemma, per coordinate); the transcript is (h, z)
 //! with c recomputed by the verifier. Aborting repeats with fresh w;
@@ -216,12 +217,12 @@ fn challenge(domain: &Domain, context: &[u8], targets: &[Poly], h: &[Poly]) -> P
         }
     }
     if picked < CHALLENGE_WEIGHT {
-        for pos in 0..signs.len() {
+        for sign in signs.iter_mut() {
             if picked >= CHALLENGE_WEIGHT {
                 break;
             }
-            if signs[pos] == 0 {
-                signs[pos] = 1;
+            if *sign == 0 {
+                *sign = 1;
                 picked += 1;
             }
         }
@@ -428,7 +429,7 @@ mod tests {
         let mut witness = toy_witness();
         let (stmt, seed) = toy_statement(&witness);
         // Overstating a bound makes the statement infeasible.
-        let mut loose = Statement::new(vec![UNIFORM_GAMMA; 3], b"loose".to_vec());
+        let loose = Statement::new(vec![UNIFORM_GAMMA; 3], b"loose".to_vec());
         assert!(matches!(
             prove(&SEAL_DKG, &loose, &witness, &seed),
             Err(SigmaError::InfeasibleBound { .. })

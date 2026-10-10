@@ -60,7 +60,10 @@ fn conformance_families_are_the_declared_eight() {
 
 #[test]
 fn errata_register_present() {
-    assert!(ERRATA_COUNT >= 9, "the nine recorded errata must be generated");
+    // `ERRATA_COUNT` is a generated constant, so the floor check is a compile-time
+    // invariant (lint `assertions_on_constants`); the runtime iteration below
+    // still catches any duplicate ids the generator might emit.
+    const _: () = assert!(ERRATA_COUNT >= 9, "the nine recorded errata must be generated");
     let ids: Vec<&str> = ERRATA.iter().map(|e| e.id).collect();
     for w in ids.windows(2) {
         assert_ne!(w[0], w[1], "erratum ids must be unique");

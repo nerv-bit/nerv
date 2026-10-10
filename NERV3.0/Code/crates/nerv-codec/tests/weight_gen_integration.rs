@@ -3,7 +3,7 @@
 //! 8's structural basis on certified weights, and the slot-block
 //! injectivity demonstration on sampled admissible differences.
 
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 
 use nerv_codec::codec_w::{CodecW, WeightVersion, EMBEDDING_DIM};
@@ -220,7 +220,7 @@ fn degenerate_groups_matrix(seed: u64) -> CodecW {
         }
     }
     for col in ACCOUNT_SLOT_COUNT..FEATURE_COUNT {
-        for r in 0..EMBEDDING_DIM {
+        for (r, _) in (0..EMBEDDING_DIM).enumerate() {
             rows[r][col] = (splitmix64(&mut s) % 16385) as i16 - 8192;
         }
     }
@@ -250,11 +250,11 @@ fn rail_in_slot_span_matrix(seed: u64) -> CodecW {
     let mut s = seed;
     let mut rows = [[0i16; FEATURE_COUNT]; EMBEDDING_DIM];
     for col in 0..FEATURE_COUNT {
-        for r in 0..EMBEDDING_DIM {
+        for (r, _) in (0..EMBEDDING_DIM).enumerate() {
             rows[r][col] = (splitmix64(&mut s) % 16385) as i16 - 8192;
         }
     }
-    for r in 0..EMBEDDING_DIM {
+    for (r, _) in (0..EMBEDDING_DIM).enumerate() {
         let s1 = (splitmix64(&mut s) % 12289) as i16 - 6144;
         let s2 = (splitmix64(&mut s) % 12289) as i16 - 6144;
         rows[r][0] = s1;

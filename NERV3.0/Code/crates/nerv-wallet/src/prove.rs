@@ -74,6 +74,7 @@ mod tests {
     use super::*;
     use crate::construct::{construct_payment, PaymentSpec};
     use crate::keys::AddressSet;
+    use nerv_core::codec::Encode;
     use crate::scan::{scan_sealed_note, NotePosition, WalletNoteSet};
     use crate::testutil::SplitMix64;
     use nerv_codec::codec_w::WeightVersion;
@@ -135,7 +136,7 @@ mod tests {
             let wit = tree.witness(idx).unwrap();
             wallet_ns.set_position(*cm.as_bytes(), NotePosition {
                 leaf_index: idx, anchor,
-                siblings: wit.siblings.iter().map(|d| d.to_elements().unwrap()).collect(),
+                siblings: wit.siblings.iter().flat_map(|d| d.to_elements().unwrap()).collect(),
                 shard, received_height: 1,
             });
         }

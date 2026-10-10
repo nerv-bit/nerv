@@ -16,6 +16,13 @@ path = "src/lib.rs"
 # opt-in so toolchain-less and riscv64 determinism-matrix builds stay
 # pure Rust (erratum 117); both backends are real implementations.
 rocksdb = ["dep:rocksdb"]
+# Deterministic test scaffolding for `apply_block`. Enables the
+# `pub mod testkit` module in this crate, which exposes the helpers
+# that drive `executor::tests` so that downstream crates (the
+# `smoke_cross_crate` example in `nerv-wallet`, integration tests in
+# `tests/cross_crate.rs`) can build valid ShardBlocks and call
+# `apply_block` from outside the crate.
+testkit = []
 
 [dependencies]
 nerv-core = { path = "../nerv-core" }

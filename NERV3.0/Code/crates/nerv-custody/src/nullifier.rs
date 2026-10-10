@@ -59,11 +59,18 @@ fn default_hashes() -> &'static [Hash256; 257] {
 fn mask(key: &[u8; 32], level: u16) -> [u8; 32] {
     let mut out = *key;
     let full = (level / 8) as usize;
-    for b in out.iter_mut().skip(full) {
-        *b = 0;
-    }
     let rem = (level % 8) as u8;
-    if rem != 0 {
+    // Zero the suffix. The partial byte at index `full` (when rem != 0) is
+    // handled separately below — otherwise the prefix-zeroing loop wipes
+    // the bits we want to keep and the subsequent `&=` mask has no effect.
+    if rem == 0 {
+        for b in out.iter_mut().skip(full) {
+            *b = 0;
+        }
+    } else {
+        for b in out.iter_mut().skip(full + 1) {
+            *b = 0;
+        }
         out[full] &= 0xFFu8 << (8 - rem);
     }
     out
@@ -446,7 +453,7 @@ mod tests {
         let mut rng = SplitMix64::new(1);
         let nf = Hash256::from_bytes(rng.bytes32());
         assert!(s.is_empty());
-        assert!(s.contains(&nf) == false);
+        assert!(!s.contains(&nf));
         assert_eq!(s.root(), default_hashes()[0]);
         let p = s.non_membership_proof(&nf);
         assert!(p.siblings.is_empty());

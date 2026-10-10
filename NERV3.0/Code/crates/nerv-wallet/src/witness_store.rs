@@ -95,7 +95,6 @@ impl WitnessStore {
 mod tests {
     use super::*;
     use nerv_core::hash::Hash256;
-    use nerv_witness::GPath;
 
     fn witness(seed: u64, leg: u8) -> InclusionWitness {
         InclusionWitness {

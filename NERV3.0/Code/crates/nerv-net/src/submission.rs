@@ -86,10 +86,8 @@ pub fn fan_out(
             break;
         }
         let id = agg.id();
-        if host.is_connected(&id) {
-            if host.send(&id, payload.clone()).is_ok() {
-                report.delivered.push(id);
-            }
+        if host.is_connected(&id) && host.send(&id, payload.clone()).is_ok() {
+            report.delivered.push(id);
         }
     }
     if report.delivered.is_empty() {
@@ -171,9 +169,8 @@ mod tests {
     ) -> Vec<PeerId> {
         let mut seen = Vec::new();
         while seen.len() < n {
-            match next_event(events).await {
-                HostEvent::Connected(p) => seen.push(p),
-                _ => {}
+            if let HostEvent::Connected(p) = next_event(events).await {
+                seen.push(p);
             }
         }
         seen
@@ -183,15 +180,18 @@ mod tests {
     async fn fan_out_to_first_n_connected() {
         let mut aggs: Vec<_> = Vec::new();
         for i in 0..5u64 {
-            let mut n = node(100 + i).await;
-            await_connected(&mut n.events, 1).await;
-            aggs.push(n);
+            aggs.push(node(100 + i).await);
         }
         let mut client = node(1).await;
         for a in &aggs {
             client.host.dial(a.info.clone()).unwrap();
         }
         await_connected(&mut client.events, 5).await;
+        // Both sides of a dial emit a Connected notice: drain the
+        // aggregators' acceptor-side notices before the frame checks.
+        for a in &mut aggs {
+            await_connected(&mut a.events, 1).await;
+        }
 
         let entry = tx_entry(42);
         let infos: Vec<PeerInfo> = aggs.iter().map(|a| a.info.clone()).collect();
@@ -218,9 +218,7 @@ mod tests {
     async fn fan_out_skips_unconnected() {
         let mut aggs: Vec<_> = Vec::new();
         for i in 0..3u64 {
-            let mut n = node(200 + i).await;
-            await_connected(&mut n.events, 1).await;
-            aggs.push(n);
+            aggs.push(node(200 + i).await);
         }
         let mut client = node(2).await;
         // Dial only the first two.
@@ -228,6 +226,9 @@ mod tests {
             client.host.dial(a.info.clone()).unwrap();
         }
         await_connected(&mut client.events, 2).await;
+        for a in &mut aggs[..2] {
+            await_connected(&mut a.events, 1).await;
+        }
 
         let entry = tx_entry(43);
         let infos: Vec<PeerInfo> = aggs.iter().map(|a| a.info.clone()).collect();
@@ -250,8 +251,7 @@ mod tests {
 
     #[tokio::test]
     async fn fan_out_zero_reachable_is_an_error() {
-        let mut agg = node(300).await;
-        await_connected(&mut agg.events, 1).await;
+        let agg = node(300).await;
         let client = node(3).await;
         let entry = tx_entry(44);
         let report = fan_out(&client.host, &[agg.info.clone()], &entry, 3);
@@ -261,24 +261,25 @@ mod tests {
     #[tokio::test]
     async fn deliver_to_single_aggregator() {
         let mut agg = node(301).await;
-        await_connected(&mut agg.events, 1).await;
         let mut client = node(4).await;
         client.host.dial(agg.info.clone()).unwrap();
         await_connected(&mut client.events, 1).await;
+        // The acceptor side emits its own Connected notice; drain it so
+        // the frame below is the next event.
+        await_connected(&mut agg.events, 1).await;
 
         let entry = tx_entry(45);
         let frame = payload_of(&entry);
         deliver(&client.host, &agg.info.id(), &frame).unwrap();
         assert_eq!(
             next_event(&mut agg.events).await,
-            HostEvent::Frame(client.info.id(), frame)
+            HostEvent::Frame(client.info.id(), frame.clone())
         );
 
-        // Not connected: an explicit error.
-        let (_, vk_x, _) = crate::testutil::node_keys(90);
-        let mut d = [0u8; 1184];
-        d.copy_from_slice(vk_x.as_bytes());
-        let _ = d;
+        // Not connected: an explicit error. PeerId is the signing key's
+        // identity, so derive it from the SigningKey.
+        let (sk_x, _, _) = crate::testutil::node_keys(90);
+        let vk_x = *sk_x.verifying_key();
         assert!(matches!(
             deliver(&client.host, &crate::host::PeerId::of(&vk_x), &frame),
             Err(SubmissionError::NotConnected(_))

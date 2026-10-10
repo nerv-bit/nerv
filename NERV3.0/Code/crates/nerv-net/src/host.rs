@@ -187,6 +187,7 @@ pub enum HostEvent {
 type Registry = Arc<Mutex<HashMap<PeerId, mpsc::UnboundedSender<Vec<u8>>>>>;
 
 
+#[allow(clippy::large_enum_variant)]
 enum Command {
     Dial(PeerInfo),
     Shutdown,
@@ -501,7 +502,7 @@ mod tests {
         let (cfg_a, vk_a, _) = host_setup(1, true);
         let (cfg_b, vk_b, ek_b) = host_setup(2, false);
         let (h_a, mut ev_a, _) = Host::bind(cfg_a, addr0()).await.unwrap();
-        let (h_b, mut ev_b, addr_b) = Host::bind(cfg_b, addr0()).await.unwrap();
+        let (_h_b, mut ev_b, addr_b) = Host::bind(cfg_b, addr0()).await.unwrap();
         let (id_a, id_b) = (PeerId::of(&vk_a), PeerId::of(&vk_b));
 
 
@@ -563,7 +564,7 @@ mod tests {
         let a2: SocketAddr = "10.0.0.2:9000".parse().unwrap();
         let mut book = PeerBook::new();
         assert!(book.is_empty());
-        book.insert(PeerInfo { vk, kem_ek: ek.clone(), addrs: vec![a1] });
+        book.insert(PeerInfo { vk, kem_ek: ek, addrs: vec![a1] });
         let id = PeerId::of(&vk);
         assert_eq!(book.len(), 1);
         assert!(book.contains(&id));
@@ -574,7 +575,7 @@ mod tests {
         assert_eq!(book.ids().collect::<Vec<_>>(), vec![id]);
         assert!(book.remove(&id).is_some());
         assert!(book.is_empty() && book.get(&id).is_none());
-        assert_ne!(id, PeerId::of(&node_keys(6).0.verifying_key()));
+        assert_ne!(id, PeerId::of(node_keys(6).0.verifying_key()));
         assert_eq!(id.to_string(), id.as_hash().to_string());
     }
 
@@ -599,6 +600,7 @@ mod tests {
 /// Tags share a single 0..=8 namespace with the inner message types so
 /// the wire bytes are unambiguous: 0,1,2,6,7,8 → `GossipMessage`;
 /// 3 → `SubmissionMessage`; 4 → `Packet`; 5 → `FragmentFrame`.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum HostFrame {
     Gossip(GossipMessage),

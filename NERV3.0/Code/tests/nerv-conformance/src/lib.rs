@@ -27,18 +27,14 @@ pub mod vectors;
 pub const SPEC_FILE: &str = "specs/params.toml";
 pub const VECTORS_DIR: &str = "specs/vectors";
 
-pub mod integration;
-
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-
     #[test]
     fn conformance_crate_loads() {
-        // The crate itself is the integration surface; the tests are
-        // in the integration module.
+        // The crate itself is the conformance surface; integration
+        // tests across crates live in their owning crates' `tests/`
+        // directories and in `crates/nerv-knowledge/tests/firewall.rs`.
         assert!(true);
     }
 }

@@ -55,7 +55,7 @@ mod tests {
     use nerv_crypto::sigaggr::{vote_bytes, VoteCollector};
     use nerv_custody::nct::NctDigest;
     use nerv_custody::tx::{InputSet, LegShell, Output, TransactionShell};
-    use nerv_custody::{Address, NoteOpening, WalletKeys};
+    use nerv_custody::Address;
     use nerv_state::block::SettledLeg;
     use nerv_state::header::{RegistryRef, ShardHeader};
     use nerv_state::ttau::TauTree;
@@ -91,7 +91,7 @@ mod tests {
     }
 
 
-    fn header(shard: nerv_core::types::ShardId, height: u64) -> ShardHeader {
+    fn header(_shard: nerv_core::types::ShardId, height: u64) -> ShardHeader {
         ShardHeader {
             prev: Hash256::from_bytes([1u8; 32]),
             height: Height::from_u64(height),
@@ -114,7 +114,7 @@ mod tests {
 
 
     fn block(shard: nerv_core::types::ShardId, n_legs: usize) -> (ShardBlock, Vec<TxId>) {
-        let set = ShardSet::genesis();
+        let _set = ShardSet::genesis();
         let mut txids = Vec::new();
         let mut legs = Vec::new();
         let mut all: Vec<TransactionShell> = Vec::new();

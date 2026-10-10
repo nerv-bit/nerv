@@ -62,8 +62,8 @@ const fn q64_mul(a: u128, b: u128) -> u128 {
 /// β^t in Q64 by binary exponentiation with floor-multiplies; β =
 /// 1 − 2^-k has an exact Q64 form.
 pub fn beta_pow_q64(k: u32, t: u64) -> u128 {
-    debug_assert!(k >= 1 && k <= 63);
-    let base = ((1u128 << k) - 1) << (64 - k as u32);
+    debug_assert!((1..=63).contains(&k));
+    let base = ((1u128 << k) - 1) << (64 - k);
     let mut result: u128 = 1u128 << 64;
     let mut exp = t;
     let mut b = base;
@@ -114,7 +114,7 @@ pub fn step(
     let s_bc2 = u128::from(isqrt(bias_correction_q64(K2, t)));
 
 
-    for i in 0..LEARNABLE {
+    for (i, _) in (0..LEARNABLE).enumerate() {
         let g = grads[i].clamp(-GRAD_CLIP_RAW, GRAD_CLIP_RAW);
 
 
@@ -122,7 +122,7 @@ pub fn step(
         moments.m[i] = moments.m[i].saturating_add(d >> K1);
 
 
-        let ga = g.unsigned_abs() as u128;
+        let ga = g.unsigned_abs();
         let g2 = ga * ga;
         let v = moments.v[i];
         moments.v[i] = if g2 >= v {
@@ -198,23 +198,23 @@ mod tests {
     #[test]
     fn isqrt_matches_the_binary_search_reference() {
         for n in 0..=65_536u128 {
-            assert_eq!(u128::from(isqrt(n)), isqrt_reference(n), "n={n}");
+            assert_eq!(u128::from(isqrt(n)), u128::from(isqrt_reference(n)), "n={n}");
         }
         let mut rng = SplitMix64::new(0xADE1);
         for _ in 0..2_000 {
             let n = ((rng.next_u64() as u128) << 64) | rng.next_u64() as u128;
-            assert_eq!(u128::from(isqrt(n)), isqrt_reference(n), "n={n}");
+            assert_eq!(u128::from(isqrt(n)), u128::from(isqrt_reference(n)), "n={n}");
         }
         for x in [0u64, 1, 2, 3, 255, 256, 65535, 65536] {
             let sq = u128::from(x) * u128::from(x);
-            assert_eq!(u128::from(isqrt(sq)), isqrt_reference(sq));
+            assert_eq!(u128::from(isqrt(sq)), u128::from(isqrt_reference(sq)));
             if sq > 0 {
-                assert_eq!(u128::from(isqrt(sq - 1)), isqrt_reference(sq - 1));
+                assert_eq!(u128::from(isqrt(sq - 1)), u128::from(isqrt_reference(sq - 1)));
             }
-            assert_eq!(u128::from(isqrt(sq + 1)), isqrt_reference(sq + 1));
+            assert_eq!(u128::from(isqrt(sq + 1)), u128::from(isqrt_reference(sq + 1)));
         }
         for n in [u128::MAX, u128::MAX - 1, 1u128 << 127, (1u128 << 126) + 12345] {
-            assert_eq!(u128::from(isqrt(n)), isqrt_reference(n));
+            assert_eq!(u128::from(isqrt(n)), u128::from(isqrt_reference(n)));
         }
         assert_eq!(isqrt(0), 0);
         assert_eq!(isqrt(1), 1);
@@ -366,10 +366,12 @@ mod tests {
 
 
         let (mut w, mut m) = zero_state();
-        assert!(matches!(
-            step(&mut w, &mut m, &vec![0i128; LEARNABLE - 1]),
-            Err(AdamError::GradLen { found: LEARNABLE - 1, expected: LEARNABLE })
-        ));
+        let result = step(&mut w, &mut m, &vec![0i128; LEARNABLE - 1]);
+        assert!(matches!(result, Err(AdamError::GradLen { .. })));
+        if let Err(AdamError::GradLen { found, expected }) = result {
+            assert_eq!(found, LEARNABLE - 1);
+            assert_eq!(expected, LEARNABLE);
+        }
     }
 
 

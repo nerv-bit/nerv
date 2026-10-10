@@ -265,6 +265,9 @@ impl Delta {
 mod tests {
     use super::*;
     use crate::features::{RAIL_COUNT, RAIL_FEE, RAIL_VOLUME};
+    use proptest::collection;
+    use proptest::prelude::any;
+    use proptest::proptest;
 
     fn codec_with(row0: &[(usize, i16)]) -> CodecW {
         let mut rows = [[0i16; FEATURE_COUNT]; EMBEDDING_DIM];
@@ -284,22 +287,22 @@ mod tests {
 
     #[test]
     fn round_half_even_ties_to_even() {
-        assert_eq!(round_half_even_shift(5, 1), 2); // 2.5 → 2
-        assert_eq!(round_half_even_shift(7, 1), 4); // 3.5 → 4
-        assert_eq!(round_half_even_shift(2, 1), 1);
-        assert_eq!(round_half_even_shift(1, 1), 0); // 0.5 → 0
-        assert_eq!(round_half_even_shift(3, 1), 2); // 1.5 → 2
-        assert_eq!(round_half_even_shift(-5, 1), -2); // −2.5 → −2
-        assert_eq!(round_half_even_shift(-7, 1), -4); // −3.5 → −4
-        assert_eq!(round_half_even_shift(-1, 1), 0);
-        assert_eq!(round_half_even_shift(-3, 1), -2);
-        assert_eq!(round_half_even_shift(1, 0), 1);
-        assert_eq!(round_half_even_shift(0, 15), 0);
-        assert_eq!(round_half_even_shift(32_768, 15), 1); // exact
-        assert_eq!(round_half_even_shift(49_152, 15), 2); // 1.5 → 2
-        assert_eq!(round_half_even_shift(81_920, 15), 2); // 2.5 → 2
-        assert_eq!(round_half_even_shift(114_688, 15), 4); // 3.5 → 4
-        assert_eq!(round_half_even_shift(-49_152, 15), -2);
+        assert_eq!(round_half_even_pow2(5, 1), 2); // 2.5 → 2
+        assert_eq!(round_half_even_pow2(7, 1), 4); // 3.5 → 4
+        assert_eq!(round_half_even_pow2(2, 1), 1);
+        assert_eq!(round_half_even_pow2(1, 1), 0); // 0.5 → 0
+        assert_eq!(round_half_even_pow2(3, 1), 2); // 1.5 → 2
+        assert_eq!(round_half_even_pow2(-5, 1), -2); // −2.5 → −2
+        assert_eq!(round_half_even_pow2(-7, 1), -4); // −3.5 → −4
+        assert_eq!(round_half_even_pow2(-1, 1), 0);
+        assert_eq!(round_half_even_pow2(-3, 1), -2);
+        assert_eq!(round_half_even_pow2(1, 0), 1);
+        assert_eq!(round_half_even_pow2(0, 15), 0);
+        assert_eq!(round_half_even_pow2(32_768, 15), 1); // exact
+        assert_eq!(round_half_even_pow2(49_152, 15), 2); // 1.5 → 2
+        assert_eq!(round_half_even_pow2(81_920, 15), 2); // 2.5 → 2
+        assert_eq!(round_half_even_pow2(114_688, 15), 4); // 3.5 → 4
+        assert_eq!(round_half_even_pow2(-49_152, 15), -2);
     }
 
     #[test]
@@ -456,11 +459,23 @@ mod tests {
         #[test]
         fn prop_apply_rounding_error_bounded(
             seed in any::<u64>(),
-            f1 in prop::collection::vec(
+            f1 in collection::vec(
                 (0usize..FEATURE_COUNT, -(2i64.pow(40))..=2i64.pow(40)), 0..=6),
-            f2 in prop::collection::vec(
+            f2 in collection::vec(
                 (0usize..FEATURE_COUNT, -(2i64.pow(40))..=2i64.pow(40)), 0..=6),
         ) {
+            // `set_value` overwrites, so a repeated index keeps only its
+            // last value; dedupe to that semantics, or the v12 accumulation
+            // below and the d2 path model different vectors.
+            let dedupe = |pairs: Vec<(usize, i64)>| -> Vec<(usize, i64)> {
+                let mut last: std::collections::BTreeMap<usize, i64> = Default::default();
+                for (i, v) in pairs {
+                    last.insert(i, v);
+                }
+                last.into_iter().collect()
+            };
+            let f1 = dedupe(f1);
+            let f2 = dedupe(f2);
             let w = codec_from_seed(seed);
             let v1 = sparse(&f1);
             let v2 = sparse(&f2);

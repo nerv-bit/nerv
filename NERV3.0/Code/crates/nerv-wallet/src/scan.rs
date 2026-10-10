@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use nerv_core::codec::Decode;
 use nerv_core::hash::Hash256;
-use nerv_core::types::{Height, LegIndex, ShardId, TxId};
+use nerv_core::types::{ShardId, TxId};
 use nerv_custody::nct::NctDigest;
 use nerv_custody::note::{SealedNote, trial_decrypt};
 use nerv_custody::NoteOpening;
@@ -142,7 +142,6 @@ impl WalletNoteSet {
         self.notes
             .iter()
             .filter(|(_, n)| !self.spent.contains(n.nullifier.as_bytes()))
-            .map(|(cm, n)| (cm, n))
             .collect()
     }
 
@@ -155,7 +154,6 @@ impl WalletNoteSet {
                 !self.spent.contains(n.nullifier.as_bytes())
                     && self.positions.get(*cm).is_some_and(|p| &p.shard == shard)
             })
-            .map(|(cm, n)| (cm, n))
             .collect()
     }
 
@@ -200,7 +198,7 @@ pub fn scan_sealed_note(
         };
 
         let pk_n = addr.address.pk_n();
-        if let Ok(note) = trial_decrypt(&sealed, &kp, published_cm, &pk_n) {
+        if let Ok(note) = trial_decrypt(&sealed, &kp, published_cm, pk_n) {
             let opening = NoteOpening {
                 value: note.value,
                 rho: note.rho,
@@ -226,6 +224,7 @@ pub fn scan_sealed_note(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use nerv_core::codec::Encode;
     use crate::keys::AddressSet;
     use crate::testutil::SplitMix64;
     use nerv_core::types::ShardSet;
@@ -240,7 +239,7 @@ mod tests {
 
 
     fn make_and_seal(
-        keys: &WalletKeys,
+        _keys: &WalletKeys,
         addr_set: &AddressSet,
         value: u64,
         seed: u64,
@@ -298,7 +297,7 @@ mod tests {
 
         // Wallet 1 tries to scan it: no match (assuming different first
         // addresses — overwhelmingly likely with different seeds).
-        let a1_first_shard_addrs: Vec<&WalletAddress> =
+        let _a1_first_shard_addrs: Vec<&WalletAddress> =
             a1.addresses_for_shard(&shard).into_iter().chain(
                 a1.addresses().iter().filter(|a| a.shard() == shard)
             ).collect();

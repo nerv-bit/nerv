@@ -11,18 +11,19 @@ use nerv_core::constants::SEAL_NOISE;
 use nerv_core::hash::{Hash256, Xof};
 use nerv_seal::decrypt::{decode_chunk, ChunkReveal, CHUNK_MAX};
 use nerv_seal::dkg::{
-    share_commitment, CommitMatrix, MemberSecret, ShareSecret, COMMITTEE_SIZE, THRESHOLD,
+    CommitMatrix, MemberSecret, ShareSecret, COMMITTEE_SIZE, THRESHOLD,
 };
 use nerv_seal::digitize::{digitize, Plaintext, COORDS, SLOTS};
 use nerv_seal::encrypt::Ciphertext;
 use nerv_seal::epoch::{
     backup_payload, establish_epoch, open_backup_payload, pad_batch, verify_backup,
-    BatchId, EpochError, EpochIndex, EpochKeyHandle, HandoffWindow, MissedReveal,
+    BatchId, EpochIndex, EpochKeyHandle, HandoffWindow, MissedReveal,
     PendingBatch, RevealLedger, RotationRecord, SAMPLES_PER_REVEAL, SealedBackup,
-    BACKUP_PAYLOAD_SIZE, CHUNK_MIN,
+    BACKUP_PAYLOAD_SIZE,
 };
+use nerv_seal::EpochError;
 use nerv_seal::error::RevealError;
-use nerv_seal::ring::{Mat2x8Ntt, Mat8x8Ntt, Poly, Vec8, Q};
+use nerv_seal::ring::{Mat2x8Ntt, Mat8x8Ntt, Poly, Vec8};
 use nerv_seal::sampling::{ASeed, NoiseSeed};
 use nerv_seal::vpd::{combine_partials, prove_partial};
 
@@ -127,7 +128,7 @@ fn reveal(e: &Epoch, ct: &Ciphertext, legs: u64) -> ChunkReveal {
     let mut w_js = Vec::new();
     for (k, &j) in subset.iter().enumerate() {
         let share = share_secret(e, j);
-        partials.push(prove_partial(&share, &e.ac, &e.handle.public.a_seed(), ct.u(), &subset, COMMITTEE_SIZE, THRESHOLD, &[0xE0 + k as u8; 32]).unwrap());
+        partials.push(prove_partial(&share, &e.ac, e.handle.public.a_seed(), ct.u(), &subset, COMMITTEE_SIZE, THRESHOLD, &[0xE0 + k as u8; 32]).unwrap());
         // Reconstruct W_j from the members' public fragments.
         let ji = j as usize - 1;
         let mut w = Vec8::zero();
@@ -139,7 +140,7 @@ fn reveal(e: &Epoch, ct: &Ciphertext, legs: u64) -> ChunkReveal {
         let _ = ji;
         w_js.push(w);
     }
-    let su = combine_partials(&partials, &e.ac, &e.handle.public.a_seed(), ct.u(), &subset, &w_js, COMMITTEE_SIZE, THRESHOLD).unwrap();
+    let su = combine_partials(&partials, &e.ac, e.handle.public.a_seed(), ct.u(), &subset, &w_js, COMMITTEE_SIZE, THRESHOLD).unwrap();
     decode_chunk(legs, &su, ct.v()).unwrap()
 }
 
@@ -209,10 +210,10 @@ fn rotation_ceremony_end_to_end() {
     let mut w_js = Vec::new();
     for (k, &j) in subset.iter().enumerate() {
         let share = share_secret(&e2, j);
-        partials.push(prove_partial(&share, &e2.ac, &e2.handle.public.a_seed(), full.u(), &subset, COMMITTEE_SIZE, THRESHOLD, &[0x90 + k as u8; 32]).unwrap());
+        partials.push(prove_partial(&share, &e2.ac, e2.handle.public.a_seed(), full.u(), &subset, COMMITTEE_SIZE, THRESHOLD, &[0x90 + k as u8; 32]).unwrap());
         w_js.push(share_commitment_publics(&e2, j));
     }
-    let su2 = combine_partials(&partials, &e2.ac, &e2.handle.public.a_seed(), full.u(), &subset, &w_js, COMMITTEE_SIZE, THRESHOLD).unwrap();
+    let su2 = combine_partials(&partials, &e2.ac, e2.handle.public.a_seed(), full.u(), &subset, &w_js, COMMITTEE_SIZE, THRESHOLD).unwrap();
     assert!(matches!(
         decode_chunk(CHUNK_MAX, &su2, full.v()),
         Err(RevealError::NegativeDigit { .. }) | Err(RevealError::DigitSumAboveEnvelope { .. })
@@ -304,7 +305,7 @@ fn backup_delivery_and_stand_in_verification() {
         let mut ks = Xof::framed(&SEAL_NOISE, &[b"test.seal.ks", key, &(ct.len() as u64).to_le_bytes()]);
         Some(ct.iter().map(|&b| b ^ ks.next_u64() as u8).collect())
     };
-    let key = [0x5EED; 32];
+    let key = [0xED; 32];
     let mut envelope = SealedBackup {
         from: j,
         to: j,
@@ -372,10 +373,10 @@ fn pad_injection_beyond_the_real_envelope_is_detected() {
     let mut w_js = Vec::new();
     for (k, &j) in subset.iter().enumerate() {
         let share = share_secret(&e, j);
-        partials.push(prove_partial(&share, &e.ac, &e.handle.public.a_seed(), evil.u(), &subset, COMMITTEE_SIZE, THRESHOLD, &[0x70 + k as u8; 32]).unwrap());
+        partials.push(prove_partial(&share, &e.ac, e.handle.public.a_seed(), evil.u(), &subset, COMMITTEE_SIZE, THRESHOLD, &[0x70 + k as u8; 32]).unwrap());
         w_js.push(share_commitment_publics(&e, j));
     }
-    let su = combine_partials(&partials, &e.ac, &e.handle.public.a_seed(), evil.u(), &subset, &w_js, COMMITTEE_SIZE, THRESHOLD).unwrap();
+    let su = combine_partials(&partials, &e.ac, e.handle.public.a_seed(), evil.u(), &subset, &w_js, COMMITTEE_SIZE, THRESHOLD).unwrap();
     match decode_chunk(1, &su, evil.v()) {
         Err(RevealError::DigitSumAboveEnvelope { slot: 0, value, envelope: 255 }) => {
             assert!(value >= 401, "injected value {value}");

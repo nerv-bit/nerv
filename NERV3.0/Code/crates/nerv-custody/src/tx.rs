@@ -182,8 +182,8 @@ impl TransactionShell {
     /// D.3 expiry ∈ [h_include + T_min, h_include + T_max] per leg.
     pub fn check_expiry_bounds(&self, include_height: Height) -> Result<(), CustodyError> {
         let c = self.canonicalize()?;
-        let lo = include_height.as_u64().saturating_add(CUSTODY_D3_EXPIRY_MIN_BLOCKS_T_MIN as u64);
-        let hi = include_height.as_u64().saturating_add(CUSTODY_D3_EXPIRY_MAX_BLOCKS_T_MAX as u64);
+        let lo = include_height.as_u64().saturating_add(CUSTODY_D3_EXPIRY_MIN_BLOCKS_T_MIN);
+        let hi = include_height.as_u64().saturating_add(CUSTODY_D3_EXPIRY_MAX_BLOCKS_T_MAX);
         for l in &c.legs {
             let e = l.expiry.as_u64();
             if e < lo || e > hi {
@@ -381,6 +381,8 @@ mod tests {
             anchor: Hash256::from_bytes(seed.bytes32()),
             expiry: Height::from_u64(5000),
             weight_version: 1,
+            ct: Vec::new(),
+            burns: Vec::new(),
         }
     }
 
@@ -442,7 +444,7 @@ mod tests {
         let mut l4 = leg(&mut seed, g.ids()[3], 1, 1);
         l4.outputs[0].value = CUSTODY_VALUE_MAX_NANO + 1;
         assert!(matches!(l4.check(), Err(CustodyError::InvalidOutput { index: 0 })));
-        let mut empty = leg(&mut seed, g.ids()[4], 0, 0);
+        let empty = leg(&mut seed, g.ids()[4], 0, 0);
         assert!(matches!(empty.check(), Err(CustodyError::EmptyLeg)));
         // duplicate nullifier within a leg
         let mut l5 = leg(&mut seed, g.ids()[5], 2, 0);
@@ -469,19 +471,21 @@ mod tests {
         let g = ShardSet::genesis();
         let tx = TransactionShell { legs: vec![leg(&mut seed, g.ids()[7], 1, 1)] };
         // genesis T_min = 60, T_max = 14400 (blocks; D.6: 60s/24h/10s at
-        // 1-second target blocks)
-        assert!(tx.check_expiry_bounds(Height::from_u64(1000)).is_err(), "5000 < 1000+60");
+        // 1-second target blocks). The default leg has expiry=5000; with
+        // include_height=1000 the valid window is [1060, 15400] — 5000
+        // is in range, so the check must return Ok.
+        assert!(tx.check_expiry_bounds(Height::from_u64(1000)).is_ok(), "5000 in [1060, 15400]");
         let mut ok_tx = TransactionShell { legs: vec![leg(&mut seed, g.ids()[8], 1, 1)] };
-        ok_tx.legs[0].expiry = Height::from_u64(1000 + D3_EXPIRY_MIN_BLOCKS_T_MIN as u64);
+        ok_tx.legs[0].expiry = Height::from_u64(1000 + CUSTODY_D3_EXPIRY_MIN_BLOCKS_T_MIN);
         assert!(ok_tx.check_expiry_bounds(Height::from_u64(1000)).is_ok());
-        ok_tx.legs[0].expiry = Height::from_u64(1000 + D3_EXPIRY_MAX_BLOCKS_T_MAX as u64);
+        ok_tx.legs[0].expiry = Height::from_u64(1000 + CUSTODY_D3_EXPIRY_MAX_BLOCKS_T_MAX);
         assert!(ok_tx.check_expiry_bounds(Height::from_u64(1000)).is_ok());
-        ok_tx.legs[0].expiry = Height::from_u64(1000 + D3_EXPIRY_MAX_BLOCKS_T_MAX as u64 + 1);
+        ok_tx.legs[0].expiry = Height::from_u64(1000 + CUSTODY_D3_EXPIRY_MAX_BLOCKS_T_MAX + 1);
         assert!(matches!(
             ok_tx.check_expiry_bounds(Height::from_u64(1000)),
             Err(CustodyError::ExpiryOutOfBounds { .. })
         ));
-        ok_tx.legs[0].expiry = Height::from_u64(1000 + D3_EXPIRY_MIN_BLOCKS_T_MIN as u64 - 1);
+        ok_tx.legs[0].expiry = Height::from_u64(1000 + CUSTODY_D3_EXPIRY_MIN_BLOCKS_T_MIN - 1);
         assert!(matches!(
             ok_tx.check_expiry_bounds(Height::from_u64(1000)),
             Err(CustodyError::ExpiryOutOfBounds { .. })
@@ -541,7 +545,7 @@ mod tests {
         let mut other = tx.clone();
         other.legs[0].fee = FeeSats::from_u64(other.legs[0].fee.as_u64() + 1);
         assert_ne!(id1, other.txid().unwrap());
-        let mut shuffled = tx.clone();
+        let shuffled = tx.clone();
         let mut t2 = TransactionShell { legs: shuffled.legs.clone() };
         t2.legs.reverse();
         assert_eq!(id1, t2.txid().unwrap(), "leg order does not change the canonical txid");

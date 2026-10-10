@@ -169,9 +169,9 @@ impl Plaintext {
 pub fn digitize(coords: &[u64; COORDS]) -> Plaintext {
     let mut p0 = [0u64; N];
     let mut p1 = [0u64; N];
-    for j in 0..COORDS {
+    for (j, coord) in coords.iter().take(COORDS).enumerate() {
         for k in 0..DIGITS_PER_COORD {
-            let d = (coords[j] >> (DIGIT_BITS * k as u32)) & DIGIT_MAX;
+            let d = (coord >> (DIGIT_BITS * k as u32)) & DIGIT_MAX;
             let s = COORDS * k + j;
             if s < N {
                 p0[s] = d;
@@ -260,9 +260,9 @@ mod tests {
         coords[2] = 256;
         coords[63] = 0x0123_4567_89AB_CDEF;
         let pt = digitize(&coords);
-        for j in 0..COORDS {
+        for (j, coord) in coords.iter().take(COORDS).enumerate() {
             for k in 0..DIGITS_PER_COORD {
-                assert_eq!(pt.digit(j, k), (coords[j] >> (8 * k)) & 255);
+                assert_eq!(pt.digit(j, k), (coord >> (8 * k)) & 255);
             }
         }
         assert!(pt.slot_values().iter().all(|&v| v <= DIGIT_MAX));

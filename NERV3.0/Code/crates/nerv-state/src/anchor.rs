@@ -157,7 +157,7 @@ mod tests {
        let mut ext = enc.clone();
        ext.push(0);
        assert!(AnchorRing::decode(&ext).is_err());
-       let mut bad = vec![0u8; 4];
+       let mut bad = vec![0u8; 4 + 32 * (WINDOW + 1)];
        bad[..4].copy_from_slice(&((WINDOW + 1) as u32).to_le_bytes());
        assert!(matches!(
            AnchorRing::decode(&bad),

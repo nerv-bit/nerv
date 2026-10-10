@@ -64,7 +64,7 @@ pub fn loss_per_dim(r: &[i64; DIMS], scales: &[u64; DIMS]) -> [u128; DIMS] {
 
 
 pub fn total_loss(r: &[i64; DIMS], scales: &[u64; DIMS]) -> u128 {
-    loss_per_dim(r, scales).iter().fold(0u128, |a, &x| a + x)
+    loss_per_dim(r, scales).iter().sum()
 }
 
 

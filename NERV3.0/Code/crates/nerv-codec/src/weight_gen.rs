@@ -652,7 +652,7 @@ mod tests {
     fn fp_of_weight_exact_over_all_i16() {
         for w in i16::MIN..=i16::MIN + 512 {
             let expected = if w >= 0 {
-                u64::from(w)
+                w as u64
             } else {
                 (P as i128 + i128::from(w)) as u64
             };
@@ -890,7 +890,7 @@ mod tests {
         let bad = tampered(&certified_fixture(), |rows| {
             for (r, row) in rows.iter_mut().enumerate() {
                 let mut sum: i16 = 0;
-                for j in 0..6 {
+                for (j, _) in (0..6).enumerate() {
                     let v: i16 = if (r >> j) & 1 == 0 { 2_000 } else { -2_000 };
                     row[j] = v;
                     sum += v;

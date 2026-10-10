@@ -2,7 +2,6 @@
 
 
 use nerv_core::hash::Hash256;
-use nerv_crypto::mldsa::VerifyingKey;
 
 
 /// Which chamber a vote belongs to.

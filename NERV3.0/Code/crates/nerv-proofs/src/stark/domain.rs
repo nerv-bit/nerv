@@ -106,7 +106,7 @@ impl TwoAdicDomain {
         let g = self.gen;
         std::iter::from_fn(move || {
             let out = cur;
-            cur = cur * g;
+            cur *= g;
             Some(out)
         })
         .take(self.size())
@@ -253,8 +253,10 @@ mod tests {
         for log in 1..=10usize {
             for dom in [TwoAdicDomain::subgroup(log), TwoAdicDomain::standard_coset(log)] {
                 let pts: Vec<Goldilocks> = dom.points().collect();
-                for (i, &p) in pts.iter().enumerate() {
-                    assert_eq!(pts[dom.sibling_index(i)], -p, "log={log} i={i}");
+                // The pairing is one-directional: sibling(i) = i + M/2 is
+                // in range exactly for the lower half i < M/2.
+                for i in 0..dom.size() / 2 {
+                    assert_eq!(pts[dom.sibling_index(i)], -pts[i], "log={log} i={i}");
                 }
             }
         }
@@ -346,7 +348,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "proper two-adic subgroup")]
+    #[should_panic(expected = "the standard shift lies inside the full subgroup")]
     fn standard_coset_rejects_full_log() {
         let _ = TwoAdicDomain::standard_coset(32);
     }

@@ -7,7 +7,7 @@ use nerv_core::constants::REGISTRY_COMMIT;
 use nerv_core::error::CodecError;
 use nerv_core::hash::Hash256;
 use nerv_core::types::{Interval, TxId};
-use nerv_state::ttau::{empty_root, RegistryWitness, TauTree};
+use nerv_state::ttau::{RegistryWitness, TauTree};
 
 
 use crate::bundle::{Bundle, BundleSummary};
@@ -155,7 +155,8 @@ pub fn build_interval_commit(
 mod tests {
     use super::*;
     use crate::testutil::harness::{agg_key, shell, shallow_proof, txid_of};
-    use nerv_proofs::IntervalSet;
+    use nerv_state::ttau::empty_root;
+
 
 
     fn entry(seed: u64) -> crate::mempool::PoolEntry {
@@ -230,6 +231,9 @@ mod tests {
         assert!(!build1.contains(&txid_of(&shell(10))));
         assert!(build1.contains(&txid_of(&shell(12))));
         assert_eq!(build1.report.cross_interval, vec![(txid_of(&shell(10)), i0)]);
+        // Commit i1 so the ledger's `current` advances; the replay check
+        // below depends on the dedup invariant `interval <= current`.
+        ledger.commit(&build1.report.set).unwrap();
 
 
         // Forward-only: replaying interval 1 is rejected by the ledger.
@@ -302,7 +306,6 @@ mod tests {
             c.digest().as_bytes(),
             blake3::hash(&pre).as_bytes()
         );
-        let _ = IntervalSet::default();
     }
 
 

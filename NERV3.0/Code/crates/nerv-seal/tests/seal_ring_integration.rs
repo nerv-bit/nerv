@@ -113,11 +113,11 @@ fn section_631_pipeline_decrypts_exactly() {
     let leg = encrypt_leg(&k, &mut s);
     let mhat = decrypt(&k, &leg.u, &leg.v);
 
-    for i in 0..2 {
-        check_noise(&mhat[i], leg.m.poly(i), LEG_NOISE_BOUND, "single leg");
+    for (i, mhat_i) in mhat.iter().enumerate() {
+        check_noise(mhat_i, leg.m.poly(i), LEG_NOISE_BOUND, "single leg");
         // Provable decode: |ν| ≤ 2050 < SCALE/2 = 4096, so rounding
         // recovers the digit exactly — deterministically, not statistically.
-        let cl = mhat[i].centerlift();
+        let cl = mhat_i.centerlift();
         let mc = leg.m.poly(i).coefficients();
         for j in 0..N {
             let decoded = (cl[j] + (SCALE as i64) / 2).div_euclid(SCALE as i64);
@@ -143,11 +143,11 @@ fn homomorphic_aggregation_property() {
         leg1.m.poly(0).add(leg2.m.poly(0)),
         leg1.m.poly(1).add(leg2.m.poly(1)),
     ]);
-    for i in 0..2 {
+    for (i, mhat_i) in mhat.iter().enumerate() {
         // Provable bound doubles; decode at this size is statistical
         // (observed noise ≈ 2·σ_leg ≈ 45), pinned by the fixed seed.
-        check_noise(&mhat[i], m_sum.poly(i), 2 * LEG_NOISE_BOUND, "aggregate of 2");
-        let cl = mhat[i].centerlift();
+        check_noise(mhat_i, m_sum.poly(i), 2 * LEG_NOISE_BOUND, "aggregate of 2");
+        let cl = mhat_i.centerlift();
         let mc = m_sum.poly(i).coefficients();
         for j in 0..N {
             let decoded = (cl[j] + (SCALE as i64) / 2).div_euclid(SCALE as i64);
@@ -168,7 +168,6 @@ fn aggregate_chunk_of_128_stays_in_budget() {
 
     let mut u_b = Vec8::zero();
     let mut v_b = Vec2::zero();
-    let mut m_sum = [Vec2::zero(), Vec2::zero()][0];
     let mut m_sum = Vec2::zero();
     for _ in 0..128 {
         let leg = encrypt_leg(&k, &mut s);
@@ -178,20 +177,20 @@ fn aggregate_chunk_of_128_stays_in_budget() {
     }
 
     let mhat = decrypt(&k, &u_b, &v_b);
-    for i in 0..2 {
-        check_noise(&mhat[i], m_sum.poly(i), 128 * LEG_NOISE_BOUND, "chunk of 128");
+    for (i, mhat_i) in mhat.iter().enumerate() {
+        check_noise(mhat_i, m_sum.poly(i), 128 * LEG_NOISE_BOUND, "chunk of 128");
     }
 
     // The closed budget, observed: worst-case digit sums plus worst-case
     // noise stay inside the centered range.
-    let worst_plaintext = SCALE * (128 255);
+    let worst_plaintext = SCALE * (128 * 255);
     let worst_noise = 128 * LEG_NOISE_BOUND as u64;
     assert!(worst_plaintext + worst_noise < Q / 2);
 
     // Sum-of-digits stays within the slot headroom q/scale.
     let headroom = Q / SCALE;
-    for i in 0..2 {
-        for &d in m_sum.poly(i).coefficients().iter() {
+    for m in m_sum.polys() {
+        for &d in m.coefficients().iter() {
             assert!(d < headroom);
         }
     }

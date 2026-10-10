@@ -62,11 +62,13 @@ impl FeeSplit {
 
 /// Σ_j |centerlift(Δ_B[j])| over the header-carried reveal — the frozen
 /// codec's rail mixture as one integer aggregate (erratum 161).
+#[allow(clippy::expect_used)] // `chunks_exact(8)` on a 512-byte slice yields 8-byte chunks by construction; the try_from is a type-system formality.
 pub fn reveal_statistic(delta_b: &[u8; 512]) -> u128 {
     let mut sum = 0u128;
     for c in delta_b.chunks_exact(8) {
-        let v = u64::from_le_bytes(c.try_into().expect("8-byte chunk"));
-        sum += (v as i64 as i128).unsigned_abs() as u128;
+        let arr = <[u8; 8]>::try_from(c).expect("chunks_exact(8) yields 8 bytes");
+        let v = u64::from_le_bytes(arr);
+        sum += (v as i64 as i128).unsigned_abs();
     }
     sum
 }
@@ -118,7 +120,7 @@ impl AdmissionFloor {
         while self.window.len() > WINDOW {
             self.window.pop_front();
         }
-        let triggered = match lower_median(&self.window.make_contiguous()) {
+        let triggered = match lower_median(self.window.make_contiguous()) {
             Some(median) if median > 0 => stat >= TRIGGER_MULT * median,
             _ => false,
         };
@@ -151,7 +153,7 @@ impl Encode for AdmissionFloor {
 impl Decode for AdmissionFloor {
     fn decode_from(r: &mut Reader<'_>) -> Result<Self, CodecError> {
         let m = r.read_u64()?;
-        if m < 1 || m > M_MAX {
+        if !(1..=M_MAX).contains(&m) {
             return Err(CodecError::InvariantViolated("admission-floor multiplier out of range"));
         }
         let n = r.read_seq_len()?;

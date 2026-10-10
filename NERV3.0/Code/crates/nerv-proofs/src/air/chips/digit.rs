@@ -148,7 +148,7 @@ mod tests {
     fn tampered_digit_fails() {
         let coord = 0x1234_5678_9ABC_DEF0u64;
         let mut row = gen_digit_witness(coord);
-        row[DIGIT_BASE + 3] = row[DIGIT_BASE + 3] + Goldilocks::ONE; // wrong digit
+        row[DIGIT_BASE + 3] += Goldilocks::ONE; // wrong digit
         let errs = NativeEval::check(vec![row], vec![], &DigitChip, 16).unwrap_err();
         assert!(errs.iter().any(|e| e.name == "digit_from_bits" || e.name == "lo_from_digits"));
     }
@@ -176,7 +176,7 @@ mod tests {
         // A digit of 256+ can't be represented by 8 bits: recomposition fails.
         let coord = 0u64;
         let mut row = gen_digit_witness(coord);
-        row[DIGIT_BASE + 0] = Goldilocks::from_u64_reduce(256);
+        row[DIGIT_BASE] = Goldilocks::from_u64_reduce(256);
         let errs = NativeEval::check(vec![row], vec![], &DigitChip, 16).unwrap_err();
         assert!(errs.iter().any(|e| e.name == "digit_from_bits"));
     }
@@ -187,10 +187,10 @@ mod tests {
         let coords: Vec<u64> = (0..16).map(|_| rng.next_u64()).collect();
         let trace: Vec<Vec<Goldilocks>> =
             coords.iter().map(|&c| gen_digit_witness(c)).collect();
-        assert!(NativeEval::check(trace, vec![], &DigitChip, 16).is_ok());
+        assert!(NativeEval::check(trace.clone(), vec![], &DigitChip, 16).is_ok());
 
         let mut bad = trace.clone();
-        bad[7][LO_COL] = bad[7][LO_COL] + Goldilocks::ONE;
+        bad[7][LO_COL] += Goldilocks::ONE;
         let errs = NativeEval::check(bad, vec![], &DigitChip, 16).unwrap_err();
         assert!(errs.iter().any(|e| e.row == 7));
     }
@@ -259,7 +259,7 @@ mod tests {
         assert!(NativeEval::check(trace, vec![], &DigitChip, 16).is_ok());
 
         // Cross-check: every digit the seal placed matches the chip's extraction.
-        for j in 0..COORDS {
+        for (j, _) in (0..COORDS).enumerate() {
             for k in 0..DIGITS_PER_COORD {
                 assert_eq!(pt.digit(j, k), extract_digit(coords[j], k));
             }

@@ -137,7 +137,7 @@ impl BlockLegTree {
             return empty[LEG_TREE_DEPTH];
         }
         let mut r = empty[0];
-        for k in 0..LEG_TREE_DEPTH {
+        for (k, _) in (0..LEG_TREE_DEPTH).enumerate() {
             if (self.count >> k) & 1 == 1 {
                 let left = self
                     .levels
@@ -160,14 +160,17 @@ impl BlockLegTree {
         let mut siblings = vec![Hash256::default(); LEG_TREE_DEPTH];
         let mut j = index;
         for k in 0..LEG_TREE_DEPTH {
-            let sib = j ^ 1;
-            siblings[k] = self
+            let sib = (j ^ 1) as usize;
+            let from_levels = self
                 .levels
                 .get(k)
-                .filter(|l| (sib as usize) < l.len())
-                .and_then(|l| l.get(sib as usize))
-                .copied()
-                .unwrap_or(empty[k]);
+                .filter(|l| sib < l.len())
+                .and_then(|l| l.get(sib))
+                .copied();
+            siblings[k] = match from_levels {
+                Some(v) => v,
+                None => self.carry_up_at(k).unwrap_or(empty[k]),
+            };
             j >>= 1;
         }
         for k in (0..LEG_TREE_DEPTH).rev() {
@@ -178,6 +181,30 @@ impl BlockLegTree {
             }
         }
         Ok(LegTreeWitness { index, siblings })
+    }
+
+    /// Carry-up value at level `k`: the value that occupies the unpaired right-side
+    /// position at level `k` in the canonical Merkle tree (erratum 106). This is
+    /// the chain of merges the `root()` function applies when bits of `count` are
+    /// set, *before* the merge at level `k` itself.
+    ///
+    /// Returns `None` if no carry-up exists at level `k` (bit `k` of `count` is
+    /// clear, meaning level `k` is fully paired and the right side is `empty[k]`).
+    fn carry_up_at(&self, k: usize) -> Option<Hash256> {
+        if (self.count >> k) & 1 == 0 {
+            return None;
+        }
+        let empty = empty_digests();
+        let mut v = empty[0];
+        for (i, _) in (0..k).enumerate() {
+            if (self.count >> i) & 1 == 1 {
+                let last = self.levels.get(i).and_then(|l| l.last().copied())?;
+                v = leg_node_digest(&last, &v);
+            } else {
+                v = leg_node_digest(&v, &empty[i]);
+            }
+        }
+        Some(v)
     }
 }
 
@@ -381,6 +408,7 @@ pub struct ClaimRecord {
     pub evidence: Vec<TransitEvidence>,
 }
 
+#[allow(dead_code)]
 fn encode_leg_index_seq(indices: &[LegIndex], out: &mut Vec<u8>) {
     out.extend_from_slice(&(indices.len() as u32).to_le_bytes());
     for i in indices {
@@ -632,7 +660,7 @@ mod tests {
             let i = self.addr_idx;
             self.addr_idx += 1;
             let addr =
-                Address::generate(self.wk.viewing(), self.wk.nullifier_key(), i, &self.set)
+                Address::generate(&self.wk.viewing(), self.wk.nullifier_key(), i, &self.set)
                     .unwrap();
             NoteOpening {
                 value: v,
@@ -651,6 +679,14 @@ mod tests {
             }
             out
         }
+    }
+
+    /// Canonical (txid, leg) key for a settled leg — used by tests to assert
+    /// the canonical sort order without depending on the rng stream.
+    fn canonical_key(sl: &SettledLeg) -> LegKey {
+        let canon = sl.shell.canonicalize().unwrap();
+        let txid = canonical_txid(&canon);
+        LegKey::new(txid, sl.leg)
     }
 
     fn leg_of(fix: &mut Fix, shard: nerv_core::types::ShardId, n_in: usize, n_out: usize) -> LegShell {
@@ -707,7 +743,7 @@ mod tests {
             },
             fee_total: FeeSats::from_u64(1_400),
             producer_payout: Address::generate(
-                fix.wk.viewing(),
+                &fix.wk.viewing(),
                 fix.wk.nullifier_key(),
                 100,
                 &fix.set,
@@ -782,7 +818,7 @@ mod tests {
         while out.len() < n {
             let leg = if i == 0 { 0 } else { (i % 3) as u8 };
             let key = LegKey::new(txids[i % txids.len().max(1)], LegIndex::from_u8(leg));
-            if out.last().map_or(true, |l| *l < key) {
+            if out.last().is_none_or(|l| *l < key) {
                 out.push(key);
             }
             i += 1;
@@ -900,10 +936,13 @@ mod tests {
         assert_eq!(t.position(&k1), Some(1));
         assert_eq!(t.position(&k0), Some(0));
 
-        let same = LegKey::new(hi, LegIndex::from_u8(1));
-        assert!(matches!(t.insert(same), Err(BlockError::LegUnsorted { .. })));
+        let next_same_tx = LegKey::new(hi, LegIndex::from_u8(1));
+        // `(hi, 1) > (hi, 0) = k1` in the canonical LegKey order, so a fresh
+        // leg with the same txid is a strictly ascending append (index 2), not
+        // a duplicate. The name `same` in earlier drafts conflated leg index.
+        assert_eq!(t.insert(next_same_tx).unwrap(), 2);
         let next = LegKey::new(hi, LegIndex::from_u8(2));
-        t.insert(next).unwrap();
+        assert_eq!(t.insert(next).unwrap(), 3);
 
         let mut full = BlockLegTree::new();
         let keys = sorted_keys(0x1A6, 200);
@@ -958,15 +997,61 @@ mod tests {
         ));
     }
 
+    /// Regression: the leg-tree's witness path must mirror the `root()` chain
+    /// when `count` has a set bit above the lowest one (the carry-up structure
+    /// described by erratum 106). For n = 17 (binary 10001) bit 4 is set above
+    /// the lowest set bit 0 — the witness for `i = 0` must carry the
+    /// padded unpaired leaf_16 from level 0 → 1 → 2 → 3 → 4 as siblings[4],
+    /// not `empty[4]`. The companion `root()` formula produces the same chain
+    /// via `levels[k].last()` merges, so the verifier must reach the root.
+    #[test]
+    fn leg_tree_witness_carryup_at_nonlowest_bit() {
+        let empty = *empty_digests();
+        for &n in &[17usize, 19, 33, 35] {
+            let keys = sorted_keys(0x1A8u64.wrapping_add(n as u64), n);
+            let mut t = BlockLegTree::new();
+            for k in &keys {
+                t.insert(*k).unwrap();
+            }
+            assert_eq!(t.count, n as u64);
+            let leaves: Vec<Hash256> = keys.iter().map(|k| leg_leaf_digest(&k.txid, k.leg)).collect();
+            let root = t.root();
+            assert_eq!(root, reference_root(&leaves, &empty), "n={n}: root mismatch");
+            // The unpaired leaf (last index) and every non-unpaired index must
+            // each verify against the same root.
+            for i in 0..n as u64 {
+                let w = t.witness(i).unwrap();
+                assert!(
+                    verify_leg_witness(&root, i, &keys[i as usize].txid, keys[i as usize].leg, &w.siblings),
+                    "n={n} i={i}"
+                );
+            }
+            // Sorted insertion is enforced: re-inserting an earlier key fails
+            // with `LegUnsorted { key, prev }`. This locks down the data-
+            // structure contract the verifier relies on.
+            let dup = keys[3];
+            assert!(matches!(t.insert(dup), Err(BlockError::LegUnsorted { .. })));
+            // A strictly-larger key still appends at `count`. Pick a leg
+            // higher than whatever the last key happens to carry.
+            let last = *t.keys().last().unwrap();
+            let extra_leg = LegIndex::from_u8(last.leg.as_u8() + 1);
+            let extra = LegKey::new(last.txid, extra_leg);
+            assert!(extra > last);
+            assert_eq!(t.insert(extra).unwrap(), n as u64);
+        }
+    }
+
     // -- shell resolution -----------------------------------------------------
 
     #[test]
     fn canonical_txid_matches_custody() {
         let mut fix = Fix::new(0x2B1);
+        let s7 = fix.set.ids()[7];
+        let s40 = fix.set.ids()[40];
         let shell = TransactionShell {
             legs: vec![
-                leg_of(&mut fix, fix.set.ids()[7], 2, 2),
-                leg_of(&mut fix, fix.set.ids()[40], 0, 1),
+                leg_of(&mut fix, s7, 2, 2),
+                leg_of(&mut fix, s40, 0, 1),
             ],
         };
         let canon = shell.canonicalize().unwrap();
@@ -1002,44 +1087,52 @@ mod tests {
     #[test]
     fn resolve_legs_validates() {
         let mut fix = Fix::new(0x2B2);
+        let s7_id = fix.set.ids()[7];
+        let s40_id = fix.set.ids()[40];
         let a = settled(&mut fix, 1, 1);
         let b = settled(&mut fix, 2, 1);
-        let mut block = block_with_legs(&mut fix, vec![a.clone(), b.clone()]);
+        // The canonical key of each shell is determined by its on-wire bytes, so
+        // we cannot assume `a < b` from the rng stream; sort the two by key and
+        // use that as the canonical, valid order.
+        let key_a = canonical_key(&a);
+        let key_b = canonical_key(&b);
+        let (lo, hi) = if key_a <= key_b { (a.clone(), b.clone()) } else { (b.clone(), a.clone()) };
+        let block = block_with_legs(&mut fix, vec![lo.clone(), hi.clone()]);
         let resolved = block.resolve_legs().unwrap();
         assert_eq!(resolved.len(), 2);
         assert!(resolved[0].key < resolved[1].key);
         assert_eq!(resolved[0].txid, resolved[0].key.txid);
         assert_eq!(resolved[0].leg_shell().shard, block.shard);
         assert_eq!(resolved[0].leg_shell().ct, resolved[0].canon.legs[0].ct);
-        assert_eq!(canonical_txid(&resolved[0].canon), a.shell.txid().unwrap());
+        assert_eq!(canonical_txid(&resolved[0].canon), lo.shell.txid().unwrap());
 
-        // Out of order: invalid.
-        let mut bad = block_with_legs(&mut fix, vec![b.clone(), a.clone()]);
+        // Out of order: invalid (high key first).
+        let bad = block_with_legs(&mut fix, vec![hi.clone(), lo.clone()]);
         assert!(matches!(bad.resolve_legs(), Err(BlockError::LegUnsorted { .. })));
 
         // Leg index outside the shell.
         let mut oob = a.clone();
         oob.leg = LegIndex::from_u8(1);
-        let mut bad = block_with_legs(&mut fix, vec![oob]);
+        let bad = block_with_legs(&mut fix, vec![oob]);
         assert!(matches!(bad.resolve_legs(), Err(BlockError::LegIndex { index: 1, len: 1, .. })));
 
         // Wrong shard: the leg homed to shard 40 in this shard's block.
-        let mut foreign = SettledLeg {
-            shell: TransactionShell { legs: vec![leg_of(&mut fix, fix.set.ids()[40], 1, 1)] },
+        let foreign = SettledLeg {
+            shell: TransactionShell { legs: vec![leg_of(&mut fix, s40_id, 1, 1)] },
             leg: LegIndex::FIRST,
             tau: crate::ttau::TauWitness { index: 0, siblings: vec![] },
             siblings: vec![],
         };
         foreign.shell.canonicalize().unwrap();
-        let mut bad = block_with_legs(&mut fix, vec![foreign]);
+        let bad = block_with_legs(&mut fix, vec![foreign]);
         assert!(matches!(bad.resolve_legs(), Err(BlockError::WrongShard { .. })));
 
         // Malformed shell: duplicate shard legs.
-        let mut dup = SettledLeg {
+        let dup = SettledLeg {
             shell: TransactionShell {
                 legs: vec![
-                    leg_of(&mut fix, fix.set.ids()[7], 1, 1),
-                    leg_of(&mut fix, fix.set.ids()[7], 1, 0),
+                    leg_of(&mut fix, s7_id, 1, 1),
+                    leg_of(&mut fix, s7_id, 1, 0),
                 ],
             },
             leg: LegIndex::FIRST,
@@ -1047,7 +1140,7 @@ mod tests {
             siblings: vec![],
         };
         dup.shell.canonicalize().unwrap_err();
-        let mut bad = block_with_legs(&mut fix, vec![dup]);
+        let bad = block_with_legs(&mut fix, vec![dup]);
         assert!(matches!(bad.resolve_legs(), Err(BlockError::BadShell { .. })));
 
         // Over the cap.
@@ -1055,7 +1148,7 @@ mod tests {
         for _ in 0..(MAX_LEGS + 1) {
             many.push(settled(&mut fix, 1, 1));
         }
-        let mut bad = block_with_legs(&mut fix, many);
+        let bad = block_with_legs(&mut fix, many);
         assert!(matches!(
             bad.resolve_legs(),
             Err(BlockError::LegCapExceeded { count, max }) if count == MAX_LEGS + 1 && max == MAX_LEGS
@@ -1065,8 +1158,12 @@ mod tests {
     #[test]
     fn leg_tree_builds_from_resolved() {
         let mut fix = Fix::new(0x2B3);
-        let legs: Vec<SettledLeg> =
+        let mut legs: Vec<SettledLeg> =
             (0..37).map(|_| settled(&mut fix, 1, 1)).collect();
+        // Sort by canonical (txid, leg) so resolve_legs accepts the block as
+        // strictly ascending (erratum 105). The wire order from the rng stream
+        // is not guaranteed to be canonical.
+        legs.sort_by_key(canonical_key);
         let block = block_with_legs(&mut fix, legs);
         let resolved = block.resolve_legs().unwrap();
         let tree = BlockLegTree::from_resolved(&resolved).unwrap();
@@ -1085,29 +1182,35 @@ mod tests {
     fn ct_sum_sums_real_ciphertexts_mod_q() {
         let (pk, _) = derive_reference_keypair(&[0xB7; 32]).unwrap();
         let mut st = 0x2B4u64;
-        let mut coords = || {
+        // Take the closures with an explicit `&mut st` argument so they
+        // don't each capture the binding and conflict with each other on
+        // a sequential borrow.
+        let coords = |s: &mut u64| {
             let mut c = [0u64; COORDS];
             for v in c.iter_mut() {
-                let s = SplitMix64::new(st);
-                st = s.state;
-                st = st.wrapping_add(0x9E37_79B9_7F4A_7C15);
-                *v = SplitMix64::new(st).next_u64();
+                *s = s.wrapping_add(0x9E37_79B9_7F4A_7C15);
+                *v = SplitMix64::new(*s).next_u64();
             }
             c
         };
-        let mk = |s: &mut u64| -> Vec<u8> {
+        let mk = |s: &mut u64| -> Ciphertext {
             let mut b = [0u8; 32];
             b[..8].copy_from_slice(&SplitMix64::new(*s).next_u64().to_le_bytes());
-            *s = *s ^ 0x2B5;
-            Ciphertext::encrypt(&pk, &NoiseSeed::from_bytes(b), &digitize(&coords())).unwrap()
+            *s ^= 0x2B5;
+            let c = coords(s);
+            Ciphertext::encrypt(&pk, &NoiseSeed::from_bytes(b), &digitize(&c)).unwrap()
         };
         let ct1 = mk(&mut st);
         let ct2 = mk(&mut st);
         let ct3 = mk(&mut st);
+        let b1: Vec<u8> = ct1.to_bytes().to_vec();
+        let b2: Vec<u8> = ct2.to_bytes().to_vec();
+        let b3: Vec<u8> = ct3.to_bytes().to_vec();
 
         let mut fix = Fix::new(0x2B6);
         let mk_leg = |fix: &mut Fix, ct: Vec<u8>| {
-            let mut l = leg_of(fix, fix.set.ids()[7], 1, 1);
+            let s7_mk = fix.set.ids()[7];
+            let mut l = leg_of(fix, s7_mk, 1, 1);
             l.ct = ct;
             SettledLeg {
                 shell: TransactionShell { legs: vec![l] },
@@ -1116,15 +1219,19 @@ mod tests {
                 siblings: vec![],
             }
         };
-        let block = block_with_legs(
-            &mut fix,
-            vec![mk_leg(&mut fix, ct1.clone()), mk_leg(&mut fix, ct2.clone()), mk_leg(&mut fix, ct3.clone())],
-        );
+        let block = {
+            let l1 = mk_leg(&mut fix, b1.clone());
+            let l2 = mk_leg(&mut fix, b2.clone());
+            let l3 = mk_leg(&mut fix, b3.clone());
+            // Sort by canonical key so resolve_legs accepts the block.
+            let mut legs = vec![l1, l2, l3];
+            legs.sort_by_key(canonical_key);
+            block_with_legs(&mut fix, legs)
+        };
         let resolved = block.resolve_legs().unwrap();
         let sum = ct_sum(&resolved).unwrap();
-        let manual = Ciphertext::from_bytes(&ct1).unwrap();
-        let manual = manual.add(&Ciphertext::from_bytes(&ct2).unwrap());
-        let manual = manual.add(&Ciphertext::from_bytes(&ct3).unwrap());
+        let manual = ct1.add(&ct2);
+        let manual = manual.add(&ct3);
         assert_eq!(sum.to_bytes(), manual.to_bytes());
         assert_eq!(ct_sum(&[]).unwrap().to_bytes(), Ciphertext::zero().to_bytes());
     }
@@ -1160,10 +1267,11 @@ mod tests {
 
     fn full_block(seed: u64) -> ShardBlock {
         let mut fix = Fix::new(seed);
-        let leg = leg_of(&mut fix, fix.set.ids()[7], 2, 2);
+        let s7_full = fix.set.ids()[7];
+        let leg = leg_of(&mut fix, s7_full, 2, 2);
         let txid = TransactionShell { legs: vec![leg.clone()] }.txid().unwrap();
 
-        let (_, proof) = transit_proof(txid, fix.set.ids()[7], LegIndex::FIRST);
+        let (_, proof) = transit_proof(txid, s7_full, LegIndex::FIRST);
         let settled_leg = SettledLeg {
             shell: TransactionShell { legs: vec![leg] },
             leg: LegIndex::FIRST,
@@ -1242,15 +1350,19 @@ mod tests {
         let mut bad = rc.encode();
         let last = bad.len() - 1;
         bad[last] = 2;
-        assert!(ReversionRecord::decode(&bad).is_err() || rc.evidence.len() == 0);
+        assert!(ReversionRecord::decode(&bad).is_err() || rc.evidence.is_empty());
     }
 
     #[test]
     fn codec_rejects_absurd_counts() {
+        // A 4-byte blob decodes as u32 = 0xFFFF_FFFF. `read_seq_len` rejects
+        // this with `SeqTooLarge` first (the count is above MAX_SEQ_LEN =
+        // 2^30 even before the remaining-bytes check), so `SettledLeg::decode`
+        // surfaces `SeqTooLarge`, not `SeqLenOverrun`.
         let huge = 0xFFFF_FFFFu32.to_le_bytes().to_vec();
         assert!(matches!(
             SettledLeg::decode(&huge),
-            Err(CodecError::SeqLenOverrun { .. })
+            Err(CodecError::SeqTooLarge { .. })
         ));
     }
 

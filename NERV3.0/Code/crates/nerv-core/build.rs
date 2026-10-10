@@ -288,7 +288,7 @@ impl Gen {
             let decl = match &val {
                 Val::U(v) => format!("pub const {name}: u64 = {v}u64;\n"),
                 Val::B(b) => format!("pub const {name}: bool = {b};\n"),
-                Val::S(s) => format!("pub const {name}: &'static str = {s:?};\n"),
+                Val::S(s) => format!("pub const {name}: &str = {s:?};\n"),
             };
             self.out.push_str(&decl);
         }
@@ -360,7 +360,7 @@ impl Gen {
                 if let Some(name) = self.const_name_for(path) {
                     let items = vals.iter().map(|s| format!("{s:?}")).collect::<Vec<_>>().join(", ");
                     self.out.push_str(&format!(
-                        "pub const {name}: [&'static str; {}] = [{items}];\n",
+                        "pub const {name}: [&str; {}] = [{items}];\n",
                         vals.len()
                     ));
                 }
@@ -482,7 +482,7 @@ impl Gen {
         );
         self.out.push_str(&format!("pub const PARAMS_LEAF_COUNT: usize = {n};\n"));
         self.out
-            .push_str("pub static PARAMS_MAP: &[(&'static str, ParamValue)] = &[\n");
+            .push_str("pub static PARAMS_MAP: &[(&str, ParamValue)] = &[\n");
         for (p, v) in &self.map {
             self.out.push_str(&format!("    ({p:?}, {}),\n", v.map_expr()));
         }
@@ -517,7 +517,7 @@ const _: () = assert!(PROOFS_FIELD_MODULUS == 18_446_744_069_414_584_321u64, "Go
 const _: () = assert!(PROOFS_FRI_SECURITY_BITS >= 100, "FRI security floor (D.2)");
 const _: () = assert!(OVERLAY_W_ROWS == 64 && OVERLAY_W_COLS == 256, "W is 64x256 (§7.2)");
 const _: () = assert!(
-    OVERLAY_SPARK_BOUND >= 2 * OVERLAY_MAX_ACTIVE_SLOTS + 1,
+    OVERLAY_SPARK_BOUND > 2 * OVERLAY_MAX_ACTIVE_SLOTS,
     "spark bound (§7.4)"
 );
 const _: () = assert!(SEAL_Q < (1u64 << 32), "seal modulus is 32-bit (§6.3.1)");

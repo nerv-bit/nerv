@@ -99,6 +99,7 @@ pub fn apply_statement_10(
 
 /// The full native verifier for statement 10: bounds, then all ten
 /// relations. Rows 0–7 are u, 8–9 are v.
+#[allow(clippy::too_many_arguments)] // The eight public components of statement 10 (A, t, u, v, m, r, e1, e2) are the protocol's external interface; bundling them into a wrapper type would shadow the on-the-wire contract this function re-checks.
 pub fn check_statement_10(
     a_seed: &ASeed,
     t: &Mat2x8,
@@ -284,24 +285,27 @@ mod tests {
         let mut cl2 = cl;
         cl2[1] += 1;
         polys[0] = Poly::from_centered(&cl2);
+        let tampered_r = Vec8::new(polys);
         assert!(matches!(
-            check(ct.u(), ct.v(), &m, &Vec8::new(polys), &e1, &e2),
+            check(ct.u(), ct.v(), &m, &tampered_r, &e1, &e2),
             Err(CircuitStmtError::RelationFailed { .. })
         ));
         let mut polys = *e1.polys();
         let mut cl2 = polys[5].centerlift();
         cl2[9] += 1;
         polys[5] = Poly::from_centered(&cl2);
+        let tampered_e1 = Vec8::new(polys);
         assert!(matches!(
-            check(ct.u(), ct.v(), &m, &r, &Vec8::new(polys), &e2),
+            check(ct.u(), ct.v(), &m, &r, &tampered_e1, &e2),
             Err(CircuitStmtError::RelationFailed { .. })
         ));
         let mut polys = *e2.polys();
         let mut cl2 = polys[0].centerlift();
         cl2[2] -= 1;
         polys[0] = Poly::from_centered(&cl2);
+        let tampered_e2 = Vec2::new(polys);
         assert!(matches!(
-            check(ct.u(), ct.v(), &m, &r, &e1, &Vec2::new(polys)),
+            check(ct.u(), ct.v(), &m, &r, &e1, &tampered_e2),
             Err(CircuitStmtError::RelationFailed { row: 8 })
         ));
 
@@ -320,8 +324,9 @@ mod tests {
         let mut vals = polys[0].centerlift();
         vals[0] = 4;
         polys[0] = Poly::from_centered(&vals);
+        let overbound_r = Vec8::new(polys);
         assert!(matches!(
-            check(ct.u(), ct.v(), &m, &Vec8::new(polys), &e1, &e2),
+            check(ct.u(), ct.v(), &m, &overbound_r, &e1, &e2),
             Err(CircuitStmtError::NoiseBound { block: 0, value: 4, bound: 3 })
         ));
         let mut polys = *e2.polys();

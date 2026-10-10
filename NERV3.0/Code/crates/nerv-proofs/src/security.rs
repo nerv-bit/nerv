@@ -14,8 +14,8 @@
 //!   * FRI query phase       error  2^(−b·q/2)    Johnson-bound list-decoding
 //!                          + grinding bits      conjecture for Reed–Solomon
 //!                                                at rate 2^−b (b = log blowup)
-//! b = 0 contributes grinding only: rate-1 codewords carry no distance —
-//! grinding is that round's only lever.
+//!      b = 0 contributes grinding only: rate-1 codewords carry no distance —
+//!      grinding is that round's only lever.
 //!
 //! RETIRED with the excision (register 58): the upstream p3-security model,
 //! its six regression vectors, and the proven-regime companion figure.
@@ -142,8 +142,8 @@ pub fn conjectured(profile: &Profile, fri: &FriShape, degree_bits: usize) -> usi
 /// so the quotient lands in a single chunk), queries 1..=512, grinding
 /// {0, 16} (grinding cannot repair the field terms — a miss is reported,
 /// not patched). Size proxy minimized: queries × (degree_bits + blowup)
-/// + query_pow (each query opens a Merkle path of ~degree_bits + blowup
-/// hashes).
+///     + query_pow (each query opens a Merkle path of ~degree_bits + blowup
+///     hashes).
 pub fn search_min_fri(
     profile: &Profile,
     degree_bits: usize,
@@ -273,8 +273,9 @@ mod tests {
       // FRI generous (b=8, q=512 → 2048 bits) → the field terms bind:
         // min(cr=128, α=108, ali=105, batch=112).
         assert_eq!(conjectured(&p, &shape(8, 512, 0), 20), 105);
-        // Taller traces weaken the DEEP-ALI term: 128 − ceil_log2(5·2^24) = 102.
-        assert_eq!(conjectured(&p, &shape(8, 512, 0), 24), 102);
+        // Taller traces weaken the DEEP-ALI term: 128 − ceil_log2(5·2^24) = 101.
+        // (The previous "102" was a comment typo; ceil(log2(5·2^24)) = 27, not 26.)
+        assert_eq!(conjectured(&p, &shape(8, 512, 0), 24), 101);
 
     }
 

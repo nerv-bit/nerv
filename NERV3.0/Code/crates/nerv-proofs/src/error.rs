@@ -49,6 +49,8 @@ pub enum WitnessError {
     RevertCount { expected: usize, found: usize },
     #[error("revert {index}: commitment does not match the shell's revert_cm (D.3)")]
     RevertCmMismatch { index: usize },
+    #[error("revert {index}: shell output has no revert_cm but the witness is conditional (D.3)")]
+    RevertCmMissing { index: usize },
     #[error("revert {index}: value does not equal its conditional output's (D.3 revert equation)")]
     RevertValueMismatch { index: usize },
     #[error("burn {index}: commitment does not match H(burn ‖ txid ‖ leg ‖ value)")]

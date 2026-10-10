@@ -261,6 +261,7 @@ impl EmergencyLedger {
 
 
     /// The accelerated-split effect: the target shard, if active.
+    #[allow(clippy::unwrap_used)]
     pub fn accelerated_split_target(&self, at_epoch: Epoch) -> Option<ShardId> {
         let probe = EmergencyKind::AcceleratedSplit {
             target: ShardId::new(6, 0).unwrap(),
@@ -399,7 +400,7 @@ mod tests {
                 EmergencyKind::HashWidening { from_bits: 256, to_bits: 512 },
                 epoch(100), evidence(3),
             ),
-            Err(crate::error::EmergencyError::BadWidening { from_bits: 256, to_bits: 512 })
+            Err(crate::error::EmergencyError::BadWidening { from: 256, to: 512 })
         ));
 
 

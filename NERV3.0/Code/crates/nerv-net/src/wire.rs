@@ -391,7 +391,7 @@ mod tests {
 
     #[tokio::test]
     async fn handshake_and_bidirectional_frames() {
-        let (mut sess_a, mut sess_b, _, _, mut sa, mut sb) = handshake_pair(11, true);
+        let (mut sess_a, mut sess_b, _, _, mut sa, mut sb) = handshake_pair(11, true).await;
         sess_a.send_frame(&mut sa, b"one").await.unwrap();
         sess_a.send_frame(&mut sa, b"two").await.unwrap();
         assert_eq!(sess_b.recv_frame(&mut sb).await.unwrap(), b"one");
@@ -405,7 +405,7 @@ mod tests {
 
     #[tokio::test]
     async fn many_frames_in_order_both_directions() {
-        let (mut sess_a, mut sess_b, _, _, mut sa, mut sb) = handshake_pair(12, true);
+        let (mut sess_a, mut sess_b, _, _, mut sa, mut sb) = handshake_pair(12, true).await;
         let payload = vec![0xA5u8; 4096];
         for i in 0..25u64 {
             sess_a.send_frame(&mut sa, &payload).await.unwrap();
@@ -420,16 +420,22 @@ mod tests {
 
     #[tokio::test]
     async fn large_frame_roundtrip() {
-        let (mut sess_a, mut sess_b, _, _, mut sa, mut sb) = handshake_pair(13, true);
+        let (mut sess_a, mut sess_b, _, _, mut sa, mut sb) = handshake_pair(13, true).await;
         let payload = vec![0x5Au8; 512 * 1024];
-        sess_a.send_frame(&mut sa, &payload).await.unwrap();
-        assert_eq!(sess_b.recv_frame(&mut sb).await.unwrap(), payload);
+        // 512 KiB ≫ the 64 KiB duplex buffer: the send and the drain must
+        // run concurrently or write_all pends forever.
+        let (sent, got) = tokio::join!(
+            sess_a.send_frame(&mut sa, &payload),
+            sess_b.recv_frame(&mut sb),
+        );
+        sent.unwrap();
+        assert_eq!(got.unwrap(), payload);
     }
 
 
     #[tokio::test]
     async fn oversized_payload_rejected_locally() {
-        let (mut sess_a, _, _, _, mut sa, _) = handshake_pair(14, true);
+        let (mut sess_a, _, _, _, mut sa, _) = handshake_pair(14, true).await;
         let payload = vec![0u8; MAX_FRAME + 1];
         assert!(matches!(
             sess_a.send_frame(&mut sa, &payload).await,
@@ -456,20 +462,16 @@ mod tests {
 
     #[tokio::test]
     async fn tampered_transcript_signature_rejected() {
-        let (sa, sb) = tokio::io::duplex(64 * 1024);
+        let (mut sa, sb) = tokio::io::duplex(64 * 1024);
         let mut sb = sb;
         let (sk_a, _, _) = node_keys(1);
         let (sk_b, ek_b, _) = node_keys(2);
         let (fresh, enc_a, enc_b) = seeds(16);
         let vk_b = *sk_b.verifying_key();
-        let dial = tokio::spawn(dial_handshake(
-            sa,
-            &sk_a,
-            &ek_b,
-            &fresh,
-            &enc_a,
-            Some(&vk_b),
-        ));
+        let pin = vk_b;
+        let dial = tokio::spawn(async move {
+            dial_handshake(&mut sa, &sk_a, &ek_b, &fresh, &enc_a, Some(&pin)).await
+        });
 
 
         let hello = read_msg(&mut sb, HELLO_LEN).await.unwrap();
@@ -494,21 +496,16 @@ mod tests {
 
     #[tokio::test]
     async fn wrong_peer_pin_rejected() {
-        let (sa, sb) = tokio::io::duplex(64 * 1024);
+        let (mut sa, sb) = tokio::io::duplex(64 * 1024);
         let mut sb = sb;
         let (sk_a, _, _) = node_keys(1);
         let (sk_c, _, _) = node_keys(3); // not the pinned key
         let (sk_b, ek_b, _) = node_keys(2);
         let (fresh, enc_a, enc_b) = seeds(17);
         let vk_b = *sk_b.verifying_key();
-        let dial = tokio::spawn(dial_handshake(
-            sa,
-            &sk_a,
-            &ek_b,
-            &fresh,
-            &enc_a,
-            Some(&vk_b),
-        ));
+        let dial = tokio::spawn(async move {
+            dial_handshake(&mut sa, &sk_a, &ek_b, &fresh, &enc_a, Some(&vk_b)).await
+        });
 
 
         let hello = read_msg(&mut sb, HELLO_LEN).await.unwrap();
@@ -549,7 +546,7 @@ mod tests {
 
     #[tokio::test]
     async fn replayed_frame_rejected() {
-        let (mut sess_a, mut sess_b, _, _, mut sa, mut sb) = handshake_pair(19, true);
+        let (mut sess_a, mut sess_b, _, _, mut sa, mut sb) = handshake_pair(19, true).await;
         sess_a.send_frame(&mut sa, b"first").await.unwrap();
         // A duplicate of frame 0, crafted with session internals.
         let replay = seal(&sess_a.send, &nonce_of(0), &[], b"first").unwrap();
@@ -564,7 +561,7 @@ mod tests {
 
     #[tokio::test]
    async fn truncated_and_garbage_frames_rejected() {
-       let (_, mut sess_b, _, _, mut sa, mut sb) = handshake_pair(20, true);
+       let (_, mut sess_b, _, _, mut sa, mut sb) = handshake_pair(20, true).await;
        write_msg(&mut sa, &[0u8; 8], MAX_WIRE).await.unwrap();
        let err = sess_b.recv_frame(&mut sb).await.unwrap_err();
        assert!(matches!(err, WireError::BadFrame));
@@ -586,7 +583,7 @@ mod tests {
     #[tokio::test]
     async fn caps_enforced() {
         let (mut sa, mut sb) = tokio::io::duplex(64);
-        let err = write_msg(&mut sa, &vec![0u8; 100], 10).await.unwrap_err();
+        let err = write_msg(&mut sa, &[0u8; 100], 10).await.unwrap_err();
         assert!(matches!(err, WireError::TooLarge { len: 100, max: 10 }));
         sa.write_all(&100u32.to_le_bytes()).await.unwrap();
         let err = read_msg(&mut sb, 10).await.unwrap_err();

@@ -188,14 +188,14 @@ fn batch_inverse_g(vals: &mut [Goldilocks]) {
     let mut acc = Goldilocks::ONE;
     for v in vals.iter() {
         debug_assert!(!v.is_zero(), "batch_inverse_g: zero input");
-        acc = acc * *v;
+        acc *= *v;
         prefix.push(acc);
     }
     let mut inv = prefix[n - 1].inverse();
     for i in (1..n).rev() {
         let orig = vals[i];
         vals[i] = inv * prefix[i - 1];
-        inv = inv * orig;
+        inv *= orig;
     }
     vals[0] = inv;
 }
@@ -218,7 +218,7 @@ fn zh_over_domain(log_n: usize, dom: &TwoAdicDomain) -> Vec<Goldilocks> {
     let mut out = Vec::with_capacity(dom.size());
     for _ in 0..dom.size() {
         out.push(cur - Goldilocks::ONE);
-        cur = cur * gen_n;
+        cur *= gen_n;
     }
     out
 }
@@ -268,7 +268,7 @@ pub fn lagrange_weights(log_n: usize, zeta: ExtF) -> Vec<ExtF> {
     for _ in 0..n {
         hs.push(hp);
         diffs.push(zeta - ExtF::from_base(hp));
-        hp = hp * h;
+        hp *= h;
     }
     batch_inverse(&mut diffs);
     let n_inv = ExtF::from_base(Goldilocks::from_u64_reduce(n as u64).inverse());
@@ -291,7 +291,7 @@ pub fn eval_table_at_ext(weights: &[ExtF], table: &[Vec<Goldilocks>]) -> Vec<Ext
     for (w, row) in weights.iter().zip(table) {
         assert_eq!(row.len(), width, "ragged table");
         for (o, v) in out.iter_mut().zip(row) {
-            *o = *o + w.scale(*v);
+            *o += w.scale(*v);
         }
     }
     out
@@ -356,7 +356,7 @@ fn gamma_powers(gamma: ExtF, width: usize) -> Vec<ExtF> {
     let mut g = ExtF::ONE;
     for _ in 0..2 * width + 1 {
         out.push(g);
-        g = g * gamma;
+        g *= gamma;
     }
     out
 }
@@ -577,7 +577,7 @@ where
     for (i, co) in trace_coeffs.iter().enumerate() {
         let w = powers[i];
         for (a, c) in a_coeffs.iter_mut().zip(co) {
-            *a = *a + w.scale(*c);
+            *a += w.scale(*c);
         }
     }
     let mut v_coeffs: Vec<ExtF> = vec![ExtF::ZERO; n];
@@ -585,20 +585,20 @@ where
      for (k, vc) in v_coeffs.iter_mut().enumerate() {
         let mut acc = ExtF::ZERO;
         for (i, co) in trace_coeffs.iter().enumerate() {
-            acc = acc + powers[width + i].scale(co[k]);
+            acc += powers[width + i].scale(co[k]);
         }
         *vc = acc.scale(gk);
-        gk = gk * g;
+        gk *= g;
     }
 
     let mut const_term = ExtF::ZERO;
     for (w, v) in powers.iter().zip(&trace_zeta) {
-        const_term = const_term + *w * *v;
+        const_term += *w * *v;
     }
     for (w, v) in powers[width..2 * width].iter().zip(&trace_zeta_next) {
-        const_term = const_term + *w * *v;
+        const_term += *w * *v;
     }
-    const_term = const_term + powers[2 * width] * quotient_zeta;
+    const_term += powers[2 * width] * quotient_zeta;
 
 
     let a_evals = fft::evaluate(&a_coeffs, &dom);
@@ -650,11 +650,6 @@ where
         fri,
         outer,
     })
-}
-
-
-fn vc_index(v_coeffs: &[ExtF], vc: &ExtF) -> usize {
-    (vc as *const ExtF as usize - v_coeffs.as_ptr() as usize) / size_of::<ExtF>()
 }
 
 
@@ -750,12 +745,11 @@ where
         let h_val = proof.fri.queries[k].openings[0].low;
         let mut s = ExtF::ZERO;
         for i in 0..width {
-            s = s + powers[i] * (ExtF::from_base(o.trace_low.row[i]) - proof.trace_zeta[i]);
-            s = s + powers[width + i]
-                * (ExtF::from_base(o.trace_next.row[i]) - proof.trace_zeta_next[i]);
+            s += powers[i] * (ExtF::from_base(o.trace_low.row[i]) - proof.trace_zeta[i]);
+            s += powers[width + i] * (ExtF::from_base(o.trace_next.row[i]) - proof.trace_zeta_next[i]);
         }
         let qv = ExtF::new(o.quotient.row[0], o.quotient.row[1]);
-        s = s + powers[2 * width] * (qv - proof.quotient_zeta);
+        s += powers[2 * width] * (qv - proof.quotient_zeta);
         if h_val * (x_lo - zeta) != s {
             return Ok(false);
         }
@@ -793,7 +787,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::air::builder::{Air as _, AirBuilder};
+    use crate::air::builder::AirBuilder;
     use crate::air::chips::conservation::{
         gen_cons_prep, gen_cons_trace, ConservationChip, PREP_ACTIVE, WIDTH as CONS_W,
     };
@@ -835,7 +829,7 @@ mod tests {
             let nxt = b.witness(1, 0);
             let one = B::constant(1);
             let step = b.is_transition();
-            b.assert_zero(step * (nxt - cur - one), "counter_step");
+            b.assert_zero(step * (nxt - cur.clone() - one), "counter_step");
             let first = b.is_first_row();
             let want = b.public(0);
             b.assert_zero(first * (cur - want), "counter_init");
@@ -874,15 +868,16 @@ mod tests {
             Err(ComposeError::NoFold { .. })
         ));
         assert!(matches!(
-            Plan::new(30, &shape(2, 1, 4, 0), &td),
+            Plan::new(31, &shape(2, 1, 4, 0), &td),
             Err(ComposeError::DomainOverflow { .. })
         ));
-        // headroom: qb = 9 at N = 8 ⇒ one chunk level.
+        // headroom: qb = 2·7 + 1 + 1 − 8 = 8 = N ⇒ no chunk level
+        // (CounterAir's quotient fits the trace height exactly).
         let p = counter_plan(1, 1, 16, 0);
-        assert_eq!(p.log_chunks, 1);
-        assert_eq!(p.log_c, 5);
+        assert_eq!(p.log_chunks, 0);
+        assert_eq!(p.log_c, 4);
         assert_eq!(p.n(), 8);
-        assert_eq!(p.c(), 32);
+        assert_eq!(p.c(), 16);
     }
 
 
@@ -972,7 +967,10 @@ mod tests {
             let coeffs: Vec<Goldilocks> = (0..dom.size()).map(|_| gf(&mut rng)).collect();
             let evals = fft::evaluate(&coeffs, &dom);
             for j in (0..dom.size()).step_by((dom.size() / 5).max(1)) {
-                assert_eq!(horner_ext(&coeffs, ExtF::from_base(dom.point(j))), evals[j]);
+                assert_eq!(
+                    horner_ext(&coeffs, ExtF::from_base(dom.point(j))),
+                    ExtF::from_base(evals[j])
+                );
             }
         }
     }
@@ -1139,17 +1137,17 @@ mod tests {
 
 
         let mut p = proof.clone();
-        p.trace_zeta[0] = p.trace_zeta[0] + ExtF::ONE;
+        p.trace_zeta[0] += ExtF::ONE;
         assert!(!check(&p), "trace_zeta");
 
 
         let mut p = proof.clone();
-        p.trace_zeta_next[0] = p.trace_zeta_next[0] + ExtF::ONE;
+        p.trace_zeta_next[0] += ExtF::ONE;
         assert!(!check(&p), "trace_zeta_next");
 
 
         let mut p = proof.clone();
-        p.quotient_zeta = p.quotient_zeta + ExtF::ONE;
+        p.quotient_zeta += ExtF::ONE;
         assert!(!check(&p), "quotient_zeta");
 
 
@@ -1159,17 +1157,17 @@ mod tests {
 
 
         let mut p = proof.clone();
-        p.outer[0].trace_low.row[0] = p.outer[0].trace_low.row[0] + Goldilocks::ONE;
+        p.outer[0].trace_low.row[0] += Goldilocks::ONE;
         assert!(!check(&p), "outer trace row");
 
 
         let mut p = proof.clone();
-        p.outer[0].trace_next.row[0] = p.outer[0].trace_next.row[0] + Goldilocks::ONE;
+        p.outer[0].trace_next.row[0] += Goldilocks::ONE;
         assert!(!check(&p), "outer next row");
 
 
         let mut p = proof.clone();
-        p.outer[0].quotient.row[0] = p.outer[0].quotient.row[0] + Goldilocks::ONE;
+        p.outer[0].quotient.row[0] += Goldilocks::ONE;
         assert!(!check(&p), "outer quotient row");
 
 
@@ -1201,12 +1199,12 @@ mod tests {
 
 
         let mut p = proof.clone();
-        p.fri.queries[0].openings[0].low = p.fri.queries[0].openings[0].low + ExtF::ONE;
+        p.fri.queries[0].openings[0].low += ExtF::ONE;
         assert!(!check(&p), "fri layer-0 value");
 
 
         let mut p = proof.clone();
-        p.fri.final_coeffs[0] = p.fri.final_coeffs[0] + ExtF::ONE;
+        p.fri.final_coeffs[0] += ExtF::ONE;
         assert!(!check(&p), "fri final");
     }
 
@@ -1230,15 +1228,5 @@ mod tests {
     fn goldilocks_prime_is_not_one() {
         // Sanity for the membership predicates' exactness premise.
         assert_ne!(GOLDILOCKS_PRIME, 1);
-    }
-}
-
-
-trait ConcatEight {
-    fn concat_eight(&self, _: &[Vec<Goldilocks>]) -> Vec<Vec<Goldilocks>>;
-}
-impl ConcatEight for [Vec<Goldilocks>] {
-    fn concat_eight(&self, _: &[Vec<Goldilocks>]) -> Vec<Vec<Goldilocks>> {
-        unreachable!()
     }
 }

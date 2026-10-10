@@ -131,7 +131,7 @@ mod tests {
         let values = [0u64, 1, 255, 65535, 12345678, u32::MAX as u64, 42];
         let trace: Vec<Vec<Goldilocks>> =
             values.iter().map(|&v| gen_range_witness(v, bits)).collect();
-        assert!(NativeEval::check(trace, vec![], &chip, 16).is_ok());
+        assert!(NativeEval::check(trace.clone(), vec![], &chip, 16).is_ok());
 
         // One bad row.
         let mut bad_trace = trace.clone();

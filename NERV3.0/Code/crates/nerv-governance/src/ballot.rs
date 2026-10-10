@@ -6,7 +6,6 @@
 
 use nerv_core::constants::{BALLOT_MATRIX, BALLOT_NULL, BALLOT_PROOF};
 use nerv_core::hash::Hash256;
-use nerv_core::types::Epoch;
 use nerv_crypto::mldsa::{Signature, SigningKey, VerifyingKey};
 use nerv_seal::dkg::sigma::{self, Proof, Statement};
 use nerv_seal::dkg::CommitMatrix;
@@ -154,12 +153,12 @@ fn weight_statement(
     for i in 0..8 {
         let mut entries = Vec::with_capacity(16);
         for j in 0..8 {
-            entries.push((j, matrix.left.row(i)[j].clone()));
+            entries.push((j, matrix.left.row(i)[j]));
         }
         for j in 0..8 {
-            entries.push((8 + j, matrix.right.row(i)[j].clone()));
+            entries.push((8 + j, matrix.right.row(i)[j]));
         }
-        stmt.push_equation(commitment.poly(i).clone(), entries);
+        stmt.push_equation(*commitment.poly(i), entries);
     }
     stmt
 }
@@ -343,7 +342,6 @@ impl ValidatorVote {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use nerv_seal::sampling::sample_short_vec8;
     use nerv_core::hash::Xof;
 
 

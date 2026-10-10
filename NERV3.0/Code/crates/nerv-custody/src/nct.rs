@@ -199,11 +199,11 @@ pub fn verify_witness(
     }
     let mut node = leaf_digest(leaf_cm);
     let mut j = leaf_index;
-    for k in 0..DEPTH {
+    for sib in siblings.iter() {
         node = if j & 1 == 0 {
-            node_digest(&node, &siblings[k])
+            node_digest(&node, sib)
         } else {
-            node_digest(&siblings[k], &node)
+            node_digest(sib, &node)
         };
         j >>= 1;
     }
@@ -278,15 +278,47 @@ impl NoteCommitmentTree {
         }
         let empty = empty_digests();
         let mut r = empty[0];
-        for k in 0..DEPTH {
-            let left = if (self.count >> k) & 1 == 1 {
-                self.levels[k].last().copied().unwrap_or(empty[k])
+        for (k, level) in self.levels.iter().zip(empty.iter()).take(DEPTH).enumerate() {
+            r = if (self.count >> k) & 1 == 1 {
+                let left = level.0.last().copied().unwrap_or(*level.1);
+                node_digest(&left, &r)
             } else {
-                empty[k]
+                node_digest(&r, level.1)
             };
-            r = node_digest(&left, &r);
         }
         r
+    }
+
+    fn subtree_root(
+        &self,
+        start: u64,
+        level: usize,
+        empty: &[NctDigest],
+    ) -> Result<NctDigest, CustodyError> {
+        if start >= self.count {
+            return Ok(empty[level]);
+        }
+        let size = 1u64 << level;
+        if start + size <= self.count {
+            return self
+                .levels
+                .get(level)
+                .and_then(|nodes| nodes.get((start >> level) as usize))
+                .copied()
+                .ok_or(CustodyError::InvalidTree("missing complete subtree node"));
+        }
+        if level == 0 {
+            return self
+                .levels
+                .first()
+                .and_then(|leaves| leaves.get(start as usize))
+                .copied()
+                .ok_or(CustodyError::InvalidTree("missing partial subtree leaf"));
+        }
+        let half = 1u64 << (level - 1);
+        let left = self.subtree_root(start, level - 1, empty)?;
+        let right = self.subtree_root(start + half, level - 1, empty)?;
+        Ok(node_digest(&left, &right))
     }
 
     /// Membership witness for leaf `index`.
@@ -297,17 +329,9 @@ impl NoteCommitmentTree {
         let empty = empty_digests();
         let mut siblings = [empty[0]; DEPTH];
         let mut j = index;
-        for k in 0..DEPTH {
+        for (k, slot) in siblings.iter_mut().enumerate() {
             let sib = j ^ 1;
-            siblings[k] = match self
-                .levels
-                .get(k)
-                .filter(|l| (sib as usize) < l.len())
-                .and_then(|l| l.get(sib as usize))
-            {
-                Some(d) => *d,
-                None => empty[k],
-            };
+            *slot = self.subtree_root(sib << k, k, empty)?;
             j >>= 1;
         }
         Ok(NctWitness { leaf_index: index, siblings })
@@ -526,12 +550,12 @@ mod tests {
 
     #[test]
     fn capacity_guards() {
-        let full = NoteCommitmentTree { levels: vec![], count: LEAF_CAPACITY };
+        let mut full = NoteCommitmentTree { levels: vec![], count: LEAF_CAPACITY };
         assert!(matches!(
             full.append(&Hash256::from_bytes([0u8; 32])),
             Err(CustodyError::TreeFull { .. })
         ));
-        let near = NoteCommitmentTree { levels: vec![], count: LEAF_CAPACITY - 1 };
+        let mut near = NoteCommitmentTree { levels: vec![], count: LEAF_CAPACITY - 1 };
         assert!(matches!(
             near.append_batch(&[Hash256::from_bytes([1u8; 32]), Hash256::from_bytes([2u8; 32])]),
             Err(CustodyError::TreeFull { .. })

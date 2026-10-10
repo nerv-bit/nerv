@@ -27,7 +27,7 @@ fn burn_message(txid: &TxId, leg: LegIndex, value: u64) -> [u8; 41] {
 
 impl BurnCommitment {
     pub fn new(txid: &TxId, leg: LegIndex, value: u64) -> Result<BurnCommitment, CustodyError> {
-        if value < CUSTODY_VALUE_MIN_NANO || value > CUSTODY_VALUE_MAX_NANO {
+        if !(CUSTODY_VALUE_MIN_NANO..=CUSTODY_VALUE_MAX_NANO).contains(&value) {
             return Err(CustodyError::ValueOutOfRange {
                 value,
                 min: CUSTODY_VALUE_MIN_NANO,
@@ -44,7 +44,7 @@ impl BurnCommitment {
     /// Out-of-range values never verify (defense in depth: the executor
     /// range-checks independently).
     pub fn verify(&self, txid: &TxId, leg: LegIndex, value: u64) -> bool {
-        (value >= CUSTODY_VALUE_MIN_NANO && value <= CUSTODY_VALUE_MAX_NANO)
+        (CUSTODY_VALUE_MIN_NANO..=CUSTODY_VALUE_MAX_NANO).contains(&value)
             && self.0 == Hash256::concat(&BURN, &burn_message(txid, leg, value))
     }
 }
@@ -116,10 +116,10 @@ mod tests {
         ));
         let max = BurnCommitment::new(&t, leg, CUSTODY_VALUE_MAX_NANO).unwrap();
         assert!(max.verify(&t, leg, CUSTODY_VALUE_MAX_NANO));
-        let handcrafted = BurnCommitment::from_bytes(*Hash256::concat(
-            &BURN,
-            &burn_message(&t, leg, 0),
-        ).as_bytes());
+        let handcrafted = BurnCommitment::decode(
+            Hash256::concat(&BURN, &burn_message(&t, leg, 0)).as_bytes(),
+        )
+        .unwrap();
         assert!(!handcrafted.verify(&t, leg, 0), "out-of-range value never verifies");
     }
 

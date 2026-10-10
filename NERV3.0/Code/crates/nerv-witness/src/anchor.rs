@@ -4,17 +4,13 @@
 //! against which cold witnesses verify.
 
 
-use std::collections::BTreeMap;
-
-
 use nerv_core::codec::Encode;
 use nerv_core::hash::Hash256;
 use nerv_core::types::{Epoch, Interval};
 use nerv_consensus::attestation::{
-    verify_chain, AttestationError, EpochAttestation, IntervalAttestation,
+    AttestationError, EpochAttestation, IntervalAttestation,
 };
 use nerv_crypto::mldsa::VerifyingKey;
-use nerv_crypto::sigaggr::validate_qc;
 
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -230,9 +226,7 @@ impl LightAnchor {
 mod tests {
     use super::*;
     use nerv_consensus::attestation::interval_digests_root;
-    use nerv_core::types::INTERVALS_PER_EPOCH;
     use nerv_crypto::mldsa::SigningKey;
-    use nerv_crypto::sigaggr::{vote_bytes, VoteCollector};
 
 
     fn keys(seed: u64, n: u64) -> (Vec<SigningKey>, Vec<VerifyingKey>) {
@@ -248,11 +242,11 @@ mod tests {
     }
 
 
-    fn committee_fn<'a>(
-        vks: &'a Vec<VerifyingKey>,
+    fn committee_fn(
+        vks: &[VerifyingKey],
         quorum: usize,
-    ) -> impl Fn(Epoch) -> Option<(Vec<VerifyingKey>, usize)> + 'a {
-        move |_| Some((vks.clone(), quorum))
+    ) -> impl Fn(Epoch) -> Option<(Vec<VerifyingKey>, usize)> + '_ {
+        move |_| Some((vks.to_vec(), quorum))
     }
 
 
@@ -303,7 +297,7 @@ mod tests {
 
     #[test]
     fn anchor_lifecycle() {
-        let (sks, vks) = keys(0xANCH0R, 21);
+        let (sks, vks) = keys(0xA00, 21); // "anchor"
         let quorum = 15;
         let cf = committee_fn(&vks, quorum);
         let zero = Hash256::from_bytes([0u8; 32]);
@@ -367,7 +361,7 @@ mod tests {
 
     #[test]
     fn from_checkpoint() {
-        let (sks, vks) = keys(0xCHKP0NT, 21);
+        let (sks, vks) = keys(0xC00, 21); // "checkpoint"
         let quorum = 15;
         let cf = committee_fn(&vks, quorum);
         let zero = Hash256::from_bytes([0u8; 32]);
@@ -381,7 +375,7 @@ mod tests {
 
     #[test]
     fn epoch_chain_and_error_paths() {
-        let (sks, vks) = keys(0xEPOCH, 21);
+        let (sks, vks) = keys(0xE00, 21); // "epoch"
         let quorum = 15;
         let cf = committee_fn(&vks, quorum);
         let zero = Hash256::from_bytes([0u8; 32]);

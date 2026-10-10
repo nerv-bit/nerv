@@ -371,8 +371,10 @@ mod tests {
         assert_eq!(s.data(d.len() as u32), d);
 
         // 30% pseudo-random withholding (k=4: every row keeps ≥ 5 of 8).
-        let mut rng = SplitMix64::new(99);
-        let m = withhold_map(&set, 0, &|_r, _c| rng.next_u64() % 10 < 3);
+        // RefCell: the closure is a `&dyn Fn`, so the RNG's interior
+        // mutability lives behind a shared borrow.
+        let rng = std::cell::RefCell::new(SplitMix64::new(99));
+        let m = withhold_map(&set, 0, &|_r, _c| rng.borrow_mut().next_u64() % 10 < 3);
         let s = Square::reconstruct(w, &m).unwrap();
         assert_eq!(s.data(d.len() as u32), d);
 

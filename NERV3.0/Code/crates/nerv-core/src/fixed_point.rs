@@ -208,7 +208,7 @@ mod tests {
         let mut best: Option<(i128, i128, i128)> = None; // (dist, parity, q)
         for q in base - 2..=base + 2 {
             let cand = ((d - q * n).abs(), q.rem_euclid(2), q);
-            if best.map_or(true, |b| cand < b) {
+            if best.is_none_or(|b| cand < b) {
                 best = Some(cand);
             }
         }

@@ -144,15 +144,15 @@ impl<B: AirBuilder> Air<B> for SealChip {
             for i in 0..N {
                 let base = cb + AX_RAUX + 3 * i;
                 let s = b.witness(0, base);
-                let m1 = b.witness(0, base + 1);
-                let m0 = b.witness(0, base + 2);
+                let bit0 = b.witness(0, base + 1);
+                let bit1 = b.witness(0, base + 2);
                 // Bit constraints first; each asserts `gate * m_i * (m_i - 1) = 0`.
                 // The `(m - one)` term moves `m`, so clone the witness before
                 // any other use later in the loop body.
                 b.assert_zero(gate.clone() * s.clone() * (s.clone() - one.clone()), "sc_r_sgn");
-                b.assert_zero(gate.clone() * m1.clone() * (m1.clone() - one.clone()), "sc_r_m1");
-                b.assert_zero(gate.clone() * m0.clone() * (m0.clone() - one.clone()), "sc_r_m0");
-                let mag = m1 * two.clone() + m0;
+                b.assert_zero(gate.clone() * bit0.clone() * (bit0.clone() - one.clone()), "sc_r_m1");
+                b.assert_zero(gate.clone() * bit1.clone() * (bit1.clone() - one.clone()), "sc_r_m0");
+                let mag = bit0 + two.clone() * bit1;
                 let r_canon = mag.clone() + s.clone() * (qc.clone() - two.clone() * mag);
                 let sc = b.witness(0, cb + S + bitrev8(i));
                 b.assert_zero(gate.clone() * (sc - r_canon), "sc_r_bind");
@@ -351,12 +351,12 @@ impl<B: AirBuilder> Air<B> for SealChip {
 
                 let ebase = cb + AX_RAUX + 3 * c;
                 let s = b.witness(0, ebase);
-                let m1 = b.witness(0, ebase + 1);
-                let m0 = b.witness(0, ebase + 2);
+                let bit0 = b.witness(0, ebase + 1);
+                let bit1 = b.witness(0, ebase + 2);
                 b.assert_zero(gate.clone() * s.clone() * (s.clone() - one.clone()), "sc_e_sgn");
-                b.assert_zero(gate.clone() * m1.clone() * (m1.clone() - one.clone()), "sc_e_m1");
-                b.assert_zero(gate.clone() * m0.clone() * (m0.clone() - one.clone()), "sc_e_m0");
-                let mag = m1.clone() * two.clone() + m0.clone();
+                b.assert_zero(gate.clone() * bit0.clone() * (bit0.clone() - one.clone()), "sc_e_m1");
+                b.assert_zero(gate.clone() * bit1.clone() * (bit1.clone() - one.clone()), "sc_e_m0");
+                let mag = bit0 + two.clone() * bit1;
                 let e_canon = mag.clone() + s.clone() * (qc.clone() - two.clone() * mag.clone());
 
                 for t2 in 0..8 {
@@ -388,7 +388,7 @@ impl<B: AirBuilder> Air<B> for SealChip {
 // Generation (the native twin pipeline)
 // ---------------------------------------------------------------------------
 
-use nerv_seal::ring::{Mat2x8, Mat8x8Ntt, Poly};
+use nerv_seal::ring::{Mat2x8, Mat8x8Ntt};
 use nerv_seal::sampling::{expand_matrix, ASeed};
 use nerv_seal::SealError;
 
@@ -494,7 +494,7 @@ pub fn gen_seal_trace(
 
     let mut r_states: Vec<Vec<[u64; N]>> = Vec::with_capacity(8);
     let mut r_ntt = vec![[0u64; N]; 8];
-    for j in 0..8 {
+    for (j, _) in (0..8).enumerate() {
         let rc_: [u64; N] = std::array::from_fn(|i| canon(input.r[j][i]));
         let st = fwd_states(&rc_);
         r_ntt[j] = st[8];
@@ -502,20 +502,20 @@ pub fn gen_seal_trace(
     }
 
     let mut u_ntt = vec![[0u64; N]; 8];
-    for i in 0..8 {
+    for (i, _) in (0..8).enumerate() {
         for c in 0..N {
             let mut s = 0u64;
-            for j in 0..8 {
+            for (j, _) in (0..8).enumerate() {
                 s = add_mod(s, mul_q(a_ntt.row(i)[j].values()[c], r_ntt[j][c]));
             }
             u_ntt[i][c] = s;
         }
     }
     let mut v_ntt = vec![[0u64; N]; 2];
-    for k in 0..2 {
+    for (k, _) in (0..2).enumerate() {
         for c in 0..N {
             let mut s = 0u64;
-            for j in 0..8 {
+            for (j, _) in (0..8).enumerate() {
                 s = add_mod(s, mul_q(t_ntt.row(k)[j].values()[c], r_ntt[j][c]));
             }
             v_ntt[k][c] = s;
@@ -544,7 +544,7 @@ pub fn gen_seal_trace(
 
     let mut trace = vec![vec![Goldilocks::ZERO; LEG_W]; ROWS];
     let mut prep = vec![vec![Goldilocks::ZERO; PREP_COLS]; ROWS];
-    for row in 0..ROWS {
+    for (row, _) in (0..ROWS).enumerate() {
         let f = if row < 72 {
             F_IS_FWD
         } else if row < 152 {
@@ -554,10 +554,10 @@ pub fn gen_seal_trace(
         };
         prep[row][f] = Goldilocks::ONE;
     }
-    for row in 0..ROWS - 1 {
+    for (row, _) in (0..ROWS - 1).enumerate() {
         prep[row][PV_SEAL_COPY] = Goldilocks::ONE;
     }
-    for j in 0..8 {
+    for (j, _) in (0..8).enumerate() {
         for l in 0..9 {
             let row = 9 * j + l;
 
@@ -573,7 +573,7 @@ pub fn gen_seal_trace(
             }
         }
     }
-    for row in 72..152 {
+    for (row, _) in (72..152).enumerate() {
         prep[row][F_MACJ + (row - 72) % 8] = Goldilocks::ONE;
         prep[row][F_MACI + (row - 72) / 8] = Goldilocks::ONE;
     }
@@ -635,9 +635,9 @@ pub fn gen_seal_trace(
                 }
             }
         }
-        for row in (9 * j + 9)..ROWS {
+        for row in trace.iter_mut().skip(9 * j + 9).take(ROWS - (9 * j + 9)) {
             for c in 0..N {
-                put_val(&mut trace[row], REG_R + 256 * j + c, r_ntt[j][c]);
+                put_val(row, REG_R + 256 * j + c, r_ntt[j][c]);
             }
         }
     }
@@ -649,7 +649,7 @@ pub fn gen_seal_trace(
         let idx = blk - 8 * usize::from(is_v);
         let mut acc = [0u64; N];
 
-        for jj in 0..8 {
+        for (jj, _) in (0..8).enumerate() {
             let row_i = 72 + 8 * blk + jj;
             let mop: &[u64; N] = if is_v {
                 t_ntt.row(idx)[jj].values()
@@ -665,7 +665,7 @@ pub fn gen_seal_trace(
                 prep[row_i][MOP + c] = Goldilocks::from_u64_reduce(mop[c]);
                 acc[c] += rv;
             }
-            for c in 0..N {
+            for (c, _) in (0..N).enumerate() {
                 put_val(&mut trace[row_i + 1], REG_ACC + c, acc[c]);
             }
         }
@@ -678,18 +678,18 @@ pub fn gen_seal_trace(
         let target = if is_v { REG_VNTT + 256 * idx } else { REG_UNTT + 256 * idx };
         let src_val: &[u64; N] =
             if is_v { &v_ntt[idx] } else { &u_ntt[idx] };
-         for row in (row_i + 1)..ROWS {
-            for c in 0..N {
-                put_val(&mut trace[row], target + c, src_val[c]);
+         for row in trace.iter_mut().skip(row_i + 1).take(ROWS - (row_i + 1)) {
+            for (c, _) in (0..N).enumerate() {
+                put_val(row, target + c, src_val[c]);
             }
         }
         acc_final.copy_from_slice(&acc);
     }
     // ACC holds block 9's final value through the inverse section — the
     // copy gate's demand on rows [152, ROWS).
-    for row in 152..ROWS {
-        for c in 0..N {
-            put_val(&mut trace[row], REG_ACC + c, acc_final[c]);
+    for row in trace.iter_mut().skip(152).take(ROWS - 152) {
+        for (c, _) in (0..N).enumerate() {
+            put_val(row, REG_ACC + c, acc_final[c]);
         }
     }
 
@@ -764,12 +764,12 @@ pub fn gen_seal_trace(
     }
 
     let mut publics = Vec::with_capacity(2560);
-    for i in 0..8 {
+    for (i, _) in (0..8).enumerate() {
         for c in 0..N {
             publics.push(Goldilocks::from_u64_reduce(u_pub[i][c]));
         }
     }
-    for k in 0..2 {
+    for (k, _) in (0..2).enumerate() {
         for c in 0..N {
             publics.push(Goldilocks::from_u64_reduce(v_pub[k][c]));
         }
@@ -787,6 +787,7 @@ mod tests {
     use nerv_seal::circuit_stmt::{apply_statement_10, check_statement_10};
     use nerv_seal::digitize::{digitize, Plaintext};
     use nerv_seal::encrypt::derive_reference_keypair;
+    use nerv_seal::ring::Poly;
     use nerv_seal::ring::{Vec2, Vec8};
 
     fn fixture(seed: u64) -> (SealLegInput, ASeed, Mat2x8) {
@@ -807,8 +808,8 @@ mod tests {
             SealLegInput { r, e1, e2, m },
             *pk.a_seed(),
             Mat2x8::new([
-                *Vec8::new(*pk.t().row(0).clone()).polys(),
-                *Vec8::new(*pk.t().row(1).clone()).polys(),
+                *pk.t().row(0),
+                *pk.t().row(1),
             ]),
         )
     }
@@ -874,8 +875,17 @@ mod tests {
             }
         }
 
+        for i in 0..N {
+            let value = input.r[0][i];
+            let want = if value < 0 { Q - value.unsigned_abs() } else { value as u64 };
+            assert_eq!(st.trace[0][S + bitrev8(i)].as_u64(), want, "r coefficient {i}");
+            let bit0 = st.trace[0][AX_RAUX + 3 * i + 1].as_u64();
+            let bit1 = st.trace[0][AX_RAUX + 3 * i + 2].as_u64();
+            assert_eq!(bit0 + 2 * bit1, value.unsigned_abs(), "r magnitude {i}");
+        }
         let chip = SealChip::new();
-        assert!(NativeEval::check_with_prep(st.trace, st.prep, st.publics, &chip, 4).is_ok());
+        let result = NativeEval::check_with_prep(st.trace, st.prep, st.publics, &chip, 4);
+        assert!(result.is_ok(), "seal constraints: {:?}", result.err());
     }
 
     #[test]
@@ -884,34 +894,34 @@ mod tests {
         let chip = SealChip::new();
 
         let mut st = gen_seal_trace(&input, &a_seed, &t).unwrap();
-        st.trace[0][S + 7] = st.trace[0][S + 7] + Goldilocks::ONE;
+        st.trace[0][S + 7] += Goldilocks::ONE;
         let errs = NativeEval::check_with_prep(st.trace.clone(), st.prep.clone(), st.publics.clone(), &chip, 8)
             .unwrap_err();
         assert!(errs.iter().any(|e| e.name == "sc_r_bind" || e.name.starts_with("sc_fwd")));
-        st.trace[0][S + 7] = st.trace[0][S + 7] - Goldilocks::ONE;
+        st.trace[0][S + 7] -= Goldilocks::ONE;
 
-        st.trace[3][S + 100] = st.trace[3][S + 100] + Goldilocks::ONE;
+        st.trace[3][S + 100] += Goldilocks::ONE;
         assert!(NativeEval::check_with_prep(st.trace.clone(), st.prep.clone(), st.publics.clone(), &chip, 8).is_err());
-        st.trace[3][S + 100] = st.trace[3][S + 100] - Goldilocks::ONE;
+        st.trace[3][S + 100] -= Goldilocks::ONE;
 
-        st.trace[72][AX_RB + 5] = st.trace[72][AX_RB + 5] + Goldilocks::ONE;
+        st.trace[72][AX_RB + 5] += Goldilocks::ONE;
         let errs = NativeEval::check_with_prep(st.trace.clone(), st.prep.clone(), st.publics.clone(), &chip, 8)
             .unwrap_err();
-        assert!(errs.iter().any(|e| e.name == "sc_div" || e.name == "sc_rbit"));
-        st.trace[72][AX_RB + 5] = st.trace[72][AX_RB + 5] - Goldilocks::ONE;
+        assert!(errs.iter().any(|e| e.name == "sc_div" || e.name == "sc_rbit"), "tamper constraint names: {:?}", errs.iter().map(|e| e.name).collect::<Vec<_>>());
+        st.trace[72][AX_RB + 5] -= Goldilocks::ONE;
 
-        st.trace[80][REG_R + 3] = st.trace[80][REG_R + 3] + Goldilocks::ONE;
+        st.trace[80][REG_R + 3] += Goldilocks::ONE;
         assert!(NativeEval::check_with_prep(st.trace.clone(), st.prep.clone(), st.publics.clone(), &chip, 8).is_err());
-        st.trace[80][REG_R + 3] = st.trace[80][REG_R + 3] - Goldilocks::ONE;
+        st.trace[80][REG_R + 3] -= Goldilocks::ONE;
 
-        st.trace[152][S + 9] = st.trace[152][S + 9] + Goldilocks::ONE;
+        st.trace[152][S + 9] += Goldilocks::ONE;
         let errs = NativeEval::check_with_prep(st.trace.clone(), st.prep.clone(), st.publics.clone(), &chip, 8)
             .unwrap_err();
         assert!(errs.iter().any(|e| e.name == "sc_invin" || e.name.starts_with("sc_inv")));
-        st.trace[152][S + 9] = st.trace[152][S + 9] - Goldilocks::ONE;
+        st.trace[152][S + 9] -= Goldilocks::ONE;
 
         let mut pubs = st.publics.clone();
-        pubs[100] = pubs[100] + Goldilocks::ONE;
+        pubs[100] += Goldilocks::ONE;
         let errs = NativeEval::check_with_prep(st.trace, st.prep, pubs, &chip, 8).unwrap_err();
         assert!(errs.iter().any(|e| e.name == "sc_bind"));
     }

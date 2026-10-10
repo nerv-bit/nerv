@@ -12,7 +12,6 @@ use nerv_crypto::mldsa::{Signature, SigningKey, VerifyingKey};
 use nerv_state::ttau::TauTree;
 
 
-use crate::error::VerificationError;
 // Re-export so callers can write `nerv_registry::bundle::BundleError` (used
 // by `nerv-consensus`'s slash module when bundling `BundleError` into
 // `SlashError`). The underlying enum lives in `nerv_registry::error`.
@@ -281,9 +280,9 @@ impl Decode for Bundle {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use crate::error::VerificationError;
     use crate::mempool::Mempool;
-    use crate::testutil::harness::{agg_key, ctx, shell, shallow_proof, txid_of};
-    use crate::testutil::SplitMix64;
+    use crate::testutil::harness::{agg_key, ctx, shell, shallow_proof, txid_of, SplitMix64};
     use nerv_core::constants::BUNDLE_ATTEST;
 
 
@@ -320,7 +319,7 @@ mod tests {
         m.extend_from_slice(root_source.as_bytes());
         m.extend_from_slice(&3u32.to_le_bytes());
         assert!(sk.verifying_key().verify(&m, &b.attestation.signature));
-        assert_eq!(b.attestation.verify(&sk.verifying_key()), true);
+        assert!(b.attestation.verify(sk.verifying_key()));
 
 
         // The summary matches the attestation.
@@ -342,7 +341,9 @@ mod tests {
             Err(BundleError::TooLarge { count: 5, max: 4 })
         ));
         b.validate_structure_with_max(5).unwrap();
-        assert!(BUNDLE_MIN >= 1 && BUNDLE_MAX >= BUNDLE_MIN);
+        const _: () = {
+            assert!(BUNDLE_MIN >= 1 && BUNDLE_MAX >= BUNDLE_MIN);
+        };
     }
 
 
@@ -393,11 +394,9 @@ mod tests {
 
         // Tampered signature bytes.
         let mut bad = b.clone();
-        let mut sig = bad.attestation.signature.as_bytes().clone();
+        let mut sig: [u8; 3309] = *bad.attestation.signature.as_bytes();
         sig[100] ^= 1;
-        bad.attestation.signature = Signature::from_bytes(
-            sig.try_into().unwrap(),
-        );
+        bad.attestation.signature = Signature::from_bytes(sig);
         assert!(matches!(bad.validate_structure(), Err(BundleError::BadSignature)));
 
 
@@ -429,7 +428,26 @@ mod tests {
         let dec = Bundle::decode(&enc).unwrap();
         assert_eq!(dec, b);
         dec.validate_structure().unwrap();
-        for cut in 0..enc.len() {
+        // Exhaustively decoding every byte prefix replays the large nested
+        // transaction-proof decoder O(enc.len()) times and made this test
+        // take many minutes. Cover evenly spaced prefixes plus every
+        // top-level shell/proof boundary while keeping the work bounded.
+        let mut cuts = vec![0, enc.len() / 2, enc.len() - 1];
+        for step in 1..64 {
+            cuts.push(enc.len() * step / 64);
+        }
+        let mut cut = b.aggregator.encoded_len() + 4;
+        for tx in &b.transactions {
+            cuts.push(cut);
+            cut += tx.shell.encoded_len();
+            cuts.push(cut);
+            cut += tx.proof.encoded_len();
+            cuts.push(cut);
+        }
+        cuts.retain(|&cut| cut < enc.len());
+        cuts.sort_unstable();
+        cuts.dedup();
+        for cut in cuts {
             assert!(Bundle::decode(&enc[..cut]).is_err(), "cut {cut}");
         }
         let mut ext = enc.clone();

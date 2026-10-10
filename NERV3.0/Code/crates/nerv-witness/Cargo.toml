@@ -23,6 +23,7 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 nerv-custody = { path = "../nerv-custody" }
+nerv-seal = { path = "../nerv-seal" }
 
 
 [lints]

@@ -1199,6 +1199,7 @@ dependencies = [
  "nerv-registry",
  "nerv-seal",
  "nerv-state",
+ "nerv-wallet-core",
  "nerv-witness",
  "proptest",
  "thiserror 2.0.21",
@@ -1226,6 +1227,7 @@ dependencies = [
  "nerv-core",
  "nerv-crypto",
  "nerv-custody",
+ "nerv-seal",
  "nerv-state",
  "thiserror 2.0.21",
 ]

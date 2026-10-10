@@ -8,6 +8,8 @@
 //!     binds the witness to the shell.
 //!   * **Step 2** — round-trip the `TransactionWitness` and
 //!     `TransactionShell` through `nerv_core::codec::{Encode, Decode}`.
+
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!   * **Step 3** — build a minimal `ShardBlock` (empty block + a stub
 //!     QC) and round-trip it through the codec.
 //!
@@ -101,12 +103,19 @@ fn funded_wallet(
 ) -> Result<(WalletKeys, nerv_wallet::keys::AddressSet, nerv_wallet::scan::WalletNoteSet, u64), Box<dyn std::error::Error>> {
     let w = wallet_keys(seed as u8);
     let active = ShardSet::genesis();
-    let addrs = nerv_wallet::keys::AddressSet::generate(&w, &active)?;
+    let mut addrs = nerv_wallet::keys::AddressSet::generate(&w, &active)?;
+    // The default wallet covers DEFAULT_SHARD_COVERAGE=8 shards chosen
+    // pseudo-randomly from the master seed; the requested shard may not be
+    // among them. ensure_shard extends coverage deterministically up to
+    // MAX_GENERATION=128 attempts.
+    if !addrs.covered_shards().iter().any(|s| s == &shard) {
+        addrs.ensure_shard(&w, &active, shard)?;
+    }
     let addr = addrs
         .addresses_for_shard(&shard)
         .into_iter()
         .next()
-        .unwrap();
+        .expect("ensure_shard must cover the requested shard");
 
     let mut wallet_ns = nerv_wallet::scan::WalletNoteSet::default();
     let mut tree = nerv_custody::nct::NoteCommitmentTree::new();
@@ -160,6 +169,29 @@ fn dummy_qc() -> QuorumCertificate {
     }
 }
 
+/// A deterministic, well-formed producer-payout Address. Mirrors the
+/// `payout()` helper inside `nerv_state::executor::tests`: ML-KEM-1024
+/// ek bytes seeded from a fixed RNG, then `Address::new` computes the
+/// tag from the ek via `home_kappa(&kappa(ek.as_bytes()))`.
+fn producer_payout() -> Address {
+    use nerv_crypto::mlkem::EncapsulationKey;
+    use nerv_core::types::{kappa, ShardSet};
+    let mut b = [0u8; 1184];
+    // Deterministic fill: splitmix64 with seed 0xFA0 (matches executor tests).
+    let mut state: u64 = 0xFA0;
+    for chunk in b.chunks_exact_mut(8) {
+        state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        chunk.copy_from_slice(&(z ^ (z >> 31)).to_le_bytes());
+    }
+    let ek = EncapsulationKey::from_bytes(b);
+    let set = ShardSet::genesis();
+    let tag = set.home_kappa(&kappa(ek.as_bytes())).unwrap();
+    Address::new(ek, tag, [0u8; 32]).unwrap()
+}
+
 fn minimal_block(shard: ShardId) -> ShardBlock {
     ShardBlock {
         shard,
@@ -178,12 +210,7 @@ fn minimal_block(shard: ShardId) -> ShardBlock {
                 root: Hash256::from_bytes([0u8; 32]),
             },
             fee_total: FeeSats::ZERO,
-            producer_payout: Address::new(
-                nerv_crypto::mlkem::EncapsulationKey::from_bytes([0u8; 1184]),
-                ShardId::new(6, 0).unwrap(),
-                [0u8; 32],
-            )
-            .unwrap(),
+            producer_payout: producer_payout(),
             qc_hash: Hash256::from_bytes([0u8; 32]),
         },
         legs: vec![],

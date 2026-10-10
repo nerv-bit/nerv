@@ -42,7 +42,7 @@ const _: () = {
     let scheme = nerv_core::params::DA_ERASURE_SCHEME;
     let expected_scheme: &[u8] = b"2d-reed-solomon";
     assert!(
-        scheme.as_bytes().len() == expected_scheme.len()
+        scheme.len() == expected_scheme.len()
             && {
                 let mut ok = true;
                 let mut i = 0;

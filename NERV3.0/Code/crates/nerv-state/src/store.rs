@@ -16,10 +16,15 @@ use crate::header::ShardHeader;
 
 pub const SCHEMA_VERSION: u32 = 1;
 
+#[cfg(feature = "rocksdb")]
 const CF_META: &str = "meta";
+#[cfg(feature = "rocksdb")]
 const CF_HEADERS: &str = "headers";
+#[cfg(feature = "rocksdb")]
 const CF_BLOCKS: &str = "blocks";
+#[cfg(feature = "rocksdb")]
 const CF_SNAPSHOTS: &str = "snapshots";
+#[cfg(feature = "rocksdb")]
 const VERSION_KEY: &[u8] = b"schema_version";
 /// The per-shard tip markers' reserved height key.
 const TIP_MARKER_HEIGHT: u64 = u64::MAX;
@@ -424,7 +429,7 @@ pub fn load_shard(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::testutil::harness::{build_chain, params};
+    use crate::testkit::{build_chain, params};
     use nerv_core::types::ShardSet;
 
     #[test]
@@ -462,9 +467,14 @@ mod tests {
 
         // A snapshot at the reserved marker height is rejected — built by
         // patching the encoded height (a hostile-snapshot decode test).
+        // The state encodes `… prev ‖ height ‖ fee_floor`, where fee_floor is
+        // a variable-length tail (m: u64 ‖ window: seq). Patch the 8-byte
+        // height slot immediately before the fee_floor.
         let mut bytes = states[3].encode();
         let n = bytes.len();
-        bytes[n - 8..].copy_from_slice(&u64::MAX.to_le_bytes());
+        let fee_floor_len = states[3].fee_floor().encoded_len();
+        let height_off = n - fee_floor_len - 8;
+        bytes[height_off..height_off + 8].copy_from_slice(&u64::MAX.to_le_bytes());
         let maxed = ShardState::decode(&bytes).unwrap();
         assert_eq!(maxed.height().as_u64(), u64::MAX);
         assert!(matches!(store.put_snapshot(&maxed), Err(StoreError::ReservedHeight)));
@@ -594,7 +604,7 @@ mod tests {
 mod rocks_tests {
     use super::*;
     use crate::error::ExecutorError;
-    use crate::testutil::harness::{build_chain, params};
+    use crate::testkit::{build_chain, params};
     use nerv_core::types::ShardSet;
 
     fn temp_path(tag: u32) -> std::path::PathBuf {
