@@ -130,6 +130,7 @@ pub enum WalletAction {
         payout_address_hex: String,
         stake_balance_nano: u64,
         account_id: [u8; 32],
+        shard: u64,
     },
     /// The producer registration failed (stake rejected, signing-key
     /// derivation error, etc.). The state machine surfaces the reason

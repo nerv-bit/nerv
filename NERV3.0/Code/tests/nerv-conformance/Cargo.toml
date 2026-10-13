@@ -7,18 +7,9 @@ license.workspace = true
 publish.workspace = true
 description = "Conformance registry: canonical encoding, spec validation and hashing, frozen golden vectors, reference emission schedule"
 
-[lints]
-workspace = true
-
 [lib]
 name = "nerv_conformance"
 path = "src/lib.rs"
-
-# The conformance crate ships as a library only; the dedicated
-# `src/bin/conformance.rs` file was an early prototype generator (no
-# main()), fully duplicated under `pub mod vectors;`. Stale binary
-# entrypoint removed; the lib's `vectors` module is the canonical
-# generator surface.
 
 [dependencies]
 blake3 = { workspace = true }
@@ -28,3 +19,28 @@ clap = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 nerv-core = { path = "../../crates/nerv-core" }
+
+[dev-dependencies]
+# Cross-crate peer surfaces wired in Session 10 to back Phase C (C1–C6)
+# integration tests in `src/tests/`. Each is on the integration test
+# surface only — production builds of `nerv-conformance` still compile
+# with the minimal `[dependencies]` block above.
+nerv-codec = { path = "../../crates/nerv-codec" }
+nerv-crypto = { path = "../../crates/nerv-crypto" }
+nerv-custody = { path = "../../crates/nerv-custody" }
+nerv-proofs = { path = "../../crates/nerv-proofs" }
+nerv-seal = { path = "../../crates/nerv-seal" }
+# `testkit` is the seam declared in `nerv-state/Cargo.toml` for the
+# deterministic test scaffolding (`TestWorld`, `seal`, `register_tau`,
+# `one_leg_block`, …); without it the `pub mod testkit` is not compiled
+# and Phase C tests cannot construct valid ShardBlocks to feed
+# `apply_block` from outside the crate (road_to_testnet.md §A3).
+nerv-state = { path = "../../crates/nerv-state", features = ["testkit"] }
+nerv-wallet = { path = "../../crates/nerv-wallet" }
+nerv-net = { path = "../../crates/nerv-net" }
+nerv-da = { path = "../../crates/nerv-da" }
+nerv-consensus = { path = "../../crates/nerv-consensus" }
+nerv-registry = { path = "../../crates/nerv-registry" }
+
+[lints]
+workspace = true

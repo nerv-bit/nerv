@@ -92,6 +92,7 @@ pub fn update(state: &mut WalletState, action: WalletAction) -> Vec<WalletEvent>
             // tied to the wallet's seed, so once the seed is dropped
             // there is no way to reauthenticate as the producer.
             state.producer_state = ProducerState::default();
+            state.chain_height = 0;
             state.sync = SyncStatus::Locked;
             state.screen = Screen::Dashboard;
             state.notify(NotificationLevel::Info, "Wallet locked".into());
@@ -130,11 +131,15 @@ pub fn update(state: &mut WalletState, action: WalletAction) -> Vec<WalletEvent>
         // === Send flow ===
         WalletAction::StartSend => {
             state.screen = Screen::Send;
-            state.draft = Some(crate::state::TransactionDraft {
+            let balance = state.balance_nano();
+            let synced = matches!(state.sync, SyncStatus::Synced { .. });
+            let mut draft = crate::state::TransactionDraft {
                 fee_nano: 1000,
                 expiry_height: state.chain_height.saturating_add(500),
                 ..Default::default()
-            });
+            };
+            draft.validate(balance, synced);
+            state.draft = Some(draft);
             events.push(WalletEvent::Redraw);
         }
         WalletAction::SetRecipient(hex) => {
@@ -197,7 +202,13 @@ pub fn update(state: &mut WalletState, action: WalletAction) -> Vec<WalletEvent>
         // === Claim flow ===
         WalletAction::StartClaim => {
             state.screen = Screen::Claim;
-            state.claim_draft = Some(ClaimDraft::default());
+            let window_open = matches!(
+                state.sync,
+                SyncStatus::Synced { .. } | SyncStatus::Scanning { .. }
+            );
+            let mut draft = ClaimDraft::default();
+            draft.validate(window_open);
+            state.claim_draft = Some(draft);
             state.notify(
                 NotificationLevel::Info,
                 "Pick a claim bucket and amount".into(),
@@ -371,22 +382,23 @@ pub fn update(state: &mut WalletState, action: WalletAction) -> Vec<WalletEvent>
             payout_address_hex,
             stake_balance_nano,
             account_id: _account_id,
+            shard,
         } => {
             // Populate the producer-state snapshot. The node's role
             // string + epoch payout are filled in by future
             // `ProducerStateRefreshed` events as the node reports
-            // them; we initialize the basics here.
+            // them; we initialize the basics here. `assigned_shard` is
+            // the shard the platform shell just registered for — echoed
+            // back from the `RegisterProducerStake` request. The draft
+            // is already consumed by the time this confirmation arrives,
+            // so it cannot be read back from `producer_draft`.
             state.producer_state = ProducerState {
                 verifying_key_hex: verifying_key_hex.clone(),
                 payout_address_hex: payout_address_hex.clone(),
                 stake_balance_nano,
                 total_payouts_nano: 0,
                 epoch_payout_nano: 0,
-                assigned_shard: state
-                    .producer_draft
-                    .as_ref()
-                    .and_then(|d| d.shard)
-                    .unwrap_or(0),
+                assigned_shard: shard,
                 node_role: "Producer".into(),
                 stake_registered: true,
             };
@@ -612,6 +624,11 @@ mod tests {
     #[test]
     fn draft_validation_flow() {
         let mut s = WalletState::new();
+        // The send flow validates against `synced`; start from a loaded,
+        // fully-synced wallet so the validation precedence below reaches
+        // the `InsufficientFunds` branch instead of short-circuiting on
+        // `NotSynced`.
+        s.sync = SyncStatus::Synced { height: 0 };
         update(&mut s, WalletAction::StartSend);
         assert!(s.draft.is_some());
 
@@ -712,6 +729,10 @@ mod tests {
     #[test]
     fn set_claim_amount_validates() {
         let mut s = WalletState::new();
+        // The claim window is open only for a loaded wallet; start from
+        // a synced wallet so `SetClaimAmount(50_000)` validates as ready
+        // rather than `WindowClosed`.
+        s.sync = SyncStatus::Synced { height: 0 };
         update(&mut s, WalletAction::StartClaim);
         update(&mut s, WalletAction::SetClaimBucket(ClaimBucket::Community));
         update(&mut s, WalletAction::SetClaimAmount(0));
@@ -726,6 +747,9 @@ mod tests {
     #[test]
     fn sign_and_claim_emits_pipeline_event() {
         let mut s = WalletState::new();
+        // The claim pipeline only fires when the window is open; start
+        // from a synced wallet (a locked wallet reports `WindowClosed`).
+        s.sync = SyncStatus::Synced { height: 0 };
         update(&mut s, WalletAction::StartClaim);
         update(&mut s, WalletAction::SetClaimBucket(ClaimBucket::Community));
         update(&mut s, WalletAction::SetClaimAmount(50_000));
@@ -1008,6 +1032,7 @@ mod tests {
                 payout_address_hex: addr.clone(),
                 stake_balance_nano: 900_000_000,
                 account_id,
+                shard: 3,
             },
         );
         assert_eq!(s.producer_state.verifying_key_hex, vk);
@@ -1086,6 +1111,7 @@ mod tests {
                 payout_address_hex: hex64(0xBB),
                 stake_balance_nano: 100,
                 account_id: [0xCC; 32],
+                shard: 0,
             },
         );
         assert!(s.producer_state.stake_registered);

@@ -855,8 +855,8 @@ pub fn gen_delta_trace(
 
 
     for l in 0..n {
-        for (r, _) in ((ROWS_PER_LEG * l)..(ROWS_PER_LEG * (l + 1))).enumerate() {
-            prep[r][PV_TIE + TIE_STRIDE * n + l] = Goldilocks::ONE;
+        for row in prep.iter_mut().skip(ROWS_PER_LEG * l).take(ROWS_PER_LEG) {
+            row[PV_TIE + TIE_STRIDE * n + l] = Goldilocks::ONE;
         }
         let e = LEG_W * l;
         let base = ROWS_PER_LEG * l;
@@ -937,8 +937,8 @@ pub fn gen_delta_trace(
                 run += ells[k];
             }
         }
-        for (r, _) in ((base + 24)..rows).enumerate() {
-            loga_at[r] = run;
+        for slot in loga_at.iter_mut().skip(base + 24) {
+            *slot = run;
         }
         let loga = run;
 
@@ -951,8 +951,8 @@ pub fn gen_delta_trace(
                 vol_running += out_values[out_start + k];
             }
         }
-        for (r, _) in ((base + 8)..rows).enumerate() {
-            vol_at[r] = vol_running;
+        for slot in vol_at.iter_mut().skip(base + 8) {
+            *slot = vol_running;
         }
         for k in 0..8 {
             let value = if k < leg.n_out { out_values[out_start + k] } else { 0 };

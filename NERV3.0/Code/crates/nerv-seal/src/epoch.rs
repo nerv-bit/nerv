@@ -493,8 +493,12 @@ impl RotationRecord {
 
 
     pub fn from_bytes(bytes: &[u8]) -> Result<RotationRecord, EpochError> {
-        if bytes.len() < 92 {
-            return Err(EpochError::BadLength { len: bytes.len(), expected: 92 });
+        // Header is 8+8+32+32+8+8+4 = 100 bytes (epoch_out, epoch_in,
+        // out_transcript_digest, in_transcript_digest, padded_batches,
+        // opened, missed.len). The count is read at bytes[96..100], so
+        // the early length check must be >= 100, not 92.
+        if bytes.len() < 100 {
+            return Err(EpochError::BadLength { len: bytes.len(), expected: 100 });
         }
         let u64at = |at: usize| {
             let mut b = [0u8; 8];

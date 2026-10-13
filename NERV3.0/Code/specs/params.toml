@@ -97,19 +97,22 @@ fiat_shamir_hash = "blake3"
 fiat_shamir_model = "qrom"               # the protocol's single named non-standard assumption
 lookup_blake3_window_bits = 16           # D.2 lookup mandate
 range_window_bits = 60                   # windowed 60-bit range checks
-digit_decomposition_bits = 8            # seal digit decomposition
+digit_decomposition_bits = 8            # seal digit decomposition (erratum 40, matches seal.digit_bits)
 fs_binding_challenge = "nf-txid-shell"   # H(all nullifiers ‖ txid ‖ shell digest) (§5.1 st. 11)
+# Poseidon2 parameters live as a sibling of [proofs.fri] inside [proofs]
+# (not inside the FRI subsection). The toml parser keeps the current
+# section in scope until a new [header] — the blank line above [proofs.fri]
+# is *not* enough; place these fields BEFORE [proofs.fri].
+poseidon2_t = 16                    # §5.3: state width over the prover field
+poseidon2_full_rounds = 8           # external rounds (M_E), split 4 + 4
+poseidon2_partial_rounds = 56       # internal rounds (M_I); frozen at ≥ plonky3-class margin
+poseidon2_sbox_degree = 7           # x^7; bijective on Goldilocks: gcd(7, p−1) = 1 (CI-verified)
 [proofs.fri]                             # chunk 12.5: the native engine's frozen FRI config (D.2)
 log_blowup = 4                           # rate 2^-4; conjectured FRI term b·q/2 = 112 bits
 num_queries = 56                         # 112 sits above the envelope's tightest field term (~111)
 log_final_poly_len = 1                   # final layer of 2 points; coefficient cap floors at 1
 commit_pow_bits = 0                      # grinding in reserve (D.2; the engine implements it)
 query_pow_bits = 0                       # Envelope check at these values (the gate runs per proof at the actual log_n): α = 128 − ceil_log₂(families) ≥ 108 (seal-chip scale 2^20); DEEP-ALI = 128 − ceil_log₂(max_heavy·N) ≥ 100 for max_heavy ≤ 5, N ≤ 2^25; batch ≥ 115 at W ≤ 2^16; FRI = 112. Floor 100 met with ≥ 7 bits margin across the whole D.2 envelope; traces beyond 2^25 re-gate (the gate errors loudly, never silently proves weak).
-
-poseidon2_t = 16                    # §5.3: state width over the prover field
-poseidon2_full_rounds = 8           # external rounds (M_E), split 4 + 4
-poseidon2_partial_rounds = 56       # internal rounds (M_I); frozen at ≥ plonky3-class margin
-poseidon2_sbox_degree = 7           # x^7; bijective on Goldilocks: gcd(7, p−1) = 1 (CI-verified)
 
 
 [overlay]

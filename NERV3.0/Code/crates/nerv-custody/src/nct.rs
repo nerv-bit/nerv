@@ -271,19 +271,25 @@ impl NoteCommitmentTree {
 
     /// Tree root. Empty tree ⇒ E_32; otherwise the frontier fold
     /// r_{k+1} = H(frontier_k or E_k, r_k), r_0 = E_0, where frontier slot
-    /// k is occupied iff bit k of `count` is set.
+    /// k is occupied iff bit k of `count` is set. The fold pads with
+    /// `empty[k]` for k ≥ `levels.len()` (matches the witness path, which
+    /// always pads to DEPTH).
     pub fn root(&self) -> NctDigest {
         if self.count == 0 {
             return empty_digests()[DEPTH];
         }
         let empty = empty_digests();
         let mut r = empty[0];
-        for (k, level) in self.levels.iter().zip(empty.iter()).take(DEPTH).enumerate() {
+        for (k, e) in empty.iter().enumerate().take(DEPTH) {
             r = if (self.count >> k) & 1 == 1 {
-                let left = level.0.last().copied().unwrap_or(*level.1);
+                let left = self
+                    .levels
+                    .get(k)
+                    .and_then(|lvl| lvl.last().copied())
+                    .unwrap_or(*e);
                 node_digest(&left, &r)
             } else {
-                node_digest(&r, level.1)
+                node_digest(&r, e)
             };
         }
         r

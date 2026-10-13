@@ -100,12 +100,15 @@ mod tests {
 
     #[test]
     fn rehome_builds_a_cross_shard_self_spend() {
-        let from = ShardSet::genesis().ids()[7];
-        let to = ShardSet::genesis().ids()[40];
         let active = ShardSet::genesis();
 
         let w = wallet(0x3E);
         let mut addrs = AddressSet::generate_with_coverage(&w, &active, 4).unwrap();
+        // Source and target shards are the wallet's first two covered
+        // shards — the covered-shard grid is seed-dependent, so hardcoding
+        // shard ids would be fragile.
+        let from = addrs.covered_shards()[0];
+        let to = addrs.covered_shards()[1];
         let addr = addrs.addresses_for_shard(&from).into_iter().next().unwrap();
 
         // Fund the wallet on `from`.

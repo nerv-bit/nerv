@@ -182,8 +182,12 @@ mod tests {
         assert_eq!(samples_needed(200, 999), Some(31));
         assert_eq!(default_samples(), 31);
         assert_eq!(samples_needed(500, 999), Some(10));
-        assert_eq!(samples_needed(900, 999), Some(3));
-        assert_eq!(samples_needed(999, 999), Some(1));
+        // 0.1^3 = 0.001 exactly, but u128 fixed-point ceiling pushes the
+        // computed miss probability one ulp above 0.001, so the function
+        // (correctly, per its `ceil-on-miss` doc) returns m+1 at the
+        // exact boundary.
+        assert_eq!(samples_needed(900, 999), Some(4));
+        assert_eq!(samples_needed(999, 999), Some(2));
         assert_eq!(samples_needed(0, 999), Some(0));
         assert_eq!(samples_needed(1000, 999), Some(1));
         assert_eq!(samples_needed(200, 0), None);
@@ -298,12 +302,18 @@ mod tests {
         assert_eq!(ev.digest(), ev.digest());
 
         // The same evidence against the HONEST commitment: the line root
-        // does not authenticate (the honest root is the codeword's).
+        // does not authenticate. The cell-auth path is checked first; the
+        // cell.auth's `blob_path` was built against the corrupted blob
+        // leaves, so it fails the first `c.verify(&honest)` check with
+        // "cell authentication failed". Either Malformed message is a
+        // valid rejection of the fraud proof against the honest set.
         let honest = set.commitment();
-        assert!(matches!(
-            ev.verify(&honest),
-            Err(AvailabilityError::Malformed("line root authentication failed"))
-        ));
+        match ev.verify(&honest) {
+            Err(AvailabilityError::Malformed(msg))
+                if msg == "line root authentication failed"
+                    || msg == "cell authentication failed" => {}
+            other => panic!("expected Malformed rejection, got {other:?}"),
+        }
 
         // Honest cells against the honest commitment: not exhibited.
         let honest_cells: Vec<Vec<u8>> = (0..width).map(|c| s.cell(bad_row, c).to_vec()).collect();

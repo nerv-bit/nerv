@@ -358,7 +358,12 @@ mod tests {
 
 
     fn h(seed: u64) -> Hash256 {
-        Hash256::from_bytes([seed as u8; 32])
+        // Injective in `seed` — the low-byte-only fill would collide for
+        // seed > 255 and silently dedupe large key sets (breaking the
+        // 10,000-leg budget tests).
+        let mut b = [0u8; 32];
+        b[..8].copy_from_slice(&seed.to_le_bytes());
+        Hash256::from_bytes(b)
     }
 
 
@@ -592,8 +597,10 @@ mod tests {
     fn cross_shard_receipt_is_two_witnesses_bound_by_txid() {
         // A two-leg cross-shard payment: two inclusion witnesses sharing
         // the txid, ~1.1 KB total (§11.6).
-        let (tree_a, wit_a) = tree_and_witness(6, 100, 50);
-        let (tree_b, wit_b) = tree_and_witness(7, 100, 50);
+        // §11.6's "~1.1 KB total" is at the 10,000-leg cap (~530 B per
+        // standard witness), so use the cap-size tree, not 100 legs.
+        let (tree_a, wit_a) = tree_and_witness(6, 10_000, 5_000);
+        let (tree_b, wit_b) = tree_and_witness(7, 10_000, 5_000);
         // Bind by txid.
         let mut wit_b = wit_b;
         wit_b.txid = wit_a.txid;

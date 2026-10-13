@@ -573,7 +573,10 @@ pub fn gen_seal_trace(
             }
         }
     }
-    for (row, _) in (72..152).enumerate() {
+    // The `(row - 72)` offset encodes the 8x10 MAC tile inside the 80-row
+    // window; iter_mut().enumerate() is a worse read here.
+    #[allow(clippy::needless_range_loop)]
+    for row in 72..152 {
         prep[row][F_MACJ + (row - 72) % 8] = Goldilocks::ONE;
         prep[row][F_MACI + (row - 72) / 8] = Goldilocks::ONE;
     }

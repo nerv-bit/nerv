@@ -252,7 +252,10 @@ mod tests {
                 }
             }
             // Every k-subset of rows inverts.
-            let mut subset = vec![0usize; k];
+            // `combine` checks `cur.len() == k` BEFORE pushing, so the
+            // initial buffer must be empty (otherwise the first call sees
+            // the pre-fill of zeros — a singular subset).
+            let mut subset: Vec<usize> = Vec::new();
             let mut ok = 0usize;
             let mut total = 0usize;
             let all: Vec<usize> = (0..n).collect();

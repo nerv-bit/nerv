@@ -19,6 +19,9 @@ nerv-crypto = { path = "../crates/nerv-crypto" }
 nerv-seal = { path = "../crates/nerv-seal" }
 nerv-net = { path = "../crates/nerv-net" }
 nerv-proofs = { path = "../crates/nerv-proofs" }
+nerv-codec = { path = "../crates/nerv-codec" }
+nerv-custody = { path = "../crates/nerv-custody" }
+nerv-da = { path = "../crates/nerv-da" }
 
 
 [[bin]]
@@ -56,6 +59,48 @@ bench = false
 [[bin]]
 name = "fold_dedup"
 path = "fuzz_targets/fold_dedup.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "nct"
+path = "fuzz_targets/nct.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "codec_w"
+path = "fuzz_targets/codec_w.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "square"
+path = "fuzz_targets/square.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sphinx_build"
+path = "fuzz_targets/sphinx_build.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ciphertext"
+path = "fuzz_targets/ciphertext.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fri"
+path = "fuzz_targets/fri.rs"
 test = false
 doc = false
 bench = false

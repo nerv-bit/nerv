@@ -64,6 +64,7 @@ pub(crate) enum ProducerMsg {
         payout_address_hex: String,
         stake_balance_nano: u64,
         account_id: [u8; 32],
+        shard: u64,
     },
     Failed(String),
 }
@@ -173,12 +174,14 @@ impl App {
                     payout_address_hex,
                     stake_balance_nano,
                     account_id,
+                    shard,
                 } => {
                     self.action(WalletAction::ProducerStakeRegistered {
                         verifying_key_hex,
                         payout_address_hex,
                         stake_balance_nano,
                         account_id,
+                        shard,
                     });
                     self.producer_pipeline = None;
                 }
@@ -307,12 +310,14 @@ impl App {
                     payout_address_hex,
                     stake_balance_nano,
                     account_id,
+                    shard,
                 }) => {
                     let _ = tx.send(ProducerMsg::Registered {
                         verifying_key_hex,
                         payout_address_hex,
                         stake_balance_nano,
                         account_id,
+                        shard,
                     });
                 }
                 Err(e) => {

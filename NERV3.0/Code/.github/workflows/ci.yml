@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    # Nightly long-tail gates (fuzz + full lib sweep) — Session 12 D1/D2.
+    - cron: '0 3 * * *'
 
 env:
   CARGO_TERM_COLOR: always
@@ -150,3 +153,116 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: target/${{ matrix.target }}/release/nerv-node*
+
+  # === D1: testnet CI gates (Session 12) ===
+
+  # Per-crate strict clippy: the canonical "tree is clippy-clean" gate.
+  # Runs on Windows (pwsh) and Linux (sh).
+  strict-clippy:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Strict clippy (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash tests/scripts/ci-strict-clippy.sh
+      - name: Strict clippy (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: pwsh -NoProfile -NonInteractive -File tests/scripts/ci-strict-clippy.ps1
+
+  # Quick regression gate: the 7 Session-9-cleaned crates' lib suites.
+  test-quick:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Quick regression gate (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash tests/scripts/ci-test-quick.sh
+      - name: Quick regression gate (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: pwsh -NoProfile -NonInteractive -File tests/scripts/ci-test-quick.ps1
+
+  # Full lib sweep: chunked per crate to fit the 8 GB box. Nightly only.
+  lib-sweep:
+    if: github.event_name == 'schedule'
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Full lib sweep (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash tests/scripts/ci-lib-sweep.sh
+      - name: Full lib sweep (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: pwsh -NoProfile -NonInteractive -File tests/scripts/ci-lib-sweep.ps1
+
+  # D4 criterion benches: nightly regression check. Baseline numbers were
+  # captured on a 16-GB Windows box (Session 13); 5%-over-baseline
+  # regression on any of the 5 production hot paths is the failure gate.
+  bench:
+    if: github.event_name == 'schedule'
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build all benches (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          cargo build --benches --ignore-rust-version \
+            -p nerv-seal -p nerv-codec -p nerv-net \
+            -p nerv-proofs -p nerv-state --features nerv-state/testkit
+      - name: Build all benches (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cargo build --benches --ignore-rust-version `
+            -p nerv-seal -p nerv-codec -p nerv-net `
+            -p nerv-proofs -p nerv-state --features nerv-state/testkit
+      - name: Run D4 benches
+        shell: bash
+        run: |
+          for B in ring_ntt build_leg_features sphinx witness_gen apply_block; do
+            case "$B" in
+              ring_ntt)            P=nerv-seal  ;;
+              build_leg_features)  P=nerv-codec ;;
+              sphinx)              P=nerv-net   ;;
+              witness_gen)         P=nerv-proofs ;;
+              apply_block)         P=nerv-state  FEAT=--features testkit ;;
+            esac
+            FEAT_ARG="${FEAT:-}"
+            cargo bench --ignore-rust-version --offline -p "$P" --bench "$B" $FEAT_ARG \
+              -- --warm-up-time 1 --measurement-time 1 --sample-size 10 \
+              | tee -a target/bench-output.log
+          done
+      - name: Upload bench log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-output-${{ matrix.os }}
+          path: target/bench-output.log

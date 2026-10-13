@@ -358,9 +358,6 @@ fn build_single_shard(
     // The recipient output.
     let (recipient_output, recipient_opening) =
         make_output(spec.amount_nano, &spec.recipient, entropy)?;
-    // Snapshot the recipient delivery for the leg's movement vector — we
-    // must keep `recipient_opening` owned for `output_openings` below.
-    let recipient_delivery = recipient_opening.delivery;
 
     // The change output (if any).
     let mut outputs = vec![recipient_output];
@@ -372,7 +369,17 @@ fn build_single_shard(
         output_openings.push(change_opening);
     }
 
-    // The movement for the feature vector.
+    // The movement for the feature vector. Each output's `delivery` is the
+    // `NoteOpening.delivery` for that output (the recipient's delivery for
+    // the recipient output, the change address's delivery for the change
+    // output) -- NOT the recipient's delivery for every entry. If we set the
+    // change output to the recipient's delivery, the feature vector assigns
+    // the change balance to the recipient's slot instead of the sender's,
+    // producing a different delta and therefore a different (u, v) than
+    // `TransactionWitness::generate` re-derives from the shell + openings.
+    // `prove_transaction`'s `check_ct_binding` then rejects with
+    // `CtMismatch { leg: 0 }` because the seal delta doesn't match the
+    // proven (u, v). erratum D.4.
     let movement = LegMovement {
         inputs: selected
             .iter()
@@ -380,9 +387,9 @@ fn build_single_shard(
                 (n.opening.delivery.to_vec(), n.opening.value)
             })
             .collect(),
-        outputs: outputs
+        outputs: output_openings
             .iter()
-            .map(|o| (recipient_delivery.to_vec(), o.value))
+            .map(|op| (op.delivery.to_vec(), op.value))
             .collect(),
         fee_nano: spec.fee_nano,
         kind: LegKind::SingleShard,
@@ -439,11 +446,13 @@ fn build_cross_shard(
 
     // The change output (on the spend shard).
     let mut spend_outputs = Vec::new();
+    let mut spend_output_opens = Vec::new();
     let mut output_openings = vec![recipient_opening];
     if change > 0 {
         let (change_output, change_opening) =
             make_output(change, &change_addr.address, entropy)?;
         spend_outputs.push(change_output);
+        spend_output_opens.push(change_opening.clone());
         output_openings.push(change_opening);
     }
 
@@ -451,15 +460,20 @@ fn build_cross_shard(
     let fee_spend = spec.fee_nano / 2;
     let fee_issue = spec.fee_nano - fee_spend;
 
-    // The spend leg's movement (inputs + change outputs).
+    // The spend leg's movement (inputs + change outputs). Each output's
+    // delivery is the change address's delivery, NOT the change address's
+    // EncapsulationKey bytes (which is what the prior code used) and not
+    // the recipient's delivery (which is the cross-shard escrow case). The
+    // movement must agree with `witness_gen::derive_movement` which reads
+    // `ow.opening.delivery` for each output. erratum D.4.
     let spend_movement = LegMovement {
         inputs: selected
             .iter()
             .map(|(_, n)| (n.opening.delivery.to_vec(), n.opening.value))
             .collect(),
-        outputs: spend_outputs
+        outputs: spend_output_opens
             .iter()
-            .map(|o| (change_addr.ek.as_bytes().to_vec(), o.value))
+            .map(|op| (op.delivery.to_vec(), op.value))
             .collect(),
         fee_nano: fee_spend,
         kind: LegKind::CrossShardSpend,
@@ -538,16 +552,19 @@ mod tests {
         w
     }
 
-    /// Build a wallet with `n` notes of `value` each on `shard`.
+    /// Build a wallet with `n` notes of `value` each, funded on the
+    /// wallet's first covered shard (which is returned). The covered-shard
+    /// grid is seed-dependent, so deriving it here — rather than hardcoding
+    /// a shard id — is robust to the deterministic address derivation.
     fn funded_wallet(
         seed: u64,
         n: usize,
         value: u64,
-        shard: ShardId,
-    ) -> (WalletKeys, AddressSet, WalletNoteSet, NctDigest, u64) {
+    ) -> (WalletKeys, AddressSet, WalletNoteSet, NctDigest, u64, ShardId) {
         let w = wallet(seed);
         let active = ShardSet::genesis();
         let addrs = AddressSet::generate(&w, &active).unwrap();
+        let shard = addrs.covered_shards()[0];
         let addr = addrs.addresses_for_shard(&shard).into_iter().next().unwrap();
 
         let mut wallet_ns = WalletNoteSet::new();
@@ -574,7 +591,7 @@ mod tests {
                 },
             );
         }
-        (w, addrs, wallet_ns, anchor, (n as u64) * value)
+        (w, addrs, wallet_ns, anchor, (n as u64) * value, shard)
     }
 
     fn test_entropy(seed: u64) -> impl FnMut() -> [u8; 32] {
@@ -584,20 +601,18 @@ mod tests {
 
     #[test]
     fn single_shard_construction() {
-        let shard = ShardSet::genesis().ids()[7];
-        let (w, addrs, notes, _anchor, _total) =
-            funded_wallet(0xC0, 3, 10_000_000_000, shard);
+        let (w, addrs, notes, _anchor, _total, shard) =
+            funded_wallet(0xC0, 3, 10_000_000_000);
         let active = ShardSet::genesis();
         let c = codec();
         let pk = epoch_pk();
 
-        // A recipient on the same shard.
-        let recipient_wallet = wallet(0xC1);
-        let recipient_addrs = AddressSet::generate(&recipient_wallet, &active).unwrap();
-        let recipient = recipient_addrs
+        // A recipient on the same shard: the wallet's own address on the
+        // funded shard (guaranteed same-shard by construction).
+        let recipient = addrs
             .addresses_for_shard(&shard)
             .into_iter()
-           .next()
+            .next()
             .unwrap();
 
         let spec = PaymentSpec {
@@ -646,17 +661,21 @@ mod tests {
 
     #[test]
     fn cross_shard_construction() {
-        let spend_shard = ShardSet::genesis().ids()[7];
-        let recv_shard = ShardSet::genesis().ids()[40];
-        let (w, addrs, notes, _anchor, _total) =
-            funded_wallet(0xC3, 2, 50_000_000_000, spend_shard);
+        let (w, addrs, notes, _anchor, _total, spend_shard) =
+            funded_wallet(0xC3, 2, 50_000_000_000);
         let active = ShardSet::genesis();
         let c = codec();
         let pk = epoch_pk();
 
-        // A recipient on a different shard.
+        // A recipient on a different shard: pick a recipient-wallet shard
+        // that is covered and distinct from the spend shard.
         let recipient_wallet = wallet(0xC4);
         let recipient_addrs = AddressSet::generate(&recipient_wallet, &active).unwrap();
+        let recv_shard = recipient_addrs
+            .covered_shards()
+            .into_iter()
+            .find(|s| *s != spend_shard)
+            .unwrap();
         let recipient = recipient_addrs
             .addresses_for_shard(&recv_shard)
             .into_iter()
@@ -677,16 +696,22 @@ mod tests {
 
         let canon = ctx.shell.canonicalize().unwrap();
         assert_eq!(canon.legs.len(), 2);
-        assert_eq!(canon.legs[0].shard, spend_shard);
-        assert_eq!(canon.legs[1].shard, recv_shard);
+        // Canonicalization sorts legs by shard id, so identify the spend
+        // (has inputs) and issue (no inputs) legs by shape, not position —
+        // the recipient shard is not guaranteed to be greater than the
+        // spend shard.
+        let spend_leg = canon.legs.iter().find(|l| !l.inputs.nullifiers.is_empty()).unwrap();
+        let issue_leg = canon.legs.iter().find(|l| l.inputs.nullifiers.is_empty()).unwrap();
+        assert_eq!(spend_leg.shard, spend_shard);
+        assert_eq!(issue_leg.shard, recv_shard);
 
         // The spend leg has inputs; the issue leg does not.
-        assert!(!canon.legs[0].inputs.nullifiers.is_empty());
-        assert!(canon.legs[1].inputs.nullifiers.is_empty());
+        assert!(!spend_leg.inputs.nullifiers.is_empty());
+        assert!(issue_leg.inputs.nullifiers.is_empty());
 
         // The issue leg's output is conditional with a revert_cm.
-        assert!(canon.legs[1].outputs[0].conditional);
-        assert!(canon.legs[1].outputs[0].revert_cm.is_some());
+        assert!(issue_leg.outputs[0].conditional);
+        assert!(issue_leg.outputs[0].revert_cm.is_some());
 
         // The custody witness has a revert witness.
         assert_eq!(ctx.custody_witness.reverts.len(), 1);
@@ -698,9 +723,8 @@ mod tests {
 
     #[test]
     fn insufficient_funds() {
-        let shard = ShardSet::genesis().ids()[7];
-        let (w, addrs, notes, _, total) =
-            funded_wallet(0xC6, 1, 1_000, shard);
+        let (w, addrs, notes, _, total, _shard) =
+            funded_wallet(0xC6, 1, 1_000);
         let active = ShardSet::genesis();
         let c = codec();
         let pk = epoch_pk();
@@ -721,9 +745,8 @@ mod tests {
 
     #[test]
     fn deterministic_construction() {
-        let shard = ShardSet::genesis().ids()[7];
-        let (w, addrs, notes, _, _) =
-            funded_wallet(0xC8, 2, 5_000_000_000, shard);
+        let (w, addrs, notes, _, _, _shard) =
+            funded_wallet(0xC8, 2, 5_000_000_000);
         let active = ShardSet::genesis();
         let c = codec();
         let pk = epoch_pk();

@@ -27,14 +27,27 @@ pub mod vectors;
 pub const SPEC_FILE: &str = "specs/params.toml";
 pub const VECTORS_DIR: &str = "specs/vectors";
 
-
+/// Cross-crate conformance tests for Phase C of `specs/road_to_testnet.md`.
+///
+/// Each submodule is the wired-up regression coverage for one of the six
+/// Phase C sub-phases:
+///   * `tx_lifecycle`        — C1a (deterministic-replay prove+apply) and C1b
+///                              (full mixnet path, scaffolded with `#[ignore]`
+///                              for C3).
+///   * `cross_shard_escrow`  — C2 (conditional-output → claim end-to-end).
+///   * `mixnet_path`         — C3 (5-relay aggregator decode).
+///   * `da_sampling`         — C4 (DA round-trip + sample).
+///   * `qc_collection`       — C5 (15-of-21 assembly + equivocation rejection).
+///   * `epoch_rotation`      — C6 (committee rotation across one epoch).
+///
+/// Plus the pre-existing cross-cutting conformance tests for spec/registry/
+/// encoding coverage.
+///
+/// The harness is intentionally explicit and deterministic — every
+/// cryptographic object is a real `nerv-crypto` / `nerv-custody` value,
+/// never a hand-computed stub. The shared helpers
+/// (`testkit::TestWorld`, `testkit::seal`, `testkit::register_tau`, …)
+/// come from `nerv_state::testkit`, enabled via the `testkit` feature on
+/// the `nerv-state` dev-dependency in `Cargo.toml`.
 #[cfg(test)]
-mod tests {
-    #[test]
-    fn conformance_crate_loads() {
-        // The crate itself is the conformance surface; integration
-        // tests across crates live in their owning crates' `tests/`
-        // directories and in `crates/nerv-knowledge/tests/firewall.rs`.
-        assert!(true);
-    }
-}
+mod tests;

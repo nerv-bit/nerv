@@ -759,8 +759,8 @@ fn delta_prep(air: &TxAir, w: &CodecW) -> Vec<Vec<Goldilocks>> {
     }
     prep[fr][PV_FINAL] = Goldilocks::ONE;
     for l in 0..n {
-        for (r, _) in ((ROWS_PER_LEG * l)..(ROWS_PER_LEG * (l + 1))).enumerate() {
-            prep[r][PV_TIE + TIE_STRIDE * n + l] = Goldilocks::ONE;
+        for row in prep.iter_mut().skip(ROWS_PER_LEG * l).take(ROWS_PER_LEG) {
+            row[PV_TIE + TIE_STRIDE * n + l] = Goldilocks::ONE;
         }
     }
     for l in 0..n {
@@ -872,6 +872,9 @@ fn seal_prep(epoch_pk: &PublicKey) -> Result<Vec<Vec<Goldilocks>>, SealError> {
             }
         }
     }
+    // The `(row - 72)` offset encodes the 8x10 MAC tile inside the 80-row
+    // window; iter_mut().enumerate() is a worse read here.
+    #[allow(clippy::needless_range_loop)]
     for row in 72..152 {
         prep[row][F_MACJ + (row - 72) % 8] = Goldilocks::ONE;
         prep[row][F_MACI + (row - 72) / 8] = Goldilocks::ONE;

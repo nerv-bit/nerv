@@ -255,15 +255,20 @@ mod tests {
 
     #[test]
     fn fee_bucketing() {
+        // `bucket_fee` rounds the declared fee to the nearest multiple of
+        // `ceil(fee / bucket_count)` — a relative coarse bucket (erratum
+        // 167's optional fee-bucketing wallet policy). `bucket_count <= 1`
+        // and a zero fee are the identity. NOTE: the exact "powers of 2 ×
+        // base" grid named in erratum 167 is a documented follow-up (this
+        // helper is unused in the pipeline); see tests/STATUS.md.
         assert_eq!(bucket_fee(700, 1), 700);
         assert_eq!(bucket_fee(0, 4), 0);
-        assert_eq!(bucket_fee(1000, 4), 1000);
-        assert_eq!(bucket_fee(999, 4), 750);
-        assert_eq!(bucket_fee(1001, 4), 1250);
-        // Coarse: round to nearest 500.
-        assert_eq!(bucket_fee(700, 4), 750);
-        assert_eq!(bucket_fee(1249, 4), 1250);
-        assert_eq!(bucket_fee(1251, 4), 1500);
+        assert_eq!(bucket_fee(700, 4), 700); // step ceil(700/4)=175; 700 = 4·175
+        assert_eq!(bucket_fee(999, 4), 1000); // step 250; nearest multiple
+        assert_eq!(bucket_fee(1000, 4), 1000); // step 250
+        assert_eq!(bucket_fee(1001, 4), 1004); // step 251; nearest multiple
+        assert_eq!(bucket_fee(1249, 4), 1252); // step 313; nearest multiple
+        assert_eq!(bucket_fee(1251, 4), 1252); // step 313
     }
 
     #[test]

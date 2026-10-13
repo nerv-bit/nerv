@@ -35,6 +35,92 @@ pub const MIX_PACKET_TAG: u8 = 4;
 pub const MIX_FRAGMENT_TAG: u8 = 5;
 pub const FRAG_CLASSES: [usize; 5] = [1, 2, 4, 8, 16];
 
+// ---------------------------------------------------------------------------
+// Public conformance-test helpers (C3, see
+// `tests/nerv-conformance/src/tests/mixnet_path.rs`).
+//
+// `testutil` is `#[cfg(test)]` so the conformance crate cannot reach into
+// it directly. These thin public wrappers duplicate the test-helper logic
+// that C3 needs; both `sphinx::tests` and the conformance crate use them.
+// ---------------------------------------------------------------------------
+
+/// Splitmix64 PRNG, the public mirror of `crate::testutil::SplitMix64`.
+/// Used by `relays` and `encap_rand` to derive deterministic keys and
+/// per-hop randomness from a single seed.
+#[derive(Clone)]
+pub struct SplitMix64 {
+    state: u64,
+}
+
+impl SplitMix64 {
+    /// Build a SplitMix64 PRNG with the given seed.
+    pub fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
+    /// Draw a u64.
+    pub fn next_u64(&mut self) -> u64 {
+        self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = self.state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^ (z >> 31)
+    }
+}
+
+/// Build a `(SigningKey, KEM (EncapsulationKey, DecapsulationKey))` triple
+/// from a single seed — public mirror of `crate::testutil::node_keys`.
+/// Conformance C3 uses this through `relays`; tests of any peer crate
+/// can use the same surface.
+#[allow(clippy::unwrap_used)] // keypair_from_seed + SigningKey::from_seed are infallible on a 32-byte seed
+pub fn node_keys(
+    seed: u64,
+) -> (
+    nerv_crypto::mldsa::SigningKey,
+    nerv_crypto::mlkem::EncapsulationKey,
+    nerv_crypto::mlkem::DecapsulationKey,
+) {
+    let mut rng = SplitMix64::new(seed);
+    let mut sign_seed = [0u8; 32];
+    for c in sign_seed.chunks_mut(8) {
+        c.copy_from_slice(&rng.next_u64().to_le_bytes());
+    }
+    let mut kem_seed = [0u8; 64];
+    for c in kem_seed.chunks_mut(8) {
+        c.copy_from_slice(&rng.next_u64().to_le_bytes());
+    }
+    let (ek, dk) = nerv_crypto::mlkem::keypair_from_seed(&kem_seed).unwrap();
+    (nerv_crypto::mldsa::SigningKey::from_seed(&sign_seed).unwrap(), ek, dk)
+}
+
+/// Build `n` deterministic relays (peer id + KEM keys) from a single
+/// seed. Public mirror of the in-crate `sphinx::tests::relays` helper.
+///
+/// C3 (`tests/nerv-conformance/src/tests/mixnet_path.rs`) uses this to
+/// pin the public mixnet surface end-to-end.
+pub fn relays(n: usize, seed: u64) -> Vec<(PeerId, EncapsulationKey, DecapsulationKey)> {
+    (1..=n as u64)
+        .map(|i| {
+            let (sk, ek, dk) = node_keys(seed.wrapping_add(i));
+            (PeerId::of(sk.verifying_key()), ek, dk)
+        })
+        .collect()
+}
+
+/// Build a deterministic per-hop encapsulation randomness array for a
+/// `PATH_RELAYS`-hop packet, drawn from `seed`. Public mirror of the
+/// in-crate `sphinx::tests::encap_rand` helper so conformance C3 can
+/// drive `sphinx::build` end-to-end.
+pub fn encap_rand(seed: u64) -> [[u8; ENCAPS_LEN]; PATH_RELAYS] {
+    let mut rng = SplitMix64::new(seed);
+    let mut out = [[0u8; ENCAPS_LEN]; PATH_RELAYS];
+    for slot in &mut out {
+        for c in slot.chunks_exact_mut(8) {
+            c.copy_from_slice(&rng.next_u64().to_le_bytes());
+        }
+    }
+    out
+}
+
 const ACTION_RELAY: u8 = 0;
 const ACTION_DELIVER: u8 = 1;
 const ACTION_DROP: u8 = 2;

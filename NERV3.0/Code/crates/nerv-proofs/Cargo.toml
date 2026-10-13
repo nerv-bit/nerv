@@ -18,6 +18,11 @@ rayon = { workspace = true }
 [dev-dependencies]
 blake3 = { workspace = true }
 proptest = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "witness_gen"
+harness = false
 
 [lints]
 workspace = true

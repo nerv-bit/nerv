@@ -537,8 +537,8 @@ const _: () = assert!(
     BUDGETS_CI_WALLET_PROOF_TARGET_BYTES <= BUDGETS_CI_WALLET_PROOF_HARD_BYTES,
     "wallet proof-size target <= ceiling (D.2)"
 );
-const _: () = assert!(PROOFS_FRI_POSEIDON2_T == 16, "Poseidon2 state width (§5.3)");
-const _: () = assert!(PROOFS_FRI_POSEIDON2_FULL_ROUNDS % 2 == 0, "Poseidon2 full rounds split evenly");
-const _: () = assert!(PROOFS_FRI_POSEIDON2_SBOX_DEGREE == 7, "Poseidon2 S-box degree");
+const _: () = assert!(PROOFS_POSEIDON2_T == 16, "Poseidon2 state width (§5.3)");
+const _: () = assert!(PROOFS_POSEIDON2_FULL_ROUNDS % 2 == 0, "Poseidon2 full rounds split evenly");
+const _: () = assert!(PROOFS_POSEIDON2_SBOX_DEGREE == 7, "Poseidon2 S-box degree");
 "#;
 

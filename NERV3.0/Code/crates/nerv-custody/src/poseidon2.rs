@@ -17,19 +17,19 @@ use nerv_core::constants::{NCT_EMPTY, NCT_LEAF, NCT_NODE, POSEIDON2};
 use nerv_core::field::Goldilocks;
 use nerv_core::hash::Xof;
 use nerv_core::params::{
-    PROOFS_FRI_POSEIDON2_FULL_ROUNDS, PROOFS_FRI_POSEIDON2_PARTIAL_ROUNDS,
-    PROOFS_FRI_POSEIDON2_SBOX_DEGREE, PROOFS_FRI_POSEIDON2_T,
+    PROOFS_POSEIDON2_FULL_ROUNDS, PROOFS_POSEIDON2_PARTIAL_ROUNDS,
+    PROOFS_POSEIDON2_SBOX_DEGREE, PROOFS_POSEIDON2_T,
 };
 
-pub const T: usize = PROOFS_FRI_POSEIDON2_T as usize;
-pub const FULL_ROUNDS: usize = PROOFS_FRI_POSEIDON2_FULL_ROUNDS as usize;
-pub const PARTIAL_ROUNDS: usize = PROOFS_FRI_POSEIDON2_PARTIAL_ROUNDS as usize;
+pub const T: usize = PROOFS_POSEIDON2_T as usize;
+pub const FULL_ROUNDS: usize = PROOFS_POSEIDON2_FULL_ROUNDS as usize;
+pub const PARTIAL_ROUNDS: usize = PROOFS_POSEIDON2_PARTIAL_ROUNDS as usize;
 pub const ROUNDS: usize = FULL_ROUNDS + PARTIAL_ROUNDS;
 
 const _: () = assert!(T == 16);
 const _: () = assert!(FULL_ROUNDS >= 2 && FULL_ROUNDS % 2 == 0);
 const _: () = assert!(PARTIAL_ROUNDS >= 1);
-const _: () = assert!(PROOFS_FRI_POSEIDON2_SBOX_DEGREE == 7);
+const _: () = assert!(PROOFS_POSEIDON2_SBOX_DEGREE == 7);
 const HALF: usize = FULL_ROUNDS / 2;
 
 static ROUND_CONSTANTS: OnceLock<Vec<[Goldilocks; T]>> = OnceLock::new();

@@ -291,12 +291,17 @@ impl Square {
 impl Encode for Square {
     fn encode_into(&self, out: &mut Vec<u8>) {
         out.extend_from_slice(&(self.k as u16).to_le_bytes());
+        // Cell-count prefix: decode_from reads it via `read_seq_len` (u32),
+        // then validates `n == w * w`. Without this prefix decode parses
+        // the first cell's bytes as the count, producing a codec mismatch
+        // on every roundtrip.
+        out.extend_from_slice(&(self.cells.len() as u32).to_le_bytes());
         for c in &self.cells {
             out.extend_from_slice(c);
         }
     }
     fn encoded_len(&self) -> usize {
-        2 + self.cells.len() * CHUNK_LEN
+        2 + 4 + self.cells.len() * CHUNK_LEN
     }
 }
 
@@ -621,14 +626,18 @@ mod tests {
         let d = data(2, 5 * CHUNK_LEN);
         let set = BlobSet::encode(shard(), Height::from_u64(9), &d).unwrap();
         assert_eq!(set.blob_count(), 1);
+        // 5 chunks need k=4 (4×4=16 ≥ 5). The square is the 2k×2k
+        // extended form (erratum 140), so width is 8.
+        assert_eq!(set.square(0).k(), 4);
+        assert_eq!(set.square(0).width(), 8);
         let c = set.commitment();
         assert_eq!(c.blob_count(), 1);
-        assert_eq!(c.width_of(0).unwrap(), 4);
+        assert_eq!(c.width_of(0).unwrap(), 8);
         assert_eq!(c.data_lens, vec![d.len() as u32]);
         assert_eq!(c.root(), set.commitment().root());
         // Every cell authenticates through both paths.
-        for r in 0..4 {
-            for col in 0..4 {
+        for r in 0..8 {
+            for col in 0..8 {
                 let auth = set.cell_auth(0, r, col);
                 assert!(auth.verify(&c), "cell ({r},{col})");
             }
@@ -643,8 +652,9 @@ mod tests {
         let mut m = c.clone();
         m.height = Height::from_u64(10);
         assert_ne!(c.root(), m.root());
+        // Mutating the width to a different valid value must change the root.
         let mut m = c.clone();
-        m.widths[0] = 8;
+        m.widths[0] = 16;
         assert_ne!(c.root(), m.root());
     }
 

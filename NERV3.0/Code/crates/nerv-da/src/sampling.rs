@@ -94,11 +94,15 @@ impl Encode for CellAuth {
         out.extend_from_slice(&self.row.to_le_bytes());
         out.extend_from_slice(&self.col.to_le_bytes());
         out.extend_from_slice(self.row_root.as_bytes());
+        // Order matches Decode: row_path_len, row_path, blob_path_len, blob_path, chunk.
         out.extend_from_slice(&(self.row_path.len() as u32).to_le_bytes());
-        for h in self.row_path.iter().chain(&self.blob_path) {
+        for h in &self.row_path {
             out.extend_from_slice(h.as_bytes());
         }
         out.extend_from_slice(&(self.blob_path.len() as u32).to_le_bytes());
+        for h in &self.blob_path {
+            out.extend_from_slice(h.as_bytes());
+        }
         out.extend_from_slice(&self.chunk);
     }
     fn encoded_len(&self) -> usize {

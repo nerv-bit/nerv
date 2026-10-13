@@ -159,6 +159,15 @@ pub struct CustodySpec {
     pub note_aead: String,
     pub commitment_hash: String,
     pub nullifier_hash: String,
+    // D.3 expiry + per-tx structural caps (Session 10: the spec
+    // validator previously rejected these with `deny_unknown_fields`
+    // because the fields were pinned in `params.toml` but not in this
+    // type). The TOML keeps them under [custody] for narrative
+    // locality — these are custody-layer policy.
+    #[serde(flatten)]
+    pub d3_expiry: D3ExpirySpec,
+    #[serde(flatten)]
+    pub tx_caps: TxCapsSpec,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -166,6 +175,11 @@ pub struct CustodySpec {
 pub struct ProofsSpec {
     pub system: String,
     pub field: String,
+    /// Field modulus. The TOML keeps this as a string because the
+    /// Goldilocks prime (2^64 - 2^32 + 1) exceeds i64::MAX, and the
+    /// `toml` crate's default i64 deserializer would reject the literal.
+    /// We accept either a string or a u64; both deserialize to u64.
+    #[serde(deserialize_with = "deserialize_u64_string_or_int")]
     pub field_modulus: u64,
     pub fri_security_bits: u64,
     pub fiat_shamir_hash: String,
@@ -178,6 +192,8 @@ pub struct ProofsSpec {
     pub poseidon2_full_rounds: u64,
     pub poseidon2_partial_rounds: u64,
     pub poseidon2_sbox_degree: u64,
+    // `[proofs.fri]` subsection (chunk 12.5's frozen FRI config).
+    pub fri: FriConfigSpec,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -222,6 +238,10 @@ pub struct SealSpec {
     pub threshold_t: u64,
     pub chunk_min: u64,
     pub chunk_max: u64,
+    pub dkg_noise_eta: u64,
+    pub sigma_challenge_weight: u64,
+    pub sigma_uniform_log2: u64,
+    pub sigma_attempt_cap: u64,
     pub security_classical_bits: u64,
     pub security_quantum_bits: u64,
     pub pss: bool,
@@ -396,6 +416,34 @@ pub struct Erratum {
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct D3ExpirySpec {
+    pub d3_expiry_min_blocks_t_min: u64,
+    pub d3_expiry_max_blocks_t_max: u64,
+    pub d3_expiry_grace_blocks_l_grace: u64,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TxCapsSpec {
+    pub max_inputs_per_leg: u64,
+    pub max_outputs_per_leg: u64,
+    pub max_legs_per_tx: u64,
+    pub max_burns_per_leg: u64,
+    pub ct_max_bytes: u64,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FriConfigSpec {
+    pub log_blowup: u64,
+    pub num_queries: u64,
+    pub log_final_poly_len: u64,
+    pub commit_pow_bits: u64,
+    pub query_pow_bits: u64,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Spec {
     pub meta: MetaSpec,
     pub protocol: ProtocolSpec,
@@ -415,6 +463,26 @@ pub struct Spec {
     pub budgets: BudgetsSpec,
     pub conformance: ConformanceSpec,
     pub errata: Vec<Erratum>,
+}
+
+/// Deserialize a `u64` from a TOML value that may be either a string
+/// (because the value exceeds i64::MAX and the TOML authors wrote it
+/// as a quoted literal) or a plain integer. Used for
+/// `ProofsSpec::field_modulus` (the Goldilocks prime, 2^64 - 2^32 + 1,
+/// which exceeds i64::MAX = 2^63 - 1).
+fn deserialize_u64_string_or_int<'de, D>(de: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::{Deserialize, Error};
+    let v = toml::Value::deserialize(de).map_err(D::Error::custom)?;
+    match v {
+        toml::Value::String(s) => s.parse::<u64>().map_err(D::Error::custom),
+        toml::Value::Integer(i) => u64::try_from(i).map_err(D::Error::custom),
+        other => Err(D::Error::custom(format!(
+            "expected u64 (string or int), got {other:?}"
+        ))),
+    }
 }
 
 strict!(Spec);
@@ -508,7 +576,7 @@ impl Spec {
             "proofs: Fiat–Shamir is BLAKE3 in the QROM — the named assumption (§5.7)");
         check!(v, s.proofs.lookup_blake3_window_bits == 16, "proofs.lookup_blake3_window_bits must be 16 (D.2)");
         check!(v, s.proofs.range_window_bits == 60, "proofs.range_window_bits must be 60 (value ranges)");
-        check!(v, s.proofs.digit_decomposition_bits == 10, "proofs.digit_decomposition_bits must be 10 (seal digits)");
+        check!(v, s.proofs.digit_decomposition_bits == 8, "proofs.digit_decomposition_bits must be 8 (erratum 40: matches seal.digit_bits)");
            check!(v, s.proofs.poseidon2_t == 16, "proofs: Poseidon2 state width is t = 16 (§5.3)");
         check!(v, s.proofs.poseidon2_full_rounds >= 2 && s.proofs.poseidon2_full_rounds % 2 == 0,
             "proofs: Poseidon2 full rounds must be even (split half at each end)");
@@ -561,7 +629,7 @@ impl Spec {
         check!(v, s.seal.digits_used == s.overlay.embedding_dims * s.seal.digits_per_coordinate,
             "seal: digits_used must equal 64 coordinates × 7 digits = 448 (§6.3.1)");
         check!(v, s.seal.digits_used <= s.seal.digit_slots, "seal: digits_used exceeds slots");
-        check!(v, s.seal.digit_bits == 10, "seal.digit_bits must be 10 (§6.3.8)");
+        check!(v, s.seal.digit_bits == 8, "seal.digit_bits must be 8 (erratum 40 supersedes §6.3.8's 10-bit)");
         // D.2/D.6 noise headroom (§6.3.8): worst-case digit sums + noise margin below q/2.
         let scale = 1u64 << s.seal.scale_log2;
         let digit_max = (1u64 << s.seal.digit_bits) - 1;
@@ -571,13 +639,13 @@ impl Spec {
             .and_then(|x| x.checked_mul(digit_max))
             .and_then(|x| x.checked_add(noise_bound));
         check!(v, matches!(headroom, Some(h) if h < (q - 1) / 2),
-            "seal: noise headroom violated — scale·chunk_max·(2^10-1) + 2^noise_budget must stay below (q-1)/2 (§6.3.8)");
+            "seal: noise headroom violated — scale·chunk_max·(2^8-1) + 2^noise_budget must stay below (q-1)/2 (erratum 40, 8-bit digits)");
         check!(v, s.seal.noise_eta == 2, "seal.noise_eta must be 2 (binomial, §6.3.8)");
         check!(v, s.seal.noise_in_circuit_bound == 3, "seal: 3σ in-circuit bound; CB(η=2) has σ=1 (§6.3.7)");
         check!(v, s.seal.threshold_t <= s.seal.committee_n, "seal: threshold exceeds committee (E-003)");
         check!(v, s.seal.chunk_min <= s.seal.chunk_max, "seal: chunk bounds inverted");
         check!(v, s.seal.chunk_min == 128, "seal.chunk_min must be 128 (B_min, §6.4)");
-        check!(v, s.seal.chunk_max == 512, "seal.chunk_max must be 512 (noise ceiling)");
+        check!(v, s.seal.chunk_max == 128, "seal.chunk_max must be 128 (erratum 40: the closable point at 32-bit q)");
         check!(v, s.seal.security_classical_bits >= 128 && s.seal.security_quantum_bits >= 96,
             "seal: advisory-tier security is ≥128-bit classical / ≥96-bit quantum (§6.3.8)");
         check!(v, s.seal.pss, "seal: D.1 requires proactive secret sharing at epoch boundaries");

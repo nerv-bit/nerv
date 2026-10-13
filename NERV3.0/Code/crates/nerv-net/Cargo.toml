@@ -30,6 +30,11 @@ blake3 = { workspace = true }
 nerv-custody = { path = "../nerv-custody" }
 nerv-codec = { path = "../nerv-codec" }
 nerv-proofs = { path = "../nerv-proofs" }
+criterion = { workspace = true }
+
+[[bench]]
+name = "sphinx"
+harness = false
 
 
 [lints]

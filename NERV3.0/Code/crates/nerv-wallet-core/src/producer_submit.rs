@@ -44,6 +44,9 @@ pub enum ProducerSubmitResult {
         stake_balance_nano: u64,
         /// Consensus-ledger account id (BLAKE3 of `SLASH || vk_bytes`).
         account_id: [u8; 32],
+        /// The shard the producer registered for (echoed back so the
+        /// platform shell can populate `ProducerState::assigned_shard`).
+        shard: u64,
     },
 }
 
@@ -148,6 +151,7 @@ pub fn register_producer_stake(
         payout_address_hex: payout_hex,
         stake_balance_nano: balance,
         account_id,
+        shard: shard_id_value,
     })
 }
 
@@ -172,11 +176,13 @@ mod tests {
                 verifying_key_hex,
                 payout_address_hex,
                 account_id,
+                shard,
             } => {
                 assert_eq!(stake_balance_nano, 1_000_000);
                 assert!(!verifying_key_hex.is_empty());
                 assert!(!payout_address_hex.is_empty());
                 assert_ne!(account_id, [0u8; 32]);
+                assert_eq!(shard, 0);
             }
         }
     }
