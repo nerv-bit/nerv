@@ -1,4 +1,8 @@
 //! Criterion bench for `nerv-codec::features::build_leg_features`.
+// Bench harnesses call deterministic operations with fixtures they fully
+// control, so a panic on `unwrap` is the appropriate failure mode for
+// the bench itself — production code never sees these.
+#![allow(clippy::unwrap_used, clippy::clone_on_copy, clippy::expect_used)]
 //!
 //! Per D4 §12.3: the leg-feature builder is on the per-block hot path (every
 //! leg of every transaction re-encodes its own `FeatureVector`). The

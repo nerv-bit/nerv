@@ -1,4 +1,8 @@
 //! Criterion bench for `nerv_net::sphinx::build` and `peel`.
+// Bench harnesses call deterministic operations with fixtures they fully
+// control, so a panic on `unwrap`/`expect` is the appropriate failure mode
+// for the bench itself — production code never sees these.
+#![allow(clippy::unwrap_used, clippy::clone_on_copy, clippy::expect_used)]
 //!
 //! Per D4 §12.3: the Sphinx packet build is on every submission fan-out's
 //! hot path, and `peel` runs on every inbound packet. The 5-relay

@@ -1,4 +1,8 @@
 //! Criterion bench for `nerv_proofs::witness_gen::TransactionWitness::generate`.
+// Bench harnesses call deterministic operations with fixtures they fully
+// control, so a panic on `unwrap`/`expect` is the appropriate failure mode
+// for the bench itself — production code never sees these.
+#![allow(clippy::unwrap_used, clippy::clone_on_copy, clippy::expect_used)]
 //!
 //! Per D4 §12.3: this is the per-transaction witness assembler that runs
 //! before any STARK prove. It binds the custody witness to the shell,

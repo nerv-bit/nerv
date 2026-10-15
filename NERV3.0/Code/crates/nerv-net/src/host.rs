@@ -435,8 +435,18 @@ mod tests {
     }
 
 
+    // Per-receive timeout. Generous on purpose: the two test crates that
+    // run immediately before this file in ci-test-quick are nerv-state
+    // (73 tests, ~357 s of CPU) and nerv-registry (proptest, ~370 s); on an
+    // 8 GB Windows box that load is enough to make a 5 s `tokio::time::timeout`
+    // trip on the simultaneous-dial race below, even though the production
+    // dial path itself completes in single-digit ms on a cold box (verified
+    // by running this test in isolation: 3/3 pass in 0.08–0.09 s each).
+    // 15 s leaves ~30 s × 4 iterations of headroom for `both_sides_dial_simultaneously`
+    // while staying well below any reasonable CI timeout. This is a test-only
+    // helper; production code uses tokio's own connect timeouts.
     async fn next_event(rx: &mut mpsc::Receiver<HostEvent>) -> HostEvent {
-        tokio::time::timeout(Duration::from_secs(5), rx.recv())
+        tokio::time::timeout(Duration::from_secs(15), rx.recv())
             .await
             .expect("event timeout")
             .expect("event channel open")
@@ -525,6 +535,11 @@ mod tests {
     }
 
 
+    // Whitepaper §6.2 simultaneous-dial property: when two nodes both initiate
+    // at once, the connection still ends up established with the right peer
+    // keys. This test is load-sensitive — see `next_event` above for why the
+    // per-receive budget is 15 s rather than 5 s. Re-runs cleanly (0.08 s) on
+    // a cold box; was the S13 flake under nerv-state/nerv-registry load.
     #[tokio::test]
     async fn both_sides_dial_simultaneously() {
         let (cfg_a, vk_a, ek_a) = host_setup(1, true);
